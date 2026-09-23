@@ -51,6 +51,7 @@ jobs:
       - name: Configure native build and test concurrency
         run: |
           python3 -m unittest discover -s scripts -p 'test_ci_resources.py'
+          python3 -m unittest discover -s scripts -p 'test_coverage_badge.py'
           python3 scripts/ci-resources.py --test-threads
 
       - name: Check README and run workspace CI with coverage
@@ -70,6 +71,8 @@ jobs:
           mkdir -p target/coverage
           cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
           cargo llvm-cov report --html --output-dir target/coverage
+          cargo llvm-cov report --json --summary-only --output-path target/coverage/summary.json
+          python3 scripts/coverage_badge.py target/coverage/summary.json target/coverage/badge.svg
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7
@@ -161,6 +164,13 @@ jobs:
 
       - name: Check sample path comparison boundaries (CPU only)
         run: node --test integrations/example-engine-host/scripts/path-pixels.test.mjs
+
+      - name: Include coverage badge and report in Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/download-artifact@v8
+        with:
+          name: rust-coverage
+          path: crates/fresco-wasm/web/dist/coverage
 
       - name: Upload tested site for Pages
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

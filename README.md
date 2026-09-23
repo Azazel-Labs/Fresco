@@ -1,6 +1,7 @@
 # Fresco
 
 [![CI](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml)
+[![Rust line coverage](https://azazel-labs.github.io/Fresco/coverage/badge.svg)](https://azazel-labs.github.io/Fresco/coverage/html/index.html)
 [![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://azazel-labs.github.io/Fresco/)
 
 > [!CAUTION]
@@ -1273,6 +1274,9 @@ Local `xtask` commands default to half the available CPUs; set
 The native CI job runs `ci-strict` with LLVM instrumentation, collecting coverage
 from its existing workspace test run. It uploads HTML and LCOV reports as the
 `rust-coverage` artifact on the CI run; no separate coverage test run is needed.
+Successful `main` deployments publish the measured Rust line-coverage badge and
+HTML report alongside the playground. The README coverage badge links to that
+report and reflects the latest deployed run; pull requests do not update it.
 The CI badge reports workflow status, not a coverage percentage. Coverage covers
 native Rust execution, separate from browser and hardware GPU execution checks;
 doctests still run, but their coverage is not collected on the stable toolchain.
