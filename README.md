@@ -1,7 +1,7 @@
 # Fresco
 
 [![CI](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml)
-[![Rust line coverage](https://azazel-labs.github.io/Fresco/coverage/badge.svg)](https://azazel-labs.github.io/Fresco/coverage/html/index.html)
+[![Coverage](https://azazel-labs.github.io/Fresco/coverage/badge.svg)](https://azazel-labs.github.io/Fresco/coverage/html/index.html)
 [![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://azazel-labs.github.io/Fresco/)
 
 **[Language guide](LANGUAGE.md) · [Roadmap and TODO](TODO.md)**
