@@ -6,6 +6,41 @@
 
 **[Language guide](LANGUAGE.md) · [Roadmap and TODO](TODO.md)**
 
+<details>
+<summary><strong>Contents</strong></summary>
+
+- [What you can build](#what-you-can-build)
+- [How Fresco extends](#how-fresco-extends)
+- [Why Fresco exists](#why-fresco-exists)
+- [Where Fresco fits](#where-fresco-fits)
+- [A first picture](#a-first-picture)
+- [Why Fresco is useful](#why-fresco-is-useful)
+- [Language tour](#language-tour)
+  - [Shapes, ink, and layers](#shapes-ink-and-layers)
+  - [Parameters and gradients](#parameters-and-gradients)
+  - [Spaces: transform the composition](#spaces-transform-the-composition)
+  - [Perspective card flip](#perspective-card-flip)
+  - [Motion and repetition](#motion-and-repetition)
+  - [Effects, blending, and cost](#effects-blending-and-cost)
+  - [Functions and reusable expressions](#functions-and-reusable-expressions)
+  - [Textures and explicit sampling](#textures-and-explicit-sampling)
+  - [Typed data textures, channels, and decoding](#typed-data-textures-channels-and-decoding)
+  - [Typed resources and their sources](#typed-resources-and-their-sources)
+  - [Mesh materials](#mesh-materials)
+  - [Surface styles: Toon lighting and an outline](#surface-styles-toon-lighting-and-an-outline)
+  - [Particle systems: simulated flame, smoke, and embers](#particle-systems-simulated-flame-smoke-and-embers)
+- [How compilation works](#how-compilation-works)
+- [Engines can author the rendering contract](#engines-can-author-the-rendering-contract)
+  - [Integrating an engine, from source files to a draw](#integrating-an-engine-from-source-files-to-a-draw)
+- [Run locally](#run-locally)
+  - [Compile a program](#compile-a-program)
+  - [Run the playground](#run-the-playground)
+  - [Explore the examples](#explore-the-examples)
+- [Current scope and limits](#current-scope-and-limits)
+- [Working on Fresco](#working-on-fresco)
+
+</details>
+
 > [!CAUTION]
 > **Work in progress: the language is not stable.**
 >
