@@ -1,0 +1,29 @@
+// The host supplies an ORM-packed data texture: these channels are not RGB color.
+texture_type SurfaceData {
+    r: occlusion
+    g: roughness
+    b: metallic
+}
+
+texture_type DetailNormal -> vec3 in tangent {
+    r: nx = raw * 2.0 - 1.0
+    g: ny = raw * 2.0 - 1.0
+    b: nz = raw * 2.0 - 1.0
+    return normalize(vec3(nx, ny, nz))
+}
+
+surface typed_texture_data(sp: surf) -> material {
+    param data: texture<SurfaceData> = "project/surface.orm.png"
+    param normals: texture<DetailNormal> = "assets/textures/wood_floor/normal_tangent_y_plus.jpg"
+
+    let properties = data.at(sp.uv)
+    let normal = normals.at(sp.uv)
+    compose {
+        base(
+            albedo: #b98958,
+            occlusion: properties.occlusion,
+            roughness: properties.roughness,
+            metallic: properties.metallic,
+            normal_map: normal)
+    }
+}

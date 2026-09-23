@@ -67,6 +67,11 @@
       "alt": "Host-supplied brick texture beneath a white circle outline"
     },
     {
+      "id": "typed_texture_data",
+      "source": "examples/40) surface shaders/typed_texture_data.fr",
+      "preview": false
+    },
+    {
       "id": "uv_material",
       "source": "examples/40) surface shaders/uv_material.fr",
       "alt": "UV-colored material on the engine mesh preview"

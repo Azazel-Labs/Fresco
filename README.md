@@ -4,6 +4,8 @@
 [![Rust line coverage](https://azazel-labs.github.io/Fresco/coverage/badge.svg)](https://azazel-labs.github.io/Fresco/coverage/html/index.html)
 [![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://azazel-labs.github.io/Fresco/)
 
+**[Language guide](LANGUAGE.md) · [Roadmap and TODO](TODO.md)**
+
 > [!CAUTION]
 > **Work in progress: the language is not stable.**
 >
@@ -640,6 +642,104 @@ This program needs the host to bind `image` before rendering. The
 [image texture example](<examples/20) techniques/image_texture.fr>) adds a
 playground asset binding and color processing. Texture sampling belongs to the
 program; loading assets and supplying GPU textures belongs to the host.
+
+### Typed data textures, channels, and decoding
+
+A texture can contain roughness, depth, a direction, or packed simulation data.
+`texture_type` declares what its samples mean: names for stored channels, how to
+decode them, and optionally the type of value returned by sampling. Engines and
+libraries can define this vocabulary once and share it with content authors.
+
+Here, one texture carries three material properties. Another decodes stored
+components into a normal tagged with its coordinate space:
+
+<!-- readme:sample typed_texture_data -->
+```fresco
+// The host supplies an ORM-packed data texture: these channels are not RGB color.
+texture_type SurfaceData {
+    r: occlusion
+    g: roughness
+    b: metallic
+}
+
+texture_type DetailNormal -> vec3 in tangent {
+    r: nx = raw * 2.0 - 1.0
+    g: ny = raw * 2.0 - 1.0
+    b: nz = raw * 2.0 - 1.0
+    return normalize(vec3(nx, ny, nz))
+}
+
+surface typed_texture_data(sp: surf) -> material {
+    param data: texture<SurfaceData> = "project/surface.orm.png"
+    param normals: texture<DetailNormal> = "assets/textures/wood_floor/normal_tangent_y_plus.jpg"
+
+    let properties = data.at(sp.uv)
+    let normal = normals.at(sp.uv)
+    compose {
+        base(
+            albedo: #b98958,
+            occlusion: properties.occlusion,
+            roughness: properties.roughness,
+            metallic: properties.metallic,
+            normal_map: normal)
+    }
+}
+```
+<!-- readme:end -->
+
+`r: occlusion` names the red storage channel `occlusion`; consumers read
+`properties.occlusion` rather than remembering which component holds it.
+Without a return declaration, the sampled result exposes the declared named
+channels. With `-> vec3 in tangent` and a `return` expression, sampling produces
+a decoded tangent-space vector instead. `raw` refers to the current channel;
+decode expressions can also read other components through `texel`, and use
+packed-data helpers such as `bit_extract`, `unpack_unorm8`, and `unpack_snorm8`.
+
+The source binding is separate from that interpretation. The host must supply
+`data` with the declared ORM packing. Both parameters name default assets for the
+host to load; `project/surface.orm.png` is a project-supplied asset, not a bundled
+image. This example requires that external data texture and is included
+as a compiled example, without a standalone preview. The compiler reflects
+texture type names and channel mappings in its manifest so host tools can retain
+their meaning. The host still chooses compatible GPU formats and samplers;
+declaring a data texture does not turn its bytes into color or load an asset.
+
+The bundled [engine vocabulary](integrations/example-engine/engine/core/01_core.fr)
+also defines color-returning albedo, RGBM lightmaps, scalar masks, point-sampled
+depth, and comparison-sampled shadow textures. These are authored contracts,
+including sampling signatures where needed. The
+[crate-side material](<examples/40) surface shaders/crate-side.fr>) applies typed
+albedo, roughness, and normal textures to a layered surface.
+
+### Typed resources and their sources
+
+Texture interpretation is part of a wider system for describing GPU data:
+
+| Declaration | What the contract carries |
+| --- | --- |
+| `texture<SurfaceData>` | Named channels and sample decoding |
+| `vec3 in tangent`, `mat4 from object to world` | Coordinate-space tags on values and transformations |
+| `buffer<PreparedVertex, read>` | Structured element type and buffer access |
+| `resource PreparedMesh` | A named bundle of buffers, counts, and bounds |
+| Capabilities and renderer `provide` declarations | Required inputs and the concrete providers that supply them |
+
+For example, the engine's
+[mesh contract](integrations/example-engine/engine/core/05_mesh_contract.fr)
+defines `PreparedVertex`, then groups vertex and index buffers with counts and
+bounds in `PreparedMesh`. Compute operations can return resource handles for
+later work to consume. Their connections let the compiler check resource types
+and infer data dependencies, while the host allocates and binds the actual data.
+
+Sources also have declared meaning. A renderer can supply a resource from an
+earlier producer, bind draw-scoped data through `draw_data(...)`, or expose a host
+resource through `@external`. Engine tables can supply a selected record through
+`@source(Table)` or a dense field column through `@table_data`. Those declarations
+describe where data comes from as well as how shaders access it; they do not
+implement the host provider themselves.
+
+See [resources and identity](LANGUAGE.md#resources-and-identity) and
+[the engine integration walkthrough](#integrating-an-engine-from-source-files-to-a-draw)
+for how these contracts connect to layout, scheduling, and execution.
 
 ### Mesh materials
 
