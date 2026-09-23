@@ -1,0 +1,21 @@
+// Demonstrates the existing `repeat_radial` space constructor.
+// One capsule is authored once, then repeated around the center by the space.
+
+canvas repeat_radial_sunburst(ctx: CanvasContext) -> color {
+    let spin = wave(period: 12s, shape: saw, range: 0deg .. 360deg)
+    let core = circle(at: (0.5, 0.5), radius: 0.12)
+    let ray = capsule(from: (0.5, 0.5), to: (0.5, 0.90), radius: 0.015)
+
+    compose {
+        fill(#0a1020)
+
+        in space rotate(angle: spin, around: (0.5, 0.5)) {
+            in space repeat_radial(count: 18, around: (0.5, 0.5), from: 0deg, to: 360deg) {
+                ray |> fill(#f59e0b)
+            }
+        } |> blend(add)
+
+        core |> fill(#fff3bf)
+        core |> glow(reach: 0.12, strength: 0.35, color: #ffb347) |> blend(add)
+    }
+}

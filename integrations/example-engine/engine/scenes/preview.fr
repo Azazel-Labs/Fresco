@@ -1,0 +1,5 @@
+// Content for the host's sample scene, not part of the engine contracts.
+surface fresco_scene_ground(sp: surf) -> material(standard) {
+    properties { style: StandardGGX }
+    compose { base(albedo: rgba(0.22, 0.235, 0.25, 1.0), roughness: 0.9) }
+}

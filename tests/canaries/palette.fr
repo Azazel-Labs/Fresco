@@ -1,0 +1,3 @@
+fn accent(amount: f32) -> color {
+    return rgba(amount, 0.25, 0.125, 1.0)
+}

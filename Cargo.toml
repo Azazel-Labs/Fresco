@@ -1,0 +1,96 @@
+[workspace]
+members = ["integrations/example-engine-host", "integrations/example-engine", "crates/fresco-artifact", "crates/fresco", "crates/fresco-cli", "crates/fresco-wasm", "crates/fresco-macros", "xtask"]
+default-members = ["crates/fresco-cli"]
+resolver = "3"
+
+[workspace.package]
+repository = "https://github.com/nickdarnell/fresco"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.98.1"
+
+[workspace.dependencies]
+fresco-example-engine = { version = "=0.2.0", path = "integrations/example-engine", default-features = false }
+fresco-artifact = { version = "=0.2.0", path = "crates/fresco-artifact" }
+fresco = { version = "=0.2.0", path = "crates/fresco" }
+fresco-macros = { version = "=0.2.0", path = "crates/fresco-macros" }
+
+[workspace.lints.rust]
+future_incompatible = { level = "warn", priority = -1 }
+rust_2018_idioms = { level = "warn", priority = -1 }
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+unfulfilled_lint_expectations = "deny"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# Repository conventions and unsafe-code review.
+mod_module_files = "deny"
+dbg_macro = "deny"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "warn"
+allow_attributes_without_reason = "warn"
+# Numeric correctness: avoid implicit loss and suspicious arithmetic.
+cast_lossless = "warn"
+checked_conversions = "warn"
+float_cmp_const = "warn"
+float_equality_without_abs = "warn"
+integer_division = "warn"
+invalid_upcast_comparisons = "warn"
+lossy_float_literal = "warn"
+manual_midpoint = "warn"
+unused_rounding = "warn"
+# Targeted pedantic/nursery checks with actionable findings.
+assigning_clones = "warn"
+clear_with_drain = "warn"
+collection_is_never_read = "warn"
+debug_assert_with_mut_call = "warn"
+explicit_into_iter_loop = "warn"
+fallible_impl_from = "warn"
+flat_map_option = "warn"
+inefficient_to_string = "warn"
+iter_on_empty_collections = "warn"
+iter_on_single_items = "warn"
+iter_with_drain = "warn"
+large_stack_arrays = "warn"
+manual_let_else = "warn"
+needless_collect = "warn"
+redundant_clone = "warn"
+redundant_closure_for_method_calls = "warn"
+return_self_not_must_use = "warn"
+semicolon_if_nothing_returned = "warn"
+unnecessary_wraps = "warn"
+unused_peekable = "warn"
+unused_result_ok = "warn"
+
+[profile.release]
+debug = true
+overflow-checks = true
+
+[profile.dev-fast]
+inherits = "dev"
+debug = 0
+incremental = true
+codegen-units = 256
+
+[profile.dev.package."*"]
+debug = 0
+
+[profile.dev-fast.package."*"]
+debug = 0
+
+[profile.wasm-dev]
+inherits = "dev"
+# The compiler runs interactively in the browser; unoptimized WASM makes every
+# edit pay debug execution costs, including dependency-heavy WGSL validation.
+opt-level = 2
+debug = 0
+
+# wasm-ld can omit archive members containing only inventory constructors in
+# unoptimized builds. Keep compiler registrations with the referenced compiler
+# code; the generated-WASM smoke check guards the actual registration boundary.
+[profile.wasm-dev.package.fresco]
+codegen-units = 1

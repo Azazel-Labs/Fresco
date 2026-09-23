@@ -1,0 +1,40 @@
+// north-star: fluid-paint — shadertoy multi-buffer idiom, buffers DERIVED not authored
+// (community ask: multi-buffer effects; classic stable-fluids BufA/BufB/Image)
+// status: aspirational
+// rung: 4-extended
+// deltas:
+//   - GRID -> GRID reads (the `velocity` reference inside `dye`; §14 extends)
+//   - grid at `size: full` (canvas-resolution grid)
+//   - `advect(self, by:, dt)` stdlib op: local, radius declared via max_speed bound
+//   - pointer params shared across grid and canvas programs
+// done when: three named programs replace three shadertoy tabs; --explain emits
+//   the full derived schedule (velocity ping-pong -> dye ping-pong -> composite)
+//   with formats on every cut edge per §18.3.
+
+grid velocity(cell: vec2, size: (512, 512), edges: wrap) local(1) {   // "Buf A"
+    param pointer: coord = (0.5, 0.5)
+    param pointer_vel: vec2 = (0, 0)
+    param pressed: bool = false
+
+    let v = advect(self, by: self, dt, max_speed: 4px/frame)
+    let force = splat(at: pointer, radius: 0.04, value: pointer_vel * 8) * f32(pressed)
+    cell = project(damp(v, 0.998) + force)
+}
+
+grid dye(cell: color, size: full, edges: clamp) local(1) {            // "Buf B"
+    param pointer: coord = (0.5, 0.5)
+    param pressed: bool = false
+
+    let c = advect(self, by: velocity, dt, max_speed: 4px/frame)
+    let ink = splat(at: pointer, radius: 0.02,
+        value: hue_ramp(wrap(time, 0 .. 6s))) * f32(pressed)
+    cell = (c |> fade(amount: 0.002)) + ink
+}
+
+canvas out(ctx: CanvasContext) -> color {                        // "Image"
+    compose {
+        fill(#06080d)
+        layer dye |> blend(screen)
+        layer visualize_flow(velocity) |> opacity(0.1) |> blend(add)
+    }
+}

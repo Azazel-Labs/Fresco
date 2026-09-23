@@ -1,0 +1,11 @@
+canvas perspective_rotate_stack(ctx: CanvasContext) -> color {
+    compose {
+        in space perspective(fov: 50deg, near: 0.02, far: 80.0, origin: center)
+            .translate3(x: 0.0, y: 0.0, z: 0.15)
+            .rotate_x(angle: 14deg, around: center)
+            .rotate_y(angle: -18deg, around: center)
+            .rotate_z(angle: 8deg, around: center) {
+            box(at: center, size: (0.48, 0.28)) |> fill(#f6d8a8)
+        }
+    }
+}

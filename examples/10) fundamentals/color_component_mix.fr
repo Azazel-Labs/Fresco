@@ -1,0 +1,20 @@
+// Basic example: color component selectors and rgb/rgba composition.
+
+canvas color_component_mix(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let base = rgb(r: 0.24, g: 0.42, b: 0.86)
+    let drift = wave(period: 3s, shape: triangle, range: -0.12 .. 0.12)
+    let tint = wave(period: 2.4s, shape: sine, range: -0.10 .. 0.10)
+
+    compose {
+        fill(#0f1628)
+
+        in space stage {
+            circle(at: (0.5, 0.5) + (drift, 0), radius: 0.18)
+            |> fill(rgba(r: base.r + 0.08 + tint,
+                g: base.g - tint * 0.5,
+                b: base.b + tint * 0.3,
+                a: 1.0))
+        }
+    }
+}

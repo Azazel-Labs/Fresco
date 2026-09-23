@@ -1,0 +1,15 @@
+texture_type Image {
+    r: x
+    g: y
+    b: z
+}
+
+surface textured(sp: surf) -> material(unlit) {
+    param paint: texture<Image> = "paint.png"
+    param offset: f32 = 0.0
+    param strength: f32 = 1.0 in 0.0 .. 1.0
+    let sampled = paint.at(vec2(0.25 + offset, 0.25))
+    compose {
+        base(albedo: rgba(sampled.x * strength, sampled.y * strength, sampled.z * strength, 1.0))
+    }
+}

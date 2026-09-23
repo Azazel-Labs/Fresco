@@ -1,0 +1,18 @@
+// §16.1 User-Defined Effects — Guarded rewrite that does not fire
+//
+// Demonstrates:
+//   - same rule shape as rewrite_guard_true.fr
+//   - guard resolves false, so the rewrite is skipped
+
+effect grain(amount: f32) point {
+    fill(rgba(r: amount, g: amount, b: amount, a: 1.0))
+
+    rewrite grain(a) compose grain(b) => grain(a) when a > b
+}
+
+canvas rewrite_guard_false_demo(ctx: CanvasContext) -> color {
+    compose {
+        fill(#101218)
+        fill(#000000) |> grain(0.8) |> grain(0.2)
+    }
+}

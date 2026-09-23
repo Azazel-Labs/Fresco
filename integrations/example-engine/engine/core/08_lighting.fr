@@ -1,0 +1,16 @@
+import "../styles/pbr.fr"
+
+// Shared standard responses: pure values, no pass-local resources.
+fn preview_safe_normalize(v: vec3) -> vec3 {
+    return v * inverseSqrt(max(dot(v, v), 0.00000001))
+}
+
+fn preview_point_light_sample(position: vec3, light: vec4) -> vec4 {
+    if light.w <= 0.0 { return vec4(0.0) }
+    let delta = light.xyz - position
+    let distance_squared = dot(delta, delta)
+    let distance = sqrt(distance_squared)
+    let l = delta / max(distance, 0.0001)
+    let window = max(1.0 - pow(distance / light.w, 4.0), 0.0)
+    return vec4(l, window * window / max(distance_squared, 0.01))
+}

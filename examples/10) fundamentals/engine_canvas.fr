@@ -1,0 +1,7 @@
+// The host selects the example engine contract explicitly.
+
+canvas engine_sample(ctx: CanvasContext) -> color {
+    compose {
+        circle(at: center, radius: 0.25) |> fill(#ff2d78)
+    }
+}

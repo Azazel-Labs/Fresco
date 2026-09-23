@@ -1,0 +1,21 @@
+// Example: Boolean array parameters
+// Shows how to use array<bool, N> for conditional rendering
+
+canvas demo(ctx: CanvasContext) -> color {
+    param flags: array<bool, 4> = [true, false, true, true]
+
+    compose {
+        fill(#f3f4f6)
+
+        // Draw circles based on flag values
+        for flag in flags {
+            if flag {
+                circle(at: (0.0, 0.0), radius: 0.12)
+                |> fill(#3b82f6)
+            } else {
+                circle(at: (0.0, 0.0), radius: 0.12)
+                |> stroke(width: 0.015, color: #9ca3af)
+            }
+        }
+    }
+}

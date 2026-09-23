@@ -1,0 +1,23 @@
+// Basic example: wave shape variants with direct visual output.
+// Demonstrates `shape: saw` and `shape: square` in a minimal scene.
+
+canvas wave_saw_square(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let saw_x = wave(period: 4s, shape: saw, range: 0.2 .. 0.8)
+    let gate = wave(period: 1.2s, shape: square, range: 0.0 .. 1.0)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1220),
+                stop(at: 1.0, color: #17263a),
+            ]
+        ))
+
+        in space stage {
+            circle(at: (saw_x, 0.45), radius: 0.08) |> fill(#7dd3fc)
+            circle(at: (0.5, 0.72), radius: 0.05 + gate * 0.04) |> fill(#fca5a5)
+        }
+    }
+}

@@ -1,0 +1,16 @@
+// Demonstrates named repeat-cell bindings via `repeat(every: ..., cell: tile)`.
+
+canvas repeat_cell_polka(ctx: CanvasContext) -> color {
+    compose {
+        fill(#101827)
+
+        in space repeat(every: (0.11, 0.11), cell: tile) {
+            let r = 0.018 + 0.02 * hash(tile)
+            let bob = wave(period: 2.4s, shape: sine,
+                phase: hash(tile, salt: 1), range: -0.006 .. 0.006)
+
+            circle(at: tile.center + (0, bob), radius: r)
+            |> fill(mix(#5eead4, #f59e0b, hash(tile, salt: 2)))
+        }
+    }
+}

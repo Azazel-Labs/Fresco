@@ -1,0 +1,16 @@
+// Demonstrates the array-param MVP with compile-time-known length.
+// The checker binds the array name to element params, so `for` can still unroll.
+
+canvas param_array_positions(ctx: CanvasContext) -> color {
+    param xs: array<f32, 5> = [0.14, 0.32, 0.50, 0.68, 0.86] in 0 .. 1
+    let pulse = wave(period: 2.6s, shape: sine, range: -0.01 .. 0.01)
+
+    compose {
+        fill(#0f172a)
+
+        for x in xs {
+            circle(at: (x, 0.50 + pulse), radius: 0.06)
+            |> fill(#38bdf8)
+        }
+    }
+}

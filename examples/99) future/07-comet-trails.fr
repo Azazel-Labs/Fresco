@@ -1,0 +1,20 @@
+// north-star: comet-trails — minimal feedback loop
+// status: aspirational
+// rung: 4
+// deltas:
+//   - `previous_frame` usable in compose (specced §11 step 4, never exercised)
+//   - `fade(toward:, amount:)` point effect
+// done when: compiles to one pass + ping-pong pair;
+//   --explain prints `feedback: previous_frame => ping-pong rgba16f x2, swap/frame`;
+//   removing the comet leaves trails that decay fully to the background color
+//   (no stuck non-zero residue — the classic feedback precision bug, tested here).
+
+canvas comet_trails(ctx: CanvasContext) -> color {
+    let orbit = (0.5 + 0.3 * cos(40deg/s),
+        0.5 + 0.3 * sin(67deg/s))
+    compose {
+        previous_frame |> fade(toward: #05070d, amount: 0.035)
+        circle(at: orbit, radius: 0.012) |> fill(#8dd6ff)
+        circle(at: orbit, radius: 0.012) |> glow(reach: 14px, strength: 0.9) |> blend(add)
+    }
+}

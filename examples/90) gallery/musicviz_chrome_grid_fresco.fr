@@ -1,0 +1,269 @@
+// Showcase example: conservative Fresco-leaning variant of the chrome-grid MusicViz port.
+//
+// The original `musicviz_chrome_grid.fr` stays as the HLSL-ish reference version.
+// This copy adopts a more native Fresco structure: the scene is expressed as a
+// real compose stack, then a postprocess function runs over the composed image.
+
+fn spectrum(x: f32, time: signal) -> f32 {
+    let xc = saturate(x)
+    let bass_emph = exp(-xc * 2.5)
+    let wob = 0.5 + 0.5 * sin(xc * 22.0 - time * 5.0)
+    return saturate(bass_emph * (0.45 + 0.55 * wob))
+}
+
+fn tonemap3(v: vec3) -> vec3 {
+    return v / ((1.0, 1.0, 1.0) + max(v - (1.0, 1.0, 1.0), 0.0))
+}
+
+fn musicviz_finish(src: color, uv: coord_like, time: signal, res: resolution) -> color {
+    let beat = pow(0.5 + 0.5 * sin(time * 5.0), 8.0)
+    let aspect = res.x / max(res.y, 1.0)
+    let p = (
+        (uv.x - 0.5) * aspect, uv.y -
+        0.5
+    )
+    let c_cyan = (0.20, 1.00, 1.00)
+    let c_magenta = (1.00, 0.10, 0.62)
+    let base = (src.r, src.g, src.b)
+    let vig = 1.0 - 0.45 * dot((p.x * 0.8, p.y), (p.x * 0.8, p.y))
+    let lit = base * saturate(vig)
+    let bright = max(lit - (0.6, 0.6, 0.6), 0.0)
+    let flash = mix(c_cyan, c_magenta, 0.5) * beat * 0.05
+    let out0 = lit + (bright * bright) * 0.45 + flash
+    let out1 = tonemap3(out0)
+    let out2 = pow(saturate(out1), 0.92)
+
+    return rgba(
+        r: out2.r,
+        g: out2.g,
+        b: out2.b,
+        a: 1.0
+    )
+}
+
+fn musicviz_horizon_glow_pass(p: vec2, horizon: f32, energy: f32, c_magenta: vec3) -> color {
+    let hg_y = exp(-max(p.y - horizon, 0.0) * 9.0)
+    let hg_x = exp(-abs(p.x) * 0.45)
+    let hg = hg_y * hg_x
+    let glow_rgb = c_magenta * hg * (0.18 + 0.10 * energy)
+    let alpha = step(horizon - 0.0005, p.y)
+    return rgba(r: glow_rgb.x, g: glow_rgb.y, b: glow_rgb.z, a: alpha)
+}
+
+fn musicviz_horizon_glint_pass(p: vec2, horizon: f32, energy: f32, c_magenta: vec3) -> color {
+    let glint = exp(-abs(p.y - horizon) * 120.0) * (0.35 + 0.35 * energy)
+    let glow_rgb = c_magenta * glint
+    let alpha = step(horizon - 0.0005, p.y)
+    return rgba(r: glow_rgb.x, g: glow_rgb.y, b: glow_rgb.z, a: alpha)
+}
+
+fn musicviz_sun_body_pass(
+    p: vec2,
+    horizon: f32,
+    t: signal,
+    bass: f32,
+    beat: f32,
+    c_cyan: vec3,
+    c_magenta: vec3,
+) -> color {
+    let sun_c = (0.0, horizon + 0.205)
+    let sun_r = 0.175 * (1.0 + 0.05 * bass + 0.04 * beat)
+    let sp2 = p - sun_c
+    let sd2 = dot(sp2, sp2)
+    let sd = sqrt(sd2)
+    let aa = fwidth(sd) + 0.0001
+    let sun_body = smoothstep(sun_r, sun_r - aa - 0.003, sd)
+
+    let sun_top = (1.00, 0.55, 0.25)
+    let sun_bot = (1.00, 0.10, 0.55)
+
+    let z2 = max(sun_r * sun_r - sd2, 0.0)
+    let nrm_zz = sqrt(z2) + 0.0001
+    let nrm_len = sqrt(sp2.x * sp2.x + sp2.y * sp2.y + nrm_zz * nrm_zz)
+    let nrm_x = sp2.x / nrm_len
+    let nrm_y = sp2.y / nrm_len
+    let nrm_z = nrm_zz / nrm_len
+
+    let refl_x = 2.0 * nrm_z * nrm_x
+    let refl_y = 2.0 * nrm_z * nrm_y
+    let refl_z = -1.0 + 2.0 * nrm_z * nrm_z
+
+    let ey = refl_y * 0.5 + 0.5
+    let env0 = mix(sun_bot, sun_top, smoothstep(0.25, 0.70, ey))
+    let env1 = mix(env0, (1.0, 0.88, 0.72), smoothstep(0.80, 1.0, ey))
+    let env = mix((0.16, 0.02, 0.22), env1, smoothstep(0.16, 0.34, ey))
+    let horizon_ref = exp(-abs(refl_y) * 20.0) * 0.45
+
+    let ldir_len = sqrt(0.35 * 0.35 + 0.55 * 0.55 + 0.75 * 0.75)
+    let ldir_x = -0.35 / ldir_len
+    let ldir_y = 0.55 / ldir_len
+    let ldir_z = 0.75 / ldir_len
+    let spec = pow(max(refl_x * ldir_x + refl_y * ldir_y + refl_z * ldir_z, 0.0), 60.0)
+    let fres = pow(1.0 - saturate(nrm_z), 2.5)
+    let chrome = env
+        + (1.0, 1.0, 1.0) * spec * 1.2
+        + mix(c_magenta, c_cyan, 0.3) * fres * 0.7
+        + (1.0, 0.4, 0.7) * horizon_ref
+
+    let scan = 0.5 + 0.5 * sin((sp2.y - t * 0.10) * 70.0)
+    let scan_mask = smoothstep(0.42, 0.62, scan)
+    let lower = smoothstep(0.04, -sun_r, sp2.y)
+    let cut = lerp(1.0, scan_mask, lower)
+
+    let alpha = sun_body * cut * step(horizon - 0.0005, p.y)
+    return rgba(r: chrome.x, g: chrome.y, b: chrome.z, a: alpha)
+}
+
+fn musicviz_ground_grid_pass(
+    p: vec2,
+    res: resolution,
+    t: signal,
+    horizon: f32,
+    bass: f32,
+    mid: f32,
+    beat: f32,
+    energy: f32,
+    c_grid: vec3,
+    c_magenta: vec3,
+) -> color {
+    let depth = horizon - p.y
+    let persp = rcp(abs(depth) + 0.018)
+    let gx = p.x * persp * 1.15
+    let gz = persp - t * 2.0
+    let wx = fwidth(gx)
+    let wz = fwidth(gz)
+
+    let ex = 0.5 - abs(frac(gx) - 0.5)
+    let ez = 0.5 - abs(frac(gz) - 0.5)
+    let gline_x = 1.0 - smoothstep(0.0, 0.9 * wx, ex)
+    let gline_z = 1.0 - smoothstep(0.0, 0.9 * wz, ez)
+    let gline = max(gline_x, gline_z)
+    let under_glow = smoothstep(0.5, 0.5 - 3.0 * wx, abs(frac(gx) - 0.5))
+        + smoothstep(0.5, 0.5 - 3.0 * wz, abs(frac(gz) - 0.5))
+
+    let ground_t = smoothstep(0.0, 0.4, depth)
+    let ground = mix((0.010, 0.000, 0.030), (0.030, 0.005, 0.075), ground_t)
+
+    let fade_far = smoothstep(0.0, 0.10, depth)
+    let fade_near = smoothstep(0.62, 0.34, depth)
+    let fade = fade_far * fade_near
+    let ground_scan = 0.85 + 0.15 * sin(p.y * res.y * 0.45)
+    let grid_bright = 0.95 + 1.0 * bass + 1.2 * beat
+    let horizon_line = exp(-depth * 60.0) * (0.5 + 0.4 * energy)
+
+    let ground_rgb = ground
+        + c_grid * under_glow * fade * 0.10 * (0.6 + 0.6 * mid)
+        + c_grid * gline * fade * grid_bright * ground_scan
+        + c_magenta * horizon_line
+    let alpha = 1.0 - step(horizon - 0.0005, p.y)
+    return rgba(r: ground_rgb.x, g: ground_rgb.y, b: ground_rgb.z, a: alpha)
+}
+
+fn musicviz_bars_pass(
+    uv: coord_like,
+    p: vec2,
+    horizon: f32,
+    time: signal,
+    bass: f32,
+    beat: f32,
+    energy: f32,
+    c_cyan: vec3,
+    c_magenta: vec3,
+) -> color {
+    let n_bars = 56.0
+    let xi = floor(uv.x * n_bars)
+    let xc = (xi + 0.5) / n_bars
+    let xm = abs(xc - 0.5) * 2.0
+    let sample_value = pow(spectrum(xm, time), 1.35) * (1.0 + 0.35 * bass + 0.30 * beat)
+    let bar_top = 0.02 + sample_value * 0.34
+    let bar_u = frac(uv.x * n_bars)
+    let xw = fwidth(uv.x) * n_bars * 1.2 + 0.0001
+    let gap = smoothstep(0.10 - xw, 0.10 + xw, bar_u) * (1.0 - smoothstep(0.90 - xw, 0.90 + xw, bar_u))
+    let yw = fwidth(uv.y)
+    let fill = 1.0 - smoothstep(bar_top, bar_top + yw * 1.5, uv.y)
+    let bar = fill * gap
+    let spec_col = mix(c_cyan, c_magenta, xm)
+    let cap = gap * smoothstep(bar_top - 0.014, bar_top, uv.y) * fill
+    let bars_rgb = spec_col * bar * (0.7 + 0.5 * energy) + (1.0, 1.0, 1.0) * cap * 0.5
+    let alpha = 1.0 - step(horizon - 0.0005, p.y)
+    return rgba(r: bars_rgb.x, g: bars_rgb.y, b: bars_rgb.z, a: alpha)
+}
+
+canvas musicviz_chrome_grid_fresco(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    let res = context(resolution)
+    let t = time
+    let bass = 0.55 + 0.45 * sin(time * 1.70)
+    let mid = 0.50 + 0.42 * sin(time * 2.30 + 1.0)
+    let treble = 0.45 + 0.40 * sin(time * 3.10 + 2.0)
+    let energy = 0.55 + 0.35 * sin(time * 0.90 + 0.5)
+    let beat = pow(0.5 + 0.5 * sin(t * 5.0), 8.0)
+
+    let aspect = res.x / max(res.y, 1.0)
+    space stage = centered(aspect: preserve)
+    let p = (
+        (uv.x - 0.5) * aspect, uv.y -
+        0.5
+    )
+    let horizon = -0.02
+
+    let c_cyan = (0.20, 1.00, 1.00)
+    let c_magenta = (1.00, 0.10, 0.62)
+    let u_accent = (
+        0.5 + 0.5 * cos(t * 0.25),
+        0.5 + 0.5 * cos(2.0 + t * 0.25),
+        0.5 + 0.5 * cos(4.0 + t * 0.25)
+    )
+    let c_grid = mix(c_cyan, u_accent, 0.30)
+    let sun_glow_color = rgba(r: 1.0, g: 0.325, b: 0.40, a: 1.0)
+    let sun_glow_strength = 0.30 + 0.12 * bass + 0.10 * beat
+    let sun_radius = 0.175 * (1.0 + 0.05 * bass + 0.04 * beat)
+
+    let sky = fill(gradient(
+        along: vertical,
+        stops: [
+            stop(at: 0.48, color: #0a051c),
+            stop(at: 0.62, color: #080416),
+            stop(at: 0.76, color: #060412),
+            stop(at: 0.90, color: #05030e),
+            stop(at: 1.00, color: #04030c),
+        ]
+    ))
+    let stars = scatter 180
+    within region((0.5 - 0.5 * aspect, 0.0) .. (0.5 + 0.5 * aspect, 1.0))
+    seed 19
+    strategy procedural {
+        let twinkle = wave(period: rand(1.4s .. 3.8s),
+            shape: sine,
+            phase: rand(0 .. 1),
+            range: 0.25 .. 1.0)
+        let sky_fade = smoothstep(0.47, 0.55, instance.pos.y)
+        let star_strength = twinkle * sky_fade * (0.28 + 0.72 * treble)
+        let star_r = rand(0.12px .. 0.30px)
+        let star_shape = circle(at: instance.pos, radius: star_r)
+
+        star_shape |> fill(#d8e6ff) |> opacity(star_strength)
+    }
+    compose {
+        sky
+        musicviz_horizon_glow_pass(p, horizon, energy, c_magenta) |> blend(add)
+
+        in space stage {
+            stars
+        } |> blend(add)
+
+        musicviz_sun_body_pass(p, horizon, t, bass, beat, c_cyan, c_magenta)
+
+        in space stage {
+            circle(at: (0.5, 0.685), radius: sun_radius)
+            |> glow(reach: 0.12, strength: sun_glow_strength, color: sun_glow_color)
+        } |> blend(add)
+
+        musicviz_horizon_glint_pass(p, horizon, energy, c_magenta) |> blend(add)
+
+        musicviz_ground_grid_pass(p, res, t, horizon, bass, mid, beat, energy, c_grid, c_magenta)
+
+        musicviz_bars_pass(uv, p, horizon, time, bass, beat, energy, c_cyan, c_magenta) |> blend(add)
+    } |> postprocess(musicviz_finish)
+}

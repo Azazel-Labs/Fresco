@@ -1,0 +1,46 @@
+import "../core/05_mesh_contract.fr"
+
+// One invocation owns one tile; conservative sphere/frustum tests also cover transparency.
+@shader pass tile_culling {
+    stage: compute
+    binding {
+        @group(0) @binding(0) scene: uniform<PreviewScene>
+        @group(0) @binding(1) lights: buffer<vec4>
+        @group(0) @binding(2) @access(read_write) tiles: buffer<u32>
+    }
+    fn inside(plane: vec4, sphere: vec4) -> bool {
+        return dot(plane, vec4(sphere.xyz, 1.0)) >= -sphere.w * length(plane.xyz)
+    }
+    @compute @workgroup_size(8, 8)
+    fn cull(@builtin(global_invocation_id) id: uvec3) {
+        let grid = uvec2(ceil(scene.res / 16.0))
+        if id.x < grid.x { if id.y < grid.y {
+            let lo = vec2(id.xy) * 16.0
+            let hi = min(lo + 16.0, scene.res)
+            let left = 2.0 * lo.x / scene.res.x - 1.0
+            let right = 2.0 * hi.x / scene.res.x - 1.0
+            let top = 1.0 - 2.0 * lo.y / scene.res.y
+            let bottom = 1.0 - 2.0 * hi.y / scene.res.y
+            let matrix = transpose(scene.proj * scene.view)
+            var masks = uvec2(u32(0))
+            for i in 0 .. 64 {
+                let sphere = lights[i * u32(2)]
+                if sphere.w > 0.0 {
+                    if inside(matrix[0] - left * matrix[3], sphere) {
+                    if inside(right * matrix[3] - matrix[0], sphere) {
+                    if inside(matrix[1] - bottom * matrix[3], sphere) {
+                    if inside(top * matrix[3] - matrix[1], sphere) {
+                    if inside(matrix[2], sphere) {
+                    if inside(matrix[3] - matrix[2], sphere) {
+                        let bit = u32(1) << (i % u32(32))
+                        if i < u32(32) { masks.x = masks.x | bit }
+                        else { masks.y = masks.y | bit }
+                    } } } } } }
+                }
+            }
+            let tile = (id.y * grid.x + id.x) * u32(2)
+            tiles[tile] = masks.x
+            tiles[tile + u32(1)] = masks.y
+        } }
+    }
+}

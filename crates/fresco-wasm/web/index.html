@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fresco Playground</title>
+    <style>
+      html { background: #181818; }
+      body.app-loading > :not(#app-startup):not(script) { visibility: hidden; }
+      #app-startup { position: fixed; inset: 0; z-index: 10000; display: grid; place-content: center; gap: 12px; margin: 0; background: #181818; color: #d4d4d4; font: 14px "Segoe UI", Arial, sans-serif; text-align: center; }
+      #app-startup[hidden] { display: none; }
+      #app-startup p { margin: 0; }
+      #app-startup a { color: #a0a0a0; font-size: 12px; }
+    </style>
+  </head>
+  <body class="app-loading" aria-busy="true">
+    <div id="app-startup">
+      <p role="status">Loading Fresco...</p>
+      <a href="">Reload page</a>
+      <noscript>Enable JavaScript to use the playground.</noscript>
+    </div>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">f</span><h1>Fresco</h1>
+      </div>
+      <div class="status-wrap">
+        <button id="docs-toggle" class="topbar-action" type="button" title="Open language docs" aria-haspopup="dialog">Docs</button>
+        <a class="topbar-link" href="https://github.com/nickdarnell/fresco" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="example-sidebar" aria-label="Example browser">
+        <div class="panel-head"><h2>Examples</h2></div>
+        <nav id="example-browser" aria-label="Examples"></nav>
+      </aside>
+      <section class="panel editor-panel">
+        <div class="panel-head">
+          <h2 id="source-title">Untitled.fr</h2>
+          <div class="editor-controls">
+            <label for="example-select" class="control-label compact-example">Example</label>
+            <select id="example-select" class="example-select compact-example" aria-label="Select example">
+              <option value="">Blank</option>
+              <option value="__custom__">Custom</option>
+            </select>
+          </div>
+        </div>
+        <div class="file-tabs" id="file-tabs" aria-label="Source files">
+          <div class="file-tab-list" id="file-tab-list" role="tablist"></div>
+          <select class="file-tab-picker" id="file-tab-picker" aria-label="Choose source file" hidden></select>
+        </div>
+        <div id="editor" class="editor"></div>
+      </section>
+
+      <section id="preview-panel" class="panel preview-panel">
+        <div class="panel-head preview-head">
+          <div class="preview-renderer-control">
+            <label class="preview-inline-label" for="preview-renderer">Renderer</label>
+            <select id="preview-renderer" class="preview-select" disabled>
+              <option value="forward">Forward</option>
+              <option value="forward-plus">Forward+</option>
+              <option value="deferred">Deferred</option>
+            </select>
+          </div>
+
+          <details id="preview-lighting-menu" class="preview-lighting-menu" hidden>
+            <summary aria-label="Lighting environment" title="Lighting environment">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+            </summary>
+            <fieldset disabled>
+              <legend>Lighting environment</legend>
+              <div class="lighting-options">
+              <label><input type="radio" name="preview-lighting" value="preview" checked><span>Preview <small>Default studio lighting</small></span></label>
+              <p class="lighting-section">Debug lighting</p>
+              <label><input type="radio" name="preview-lighting" value="unlit">Unlit</label>
+              <label><input type="radio" name="preview-lighting" value="directional">One directional light</label>
+              <label><input type="radio" name="preview-lighting" value="three-lights">Three colored lights</label>
+              </div>
+            </fieldset>
+          </details>
+          <div id="preview-buffer-control" class="preview-renderer-control" hidden>
+            <label class="preview-inline-label" for="preview-buffer">View</label>
+            <select id="preview-buffer" class="preview-select" aria-label="Buffer visualization"></select>
+          </div>
+          <p id="preview-status" class="panel-meta preview-head-status">Waiting for shader</p>
+        </div>
+        <div class="preview-viewport">
+          <canvas id="preview-canvas" class="preview-canvas"></canvas>
+          <div id="preview-freshness" class="preview-freshness" role="status" aria-live="polite" hidden></div>
+          <div id="preview-unavailable" class="preview-unavailable" role="status" aria-live="polite" hidden>
+            <div class="preview-unavailable-message">
+              <h3 id="preview-unavailable-title">Preview unavailable</h3>
+              <p id="preview-unavailable-help"></p>
+              <p>You can still edit the source and view the compiled shader.</p>
+              <details>
+                <summary>Technical details</summary>
+                <p id="preview-unavailable-detail"></p>
+              </details>
+            </div>
+          </div>
+        <button id="preview-spin" class="mesh-pick-btn preview-spin-overlay" type="button" aria-label="Resume orbit spin" title="Resume orbit spin" hidden>Spin</button>
+        <div id="mesh-picker" class="mesh-picker" hidden>
+          <button class="mesh-pick-btn active" data-mesh="sphere" type="button" title="Sphere">&#9711; Sphere</button>
+          <button class="mesh-pick-btn" data-mesh="plane" type="button" title="Plane">&#9645; Plane</button>
+          <button class="mesh-pick-btn" data-mesh="box" type="button" title="Box">&#9633; Box</button>
+        </div>
+        </div>
+        <div class="preview-bottombar">
+          <div class="preview-controls">
+            <button id="preview-play" class="preview-action" type="button" aria-label="Pause preview" title="Pause preview"></button>
+            <button id="preview-fullscreen" class="preview-action" type="button" aria-label="Enter fullscreen" title="Enter fullscreen"></button>
+            <label class="preview-inline-label" for="preview-rate">Rate</label>
+            <select id="preview-rate" class="preview-select" aria-label="Preview playback rate" title="Preview playback rate">
+              <option value="-2">-2x</option>
+              <option value="-1">-1x</option>
+              <option value="-0.5">-0.5x</option>
+              <option value="-0.0166667">-1fps eq</option>
+              <option value="0">0x</option>
+              <option value="0.0166667">1fps eq</option>
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+            </select>
+            <label class="preview-inline-label" for="preview-time-input">Time (s)</label>
+            <input id="preview-time-input" class="preview-time-input" type="number" step="0.001" value="0" aria-label="Edit preview time in seconds" title="Edit preview time (seconds)">
+            <button id="preview-step-back" class="preview-action preview-step-action" type="button" aria-label="Step back one frame" title="Step back one frame">-1f</button>
+            <button id="preview-step-forward" class="preview-action preview-step-action" type="button" aria-label="Step forward one frame" title="Step forward one frame">+1f</button>
+          </div>
+          <div class="preview-readouts">
+            <span id="preview-fps" class="panel-meta">FPS --</span>
+            <span id="preview-resolution" class="panel-meta">-- x --</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="params-panel" class="panel params-panel" aria-hidden="true">
+        <div class="panel-head">
+          <h2>Parameters</h2>
+        </div>
+        <div id="params-panel-body" class="params-host"></div>
+      </section>
+
+      <section class="panel outputs-panel">
+        <div class="panel-head">
+          <h2>Compiler Output</h2>
+          <div class="tab-row">
+            <button class="tab active" data-tab="diagnostics">Diagnostics</button>
+            <button class="tab" data-tab="explain">Explain</button>
+            <button class="tab" data-tab="wgsl">WGSL</button>
+            <button class="tab" data-tab="manifest">Manifest</button>
+            <button class="tab" data-tab="inspector">Options</button>
+            <button class="tab" data-tab="params" hidden>Parameters</button>
+          </div>
+        </div>
+        <div id="params-tab" class="tab-content params-tab-content" aria-hidden="true"></div>
+        <div id="diagnostics" class="tab-content active"></div>
+        <pre id="explain" class="tab-content pre"></pre>
+        <div id="wgsl" class="tab-content wgsl-editor"></div>
+        <pre id="manifest" class="tab-content pre"></pre>
+        <div id="manifest-inspector" class="tab-content manifest-inspector" aria-hidden="true"></div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <div id="compile-status" class="status-pill" role="status">Idle</div>
+      <div id="version" class="version" title="Version of the loaded Fresco compiler">Fresco (loading compiler...)</div>
+    </footer>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+[package]
+repository.workspace = true
+name = "fresco-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "CLI for the Fresco compiler."
+license = "MIT-0"
+
+[[bin]]
+name = "fresco"
+path = "src/main.rs"
+# CLI usage is documented by --help; avoid overwriting the fresco library's API docs.
+doc = false
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
+fresco.workspace = true
+
+[dev-dependencies]
+fresco-artifact.workspace = true
+fresco-example-engine.workspace = true
+libtest-mimic = "0.8.2"
+naga = { version = "30.0.0", features = ["wgsl-in"] }
+serde_json = "1.0"
+
+[[test]]
+name = "examples_compile_all"
+path = "tests/examples_compile_all.rs"
+harness = false
+
+[[test]]
+name = "examples_wgsl_valid"
+path = "tests/examples_wgsl_valid.rs"
+harness = false
+
+[lints]
+workspace = true

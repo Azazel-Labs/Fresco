@@ -1,0 +1,23 @@
+// Basic example: deterministic phase offsets on sine waves.
+// Demonstrates `phase:` usage outside scatter with two offset motions.
+
+canvas sine_phase_offsets(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let x0 = wave(period: 3s, shape: sine, phase: 0.0, range: 0.2 .. 0.8)
+    let x1 = wave(period: 3s, shape: sine, phase: 0.25, range: 0.2 .. 0.8)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1524),
+                stop(at: 1.0, color: #14263a),
+            ]
+        ))
+
+        in space stage {
+            circle(at: (x0, 0.42), radius: 0.06) |> fill(#93c5fd)
+            circle(at: (x1, 0.66), radius: 0.06) |> fill(#fca5a5)
+        }
+    }
+}

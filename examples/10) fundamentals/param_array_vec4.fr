@@ -1,0 +1,20 @@
+// Example: Vec4 array parameters
+// Shows how to use array<vec4, N> for 4D vector arrays
+
+canvas demo(ctx: CanvasContext) -> color {
+    param data: array<vec4, 3> = [
+        (0.2, 0.3, 0.5, 1.0),
+        (0.4, 0.5, 0.6, 0.8),
+        (0.6, 0.4, 0.7, 0.9)
+    ]
+
+    compose {
+        fill(#faf5ff)
+
+        // Use vec4 data - x, y for position, z for size, w for alpha
+        for d in data {
+            circle(at: (d.x, d.y), radius: d.z * 0.1)
+            |> fill(#8b5cf6)
+        }
+    }
+}

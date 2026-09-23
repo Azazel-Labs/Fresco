@@ -1,0 +1,122 @@
+// Showcase example: synthwave sunset with striped sun, mountain silhouette,
+// drifting clouds, and a perspective neon grid floor.
+
+fn horizon_y(step: f32, start: f32, linear_drop: f32, perspective_curve: f32) -> f32 {
+    return start - step * linear_drop + step * step * perspective_curve;
+}
+
+fn centered_step(index: f32, count: f32) -> f32 {
+    return index - (count - 1.0) * 0.5;
+}
+
+fn growing_span_angle(step: f32, linear_deg: f32, curve_deg: f32) -> f32 {
+    return (step * linear_deg + step * step * step * curve_deg) * 1deg;
+}
+
+canvas synthwave_fuji(ctx: CanvasContext) -> color {
+    let sky = fill(gradient(
+        along: y,
+        stops: [
+            stop(at: 0.0, color: #02030f),
+            stop(at: 0.45, color: #170a39),
+            stop(at: 1.0, color: #050612),
+        ]
+    ))
+
+    let horizon_glow = box(at: (0.5, 0.42), size: (1.20, 0.08)) |> round(0.02)
+
+    // Striped synthwave sun.
+    let sun_disc = circle(at: (0.29, 0.70), radius: 0.105)
+    let stripe_offsets = [0.772, 0.745, 0.718, 0.691, 0.664, 0.637]
+    let sun_cuts = [for y in stripe_offsets => box(at: (0.29, y), size: (0.25, 0.006))]
+    let sun = reduce(sun_cuts, sun_disc, op: subtract)
+
+    // Mountain body approximated from intersected soft capsules.
+    let mountain_l = capsule(from: (0.47, 0.46), to: (0.72, 0.74), radius: 0.21)
+    let mountain_r = capsule(from: (0.98, 0.45), to: (0.72, 0.74), radius: 0.21)
+    let mountain_cap = box(at: (0.72, 0.58), size: (0.60, 0.32))
+    let mountain = (mountain_l & mountain_r) & mountain_cap
+
+    let snow = (
+        mountain &
+        box(at: (0.72, 0.73), size: (0.48, 0.085)) -
+        circle(at: (0.61, 0.705), radius: 0.034) -
+        circle(at: (0.70, 0.698), radius: 0.030) -
+        circle(at: (0.79, 0.707), radius: 0.033)
+    )
+
+    // Two stylized cloud bands inspired by the original piece.
+    let cloud_a = (
+        capsule(from: (-0.08, 0.62), to: (0.18, 0.62), radius: 0.026) |
+        capsule(from: (-0.02, 0.58), to: (0.14, 0.58), radius: 0.020) |
+        (box(at: (0.09, 0.56), size: (0.30, 0.04)) |> round(0.02))
+    )
+
+    let cloud_b = (
+        capsule(from: (0.36, 0.67), to: (0.50, 0.67), radius: 0.027) |
+        capsule(from: (0.40, 0.62), to: (0.74, 0.62), radius: 0.020) |
+        (box(at: (0.58, 0.60), size: (0.34, 0.04)) |> round(0.02))
+    )
+
+    let cloud_drift = wave(period: 26s, shape: saw, range: -0.05 .. 0.05)
+
+    // Ground plane and perspective grid.
+    let floor = box(at: (0.5, 0.18), size: (1.30, 0.36))
+    let horizon_cut = box(at: (0.5, 0.395), size: (1.30, 0.01))
+
+    // Intent-based generators: perspective-compressed lines and widening ray fan.
+    let horizon_lines = [for i in 0 .. 15 => horizon_y(i, 0.39, 0.041, 0.00135)]
+    let ray_steps = [for i in 0 .. 21 => centered_step(i, 21.0)]
+    let ray_angles = [for step in ray_steps => growing_span_angle(step, 5.2, 0.02)]
+
+    let v_seed = capsule(from: (0.5, 0.395), to: (0.5, -0.30), radius: 0.0012)
+
+    compose {
+        sky
+
+        horizon_glow |> glow(reach: 0.24, strength: 0.33, color: #ff2ac6) |> blend(add)
+
+        sun |> fill(gradient(
+            kind: radial,
+            center: (0.29, 0.70),
+            radius: 0.13,
+            stops: [
+                stop(at: 0.0, color: #ff8ee6),
+                stop(at: 1.0, color: #ff38d1),
+            ]
+        ))
+        sun |> glow(reach: 0.12, strength: 0.35, color: #ff41d6) |> blend(add)
+
+        mountain |> fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #04065e),
+                stop(at: 1.0, color: #ff29d3),
+            ]
+        )) |> blend(screen)
+        snow |> fill(#eef0ff)
+        mountain |> stroke(width: 0.0035) |> fill(#fdb1ff) |> blend(add)
+
+        in space translate((cloud_drift, 0.0)) {
+            cloud_a |> stroke(width: 0.003) |> fill(#e7ebff)
+        } |> blend(screen)
+        in space translate((cloud_drift * 0.6, 0.0)) {
+            cloud_b |> stroke(width: 0.003) |> fill(#dfe7ff)
+        } |> blend(screen)
+
+        floor |> fill(#02041b)
+        horizon_cut |> fill(#c4ffd2)
+
+        for y in horizon_lines {
+            box(at: (0.5, y), size: (1.30, 0.0018)) |> fill(#ff93f5)
+        } |> blend(add)
+
+        for angle in ray_angles {
+            in space rotate(angle: angle, around: (0.5, 0.395)) {
+                v_seed |> fill(#ff93f5)
+            }
+        } |> blend(add)
+
+        floor |> glow(reach: 0.04, strength: 0.18, color: #ff5de3) |> blend(add)
+    }
+}

@@ -1,0 +1,16 @@
+// Basic example: blur-over-fill rewrite path (`blur ∘ fill => soften`).
+// Run with `--explain` to see the rewrite receipt.
+
+canvas blur_soften_haze(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let blob = circle(at: (0.5, 0.5), radius: 0.16)
+
+    compose {
+        fill(#0b1220)
+
+        in space stage {
+            blob |> fill(#ffb266) |> blur(0.10) |> blend(screen)
+            blob |> fill(#ffd7aa)
+        }
+    }
+}

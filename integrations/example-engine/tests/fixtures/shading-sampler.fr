@@ -1,0 +1,28 @@
+compute Palette() -> texture2d<rgba16float, read> {
+    output pixels: texture2d<rgba16float, write>(2u, 1u)
+    workgroup_size: (2, 1, 1)
+    dispatch threads(2u, 1u, 1u)
+    @compute fn main(id: uvec3) { pixels.store(id.xy, vec4(f32(id.x))) }
+    return pixels
+}
+style Sampled for standard : StandardStyle {
+    requires SurfaceUV, DrawShadingResources
+    shading_input palette: texture2d<rgba16float, read> scope draw
+    shading_input filtering: sampler scope draw
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    fn finish(surface: StandardSurface, context: ShadingContext, lighting: LightingResult) -> vec3 {
+        let a = palette.sample_level(filtering, vec2(1.25, 0.5), 0.0).r
+        let b = palette.sample_grad(filtering, vec2(1.5, 0.5), vec2(0.0), vec2(0.0)).r
+        let c = palette.sample_level(filtering, vec2(0.5), 0.0).r
+        return vec3(a, b, c)
+    }
+    for self {
+        let image = Palette()
+        bind shading.palette = image
+        bind shading.filtering = nearest_repeat
+    }
+}
+surface item(sp: surf) -> material(standard) {
+    properties { style: Sampled }
+    compose { base(albedo: #fff) }
+}

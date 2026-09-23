@@ -1,0 +1,20 @@
+// Demonstrates mat2 array parameters - matrix transformations
+
+canvas demo(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    param transforms: array<mat2, 2> = [
+        mat2(vec2(1.0, 0.0), vec2(0.0, 1.0)),
+        mat2(vec2(0.707, 0.707), vec2(-0.707, 0.707))
+    ]
+
+    compose {
+        fill(#faf5ff)
+
+        for mat in transforms {
+            let transformed_uv = mat * (uv - vec2(0.5, 0.5)) + vec2(0.5, 0.5);
+            circle(at: transformed_uv, radius: 0.1)
+            |> fill(#8b5cf6)
+            |> opacity(0.5)
+        }
+    }
+}

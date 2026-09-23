@@ -1,0 +1,49 @@
+// Test: explicit `in space` transform versus root space.
+//
+// Left panel: geometry is wrapped in `in space warped`, so shapes move/warp.
+// Right panel: same geometry is drawn directly in root space, so it stays put.
+//
+// The left side applies the transform through `in space`; the right side does not.
+
+canvas space_vs_root_space(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    let wobble = sin(time * 0.6) * 10deg
+    space warped = rotate(14deg + wobble) . scale(1.0 + uv.y * 1.6)
+
+    let left_panel = box(at: (0.25, 0.54), size: (0.46, 0.84)) |> round(0.04)
+    let right_panel = box(at: (0.75, 0.54), size: (0.46, 0.84)) |> round(0.04)
+
+    let ring_l = circle(at: (0.25, 0.58), radius: 0.12) |> stroke(2px)
+    let rail_l = capsule(from: (0.10, 0.36), to: (0.40, 0.22), radius: 0.010)
+    let frame_l = box(at: (0.30, 0.34), size: (0.16, 0.12)) |> round(0.03) |> stroke(2px)
+
+    let ring_r = circle(at: (0.75, 0.58), radius: 0.12) |> stroke(2px)
+    let rail_r = capsule(from: (0.60, 0.36), to: (0.90, 0.22), radius: 0.010)
+    let frame_r = box(at: (0.80, 0.34), size: (0.16, 0.12)) |> round(0.03) |> stroke(2px)
+
+    compose {
+        fill(#0f1419)
+
+        left_panel |> fill(#1d2936)
+        right_panel |> fill(#1d2936)
+        left_panel |> stroke(2px) |> fill(#4a6178)
+        right_panel |> stroke(2px) |> fill(#4a6178)
+
+        // Explicit transform path: geometry changes because of `in space`.
+        in space warped {
+            compose {
+                ring_l |> fill(#ff6f61)
+                rail_l |> fill(#ffd166)
+                frame_l |> fill(#9ad1ff)
+            }
+        }
+
+        // No explicit transform path: geometry remains in root space.
+        ring_r |> fill(#5dd39e)
+        rail_r |> fill(#ffd166)
+        frame_r |> fill(#9ad1ff)
+
+        box(at: (0.50, 0.54), size: (0.006, 0.92)) |> fill(#d7e3ef)
+    }
+}

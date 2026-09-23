@@ -1,0 +1,18 @@
+canvas orb(ctx: CanvasContext) -> color {
+    param radius: f32 = 0.3 in 0.05 .. 0.45
+    param accent: color = #ffb347
+
+    compose {
+        fill(#141827)
+        circle(at: center, radius: radius) |> fill(gradient(
+            kind: radial,
+            center: center,
+            radius: radius,
+            stops: [
+                stop(at: 0.0, color: #fff3bf),
+                stop(at: 0.45, color: accent),
+                stop(at: 1.0, color: #9a3412),
+            ]
+        ))
+    }
+}

@@ -1,0 +1,72 @@
+// Hex circuitry: the original rendering, written as named light masks.
+//
+// Read this as a small recipe evaluated at each pixel:
+//   cell coordinates -> distance to tracks -> thin cores + wide halos
+//                    -> moving pulse masks -> colored light + white highlights
+// A mask is a brightness value: 0 is dark, 1 is fully lit. Multiplying masks
+// lights only their overlap. Adding them combines contributions before clamping.
+// Change cells.every for density, or seed for colors and animation phases.
+
+canvas hex_circuit(ctx: CanvasContext) -> color {
+    let time = context(time)
+
+    in space centered(aspect: preserve)
+        .rotate(12deg)
+        .cells(layout: hex, every: 0.16, seed: 73, sampling: grid4x4, cell: tile) {
+        // 1. Ask the cell for two inset tracks, independent of its layout.
+        // Numbers are normalized cell units. Try by: 2px to keep an inset
+        // two screen pixels wide instead, including under scale and rotation.
+        let local = tile.local
+        let outer_track_distance = tile.inset_distance(by: 0.037)
+        let inner_track_distance = tile.inset_distance(by: 0.105)
+
+        // 2. Move light around the cell. One turn is a full lap.
+        // fract wraps the head-to-pixel gap at the seam. exp makes the light
+        // brightest at the head and fades its tail. The inner pulse reverses.
+        let position_in_turns = tile.angle / 1turn
+        let head_in_turns = time * (0.12 + 0.08 * hash(tile, salt: 1)) + tile.rand
+        let turns_behind_head = fract(head_in_turns - position_in_turns)
+        let outer_pulse = exp(-turns_behind_head * 24.0)
+        let inner_pulse = exp(-fract(position_in_turns + head_in_turns * 0.7 + 0.5) * 32.0)
+
+        // 3. Give each track a narrow core and a soft halo.
+        // exp(-distance * falloff) is 1 on the track and fades away from it.
+        // Larger falloff = thinner light; smaller falloff = a wider halo.
+        let outer_core = exp(-outer_track_distance * 210.0)
+        let outer_halo = exp(-outer_track_distance * 35.0)
+        let inner_core = exp(-inner_track_distance * 240.0)
+        let inner_halo = exp(-inner_track_distance * 45.0)
+
+        // 4. Small circuit details, also described as brightness masks.
+        // Start with a horizontal line, then fade it in/out along x to leave
+        // two short feeds. Distance to a radius makes a ring; two soft bands
+        // multiplied together make the rectangular chip.
+        let feed_lines = exp(-abs(local.y) * 220.0)
+            * smoothstep(0.10, 0.13, abs(local.x))
+            * (1.0 - smoothstep(0.37, 0.395, abs(local.x)))
+        let contact_ring = exp(-abs(length(local) - 0.075) * 230.0)
+        let chip = (1.0 - smoothstep(0.025, 0.035, abs(local.x)))
+            * (1.0 - smoothstep(0.040, 0.050, abs(local.y)))
+        let heartbeat = 0.5 + 0.5 * sin(time * 2.4 + tile.rand * 6.2831853)
+
+        // 5. Light the tracks. A small constant keeps them visible between
+        // pulses; multiplying by a pulse brightens just its moving segment.
+        let outer_core_light = outer_core * (0.15 + outer_pulse * 1.8)
+        let outer_halo_light = outer_halo * (0.025 + outer_pulse * 0.48)
+        let inner_core_light = inner_core * (0.07 + inner_pulse * 0.7)
+        let inner_halo_light = inner_halo * inner_pulse * 0.18
+        let feed_light = feed_lines * 0.12
+        let contact_light = contact_ring * (0.10 + heartbeat * 0.16)
+        let colored_light = outer_core_light + outer_halo_light
+            + inner_core_light + inner_halo_light + feed_light + contact_light
+        let white_highlights = outer_core * outer_pulse * 0.8 + chip * heartbeat * 0.6
+        let copper = mix(#16d9ec, #ffae47, step(0.78, tile.rand))
+
+        // 6. Paint three layers: board, colored circuitry, bright highlights.
+        compose {
+            fill(mix(#030a14, #0a1d2a, tile.rand))
+            fill(copper) |> opacity(clamp(colored_light, 0.0, 1.0))
+            fill(#dcffff) |> opacity(clamp(white_highlights, 0.0, 1.0))
+        }
+    }
+}

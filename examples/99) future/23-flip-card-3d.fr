@@ -1,0 +1,50 @@
+// north-star: flip-card-3d — the honest version of perspective_flip_card
+// status: aspirational
+// rung: 9 (volume v0: shape3 + camera + march, surfaces only, no media)
+// deltas:
+//   - `volume` entry, `ray3`, `camera(...)` space, `march` clause (ext §26.2-26.3)
+//   - `shape3` (box3, round in 3D), sphere-traced since content is pure SDF
+//   - two-sided `shade(front:, back:)` selected by normal-vs-ray — DISSOLVES the
+//     hand-written `if cos(flip) >= 0` backface branch from the 2.5D original
+//   - faces shaded by SURFACE programs via the shape's local UV frame
+//     (cross-entry-point composition: volume -> surface)
+// done when: replaces examples/09) showcase/perspective_flip_card.fr; correct
+//   self-occlusion at grazing angles with no branch in source; --explain prints
+//   `march: sphere-trace (pure shape3), budget 64, epsilon 0.5px`.
+
+surface card_front(sp: surf, time: signal) -> material(unlit) {
+    let pulse = wave(period: 1.6s, shape: sine, range: 0.35 .. 0.85)
+    compose {
+        base(albedo: #f8fafc)
+        circle(at: (0.5, 0.36), radius: 0.055 * pulse) |> fill(albedo: #5eead4)
+        star(at: (0.5, 0.62), outer: 0.06, inner: 0.028, points: 5)
+        |> fill(albedo: #f59e0b)
+    }
+}
+
+surface card_back(sp: surf, time: signal) -> material(unlit) {
+    compose {
+        base(albedo: #0f766e)
+        each (i) in 0 .. 3 {
+            box(at: (0.5, 0.38 + i * 0.08), size: (0.30, 0.04)) |> round(0.01)
+            |> fill(albedo: #99f6e4)
+        }
+    }
+}
+
+volume flip_card(ray: ray3, time: signal) -> radiance {
+    let flip = time * 96deg
+    space cam = camera(at: (0m, 0m, -1.6m), look: origin3, fov: 58deg)
+    let key = directional(azimuth: -30deg, elevation: 40deg, color: #fff)
+
+    in space cam . rotate_x(-8deg) . rotate_y(flip) {
+        compose {
+            fill(gradient(along: y, stops: [
+                    stop(at: 0.0, color: #101827),
+                    stop(at: 1.0, color: #1f2f46)]))
+            box3(at: origin3, size: (0.42m, 0.58m, 0.008m)) |> round(0.02m)
+            |> shade(front: card_front, back: card_back)
+            |> lit_by(key, shadows: sdf)
+        }
+    }
+} march(budget: 64, epsilon: 0.5px)

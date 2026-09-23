@@ -1,0 +1,251 @@
+import "01_core.fr"
+
+const f32 PI     = 3.14159265
+const f32 INV_PI = 0.31830989
+
+fn sign_nz(x: f32) -> f32 { if x >= 0.0 { return 1.0 } return -1.0 }
+
+fn ggx_d(ndh: f32, a: f32) -> f32 {
+    let a2 = a * a
+    let d  = ndh * ndh * (a2 - 1.0) + 1.0
+    return a2 / max(PI * d * d, 1e-8)
+}
+
+fn smith_g(ndv: f32, ndl: f32, a: f32) -> f32 {
+    let a2 = a * a
+    let lv = ndl * sqrt(ndv * ndv * (1.0 - a2) + a2)
+    let ll = ndv * sqrt(ndl * ndl * (1.0 - a2) + a2)
+    return (2.0 * ndl * ndv) / max(lv + ll, 1e-8)
+}
+
+fn fresnel_schlick(vdh: f32, f0: vec3) -> vec3 {
+    let f = pow(1.0 - vdh, 5.0)
+    return f0 + (vec3(1.0) - f0) * f
+}
+
+fn oct16_encode(n: vec3 in world) -> vec2 {
+    let p = n.xy * (1.0 / (abs(n.x) + abs(n.y) + abs(n.z)))
+    var e = p
+    if n.z < 0.0 {
+        e = (vec2(1.0) - abs(vec2(p.y, p.x))) * vec2(sign_nz(p.x), sign_nz(p.y))
+    }
+    return e * 0.5 + 0.5
+}
+
+fn oct16_decode(e: vec2) -> vec3 in world {
+    let f = e * 2.0 - 1.0
+    var n = vec3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y)) in world
+    let t = max(-n.z, 0.0)
+    n.x -= t * sign_nz(n.x)
+    n.y -= t * sign_nz(n.y)
+    return normalize(n)
+}
+
+fn tap_offset(i: u32, taps: u32) -> vec2 {
+    let c = f32(taps - 1u) * 0.5
+    return vec2(f32(i % taps) - c, f32(i / taps) - c)
+}
+
+fn eval_sh2(sh: SH2, n: vec3 in world) -> vec3 {
+    let c1 = 0.429043; let c2 = 0.511664; let c3 = 0.743125
+    let c4 = 0.886227; let c5 = 0.247708
+    return c4 * sh.coeffs[0].xyz
+         + 2.0 * c2 * (sh.coeffs[1].xyz * n.y + sh.coeffs[2].xyz * n.z + sh.coeffs[3].xyz * n.x)
+         + 2.0 * c1 * (sh.coeffs[4].xyz * n.x * n.y + sh.coeffs[5].xyz * n.y * n.z
+                     + sh.coeffs[7].xyz * n.x * n.z)
+         + c3 * sh.coeffs[6].xyz * (n.z * n.z)
+         - c5 * sh.coeffs[6].xyz
+         + c1 * sh.coeffs[8].xyz * (n.x * n.x - n.y * n.y)
+}
+
+fn plane_from(a: vec3 in world, b: vec3 in world, c: vec3 in world) -> vec4 {
+    let n = normalize(cross(b - a, c - a))
+    return vec4(n, -dot(n, a))
+}
+
+fn plane_distance(p: vec4, x: vec3 in world) -> f32 {
+    return dot(p.xyz, x) + p.w
+}
+
+fn sphere_vs_frustum(c: vec3 in world, r: f32, f: Frustum) -> bool {
+    unroll for i in 0 .. 6 {
+        if plane_distance(f.planes[i], c) < -r { return false }
+    }
+    return true
+}
+
+fn cone_vs_frustum(o: vec3 in world, d: vec3 in world,
+                   r: f32, cos_outer: f32, f: Frustum) -> bool {
+    let axis     = normalize(d)
+    let tan_half = sqrt(max(1.0 - cos_outer * cos_outer, 0.0)) / max(cos_outer, 1e-4)
+    unroll for i in 0 .. 6 {
+        let p  = f.planes[i]
+        let m  = cross(cross(p.xyz, axis), axis)
+        let lm = length(m)
+        var rim = o + axis * r
+        if lm > 1e-6 { rim -= (m / lm) * (r * tan_half) }
+        if plane_distance(p, o) < 0.0 && plane_distance(p, rim) < 0.0 { return false }
+    }
+    return true
+}
+
+fn cluster_grid(cam: CameraData, tile: u32,
+                slices: u32) -> uvec3 {
+    return uvec3(div_ceil(u32(cam.viewport.x), tile),
+                 div_ceil(u32(cam.viewport.y), tile), slices)
+}
+
+fn slice_view_depth(cam: CameraData, k: f32, slices: u32) -> f32 {
+    return cam.near * pow(cam.far / cam.near, k / f32(slices))
+}
+
+fn slice_of(cam: CameraData, view_depth: f32, slices: u32) -> u32 {
+    let t = log(max(view_depth, cam.near) / cam.near) / log(cam.far / cam.near)
+    return min(u32(t * f32(slices)), slices - 1u)
+}
+
+fn ndc_depth(cam: CameraData, view_depth: f32) -> f32 {
+    return cam.far * (view_depth - cam.near) / (view_depth * (cam.far - cam.near))
+}
+
+fn unproject(cam: CameraData, ndc: vec3) -> vec3 in world {
+    let w = cam.inv_view_proj * vec4(ndc, 1.0) in clip
+    return w.xyz / w.w
+}
+
+fn cluster_index(gid: uvec3, grid: uvec3) -> u32 {
+    return gid.z * grid.x * grid.y + gid.y * grid.x + gid.x
+}
+
+fn cluster_base(idx: u32, max_per_cluster: u32) -> u32 {
+    return idx * max_per_cluster
+}
+
+fn cluster_of(cam: CameraData, screen: vec2, view_depth: f32,
+              tile: u32, slices: u32) -> u32 {
+    let grid = cluster_grid(cam, tile, slices)
+    return cluster_index(uvec3(u32(screen.x) / tile, u32(screen.y) / tile,
+                               slice_of(cam, view_depth, slices)), grid)
+}
+
+fn cluster_frustum(cam: CameraData, gid: uvec3, tile: u32, slices: u32) -> Frustum
+{
+    let grid = cluster_grid(cam, tile, slices)
+    let g    = vec2(f32(grid.x), f32(grid.y))
+    let lo   = vec2(f32(gid.x),       f32(gid.y))       / g * 2.0 - 1.0
+    let hi   = vec2(f32(gid.x + 1u),  f32(gid.y + 1u))  / g * 2.0 - 1.0
+    let zn   = ndc_depth(cam, slice_view_depth(cam, f32(gid.z),      slices))
+    let zf   = ndc_depth(cam, slice_view_depth(cam, f32(gid.z + 1u), slices))
+
+    let a = unproject(cam, vec3(lo.x, lo.y, zn))
+    let b = unproject(cam, vec3(hi.x, lo.y, zn))
+    let c = unproject(cam, vec3(hi.x, hi.y, zn))
+    let d = unproject(cam, vec3(lo.x, hi.y, zn))
+    let e = unproject(cam, vec3(lo.x, lo.y, zf))
+    let f = unproject(cam, vec3(hi.x, lo.y, zf))
+    let g2 = unproject(cam, vec3(hi.x, hi.y, zf))
+    let h = unproject(cam, vec3(lo.x, hi.y, zf))
+
+    return Frustum(planes: [
+        plane_from(a, d, h),
+        plane_from(b, f, g2),
+        plane_from(a, e, f),
+        plane_from(d, c, g2),
+        plane_from(a, b, c),
+        plane_from(f, e, h)])
+}
+
+fn view_depth_of(cam: CameraData, px: Pixel) -> f32 {
+    return length(world_from_depth(cam, px) - cam.position)
+}
+
+fn sample_directional(d: LightData, p: vec3 in world) -> LightSample {
+    return LightSample(l: normalize(-d.direction),
+                       radiance: d.color * d.intensity,
+                       attenuation: 1.0)
+}
+
+fn sample_point(d: LightData, p: vec3 in world) -> LightSample {
+    let to_light = d.position - p
+    let dist2    = dot(to_light, to_light)
+    let window   = saturate(1.0 - (dist2 * dist2) / pow(d.range, 4.0))
+    return LightSample(l: to_light * rsqrt(max(dist2, 1e-8)),
+                       radiance: d.color * d.intensity,
+                       attenuation: (window * window) / max(dist2, 1e-4))
+}
+
+fn sample_spot(d: LightData, p: vec3 in world) -> LightSample {
+    let to_light = d.position - p
+    let dist2    = dot(to_light, to_light)
+    let l        = to_light * rsqrt(max(dist2, 1e-8))
+    let window   = saturate(1.0 - (dist2 * dist2) / pow(d.range, 4.0))
+    let cone     = saturate((dot(-l, normalize(d.direction)) - d.cos_outer)
+                          / max(d.cos_inner - d.cos_outer, 1e-4))
+    return LightSample(l: l,
+                       radiance: d.color * d.intensity,
+                       attenuation: (window * window) * (cone * cone) / max(dist2, 1e-4))
+}
+
+fn sample_any(d: LightData, p: vec3 in world) -> LightSample {
+    match d.kind {
+        LightKind.directional: return sample_directional(d, p)
+        LightKind.point:       return sample_point(d, p)
+        LightKind.spot:        return sample_spot(d, p)
+    }
+}
+
+fn brdf(sample_value: LightSample, n: vec3 in world, v: vec3 in world,
+        diffuse: vec3, f0: vec3, roughness: f32) -> vec3 {
+    let ndl = saturate(dot(n, sample_value.l))
+    if ndl <= 0.0 || sample_value.attenuation <= 0.0 { return vec3(0.0) }
+    let h   = normalize(sample_value.l + v)
+    let ndv = saturate(dot(n, v)) + 1e-5
+    let ndh = saturate(dot(n, h))
+    let vdh = saturate(dot(v, h))
+    let a   = roughness * roughness
+    let spec = (ggx_d(ndh, a) * smith_g(ndv, ndl, a) * fresnel_schlick(vdh, f0))
+             / (4.0 * ndv * ndl)
+    return (diffuse * INV_PI + spec) * sample_value.radiance * sample_value.attenuation * ndl
+}
+
+fn split_material(albedo: vec3, metallic: f32) -> MaterialSplit {
+    return MaterialSplit(
+    diffuse: albedo * (1.0 - metallic),
+    f0: mix(vec3(0.04), albedo, metallic))
+}
+
+fn eval_dir_lightmap(irradiance: vec3, dir: vec4, n: vec3 in world) -> vec3 {
+    let d = normalize(dir.xyz * 2.0 - 1.0) in world
+    return irradiance * saturate((dot(d, n) + dir.w) / max(dir.w, 1e-4))
+}
+
+fn fog_linear(f: FogData, d: f32) -> f32 { return saturate((f.end - d) / (f.end - f.start)) }
+fn fog_exp2(f: FogData, d: f32) -> f32   { return exp(-(f.density * d) * (f.density * d)) }
+
+fn cascade_for<const COUNT: u32>(view_depth: f32, sample_value: Splits) -> u32 {
+    var i = 0u
+    unroll for k in 0 .. COUNT - 1 { if view_depth > sample_value.depth[k] { i = k + 1u } }
+    return i
+}
+
+fn project(m: mat4 from world to clip, p: vec3 in world) -> vec3 {
+    let c = m * vec4(p, 1.0)
+    return vec3(c.xy / c.w * 0.5 + 0.5, c.z / c.w)
+}
+
+fn world_from_depth(cam: CameraData, px: Pixel) -> vec3 in world {
+    let c = vec4(px.uv * 2.0 - 1.0, px.depth, 1.0) in clip
+    let w = cam.inv_view_proj * c
+    return w.xyz / w.w
+}
+
+fn shadow_visibility<const TAPS: u32>(atlas: texture<ShadowDepthArray>, d: ShadowData,
+                                      p: vec3 in world, n: vec3 in world) -> f32 {
+    let uvz = project(d.view_proj, p + n * d.normal_bias)
+    var acc = 0.0
+    unroll for i in 0 .. (TAPS * TAPS) {
+        let uv = uvz.xy + tap_offset(i, TAPS) * d.inv_size
+        acc += atlas.at(uv, d.slice, uvz.z - d.depth_bias)
+    }
+    return acc / f32(TAPS * TAPS)
+}

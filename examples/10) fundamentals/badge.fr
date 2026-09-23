@@ -1,0 +1,23 @@
+// The worked example from the design doc §12: a rotated space (the compiler
+// emits the *inverse* rotation of the sample point), an analytic shadow
+// (no blur pass), a fill, and a stroke — all folded into one expression,
+// with the box's SDF evaluated once and shared (shape CSE).
+
+canvas badge(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let b = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> round(0.04uv)
+
+    compose {
+        fill(#101018)
+
+        in space stage {
+            in space rotate(20deg/s) {
+                compose {
+                    b |> shadow(offset: (6px, 6px), soften: 12px, color: #000000aa)
+                    b |> fill(#ff2d78)
+                    b |> stroke(2px) |> fill(#ffffff)
+                }
+            }
+        }
+    }
+}

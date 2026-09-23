@@ -1,0 +1,31 @@
+// north-star: newsprint — halftone: repeat space + cross-layer sampling at cell rate
+// status: aspirational
+// rung: 3
+// deltas:
+//   - `param src: image` with declared sampling (ext §23.5)
+//   - `at` as a documented sampling operator on field/layer (ext §23.7)
+//   - CELL-RATE EVALUATION: `luma at cell.center` is per-cell uniform, hoisted
+//     when the repeat grid is static (ext §23.7)
+// done when: --explain prints `luma at cell.center: hoisted to cell rate`;
+//   rotating the screen angle param produces classic halftone moire-free dots.
+
+canvas newsprint(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    param src: image
+    param dot: length = 7px in 3px .. 16px
+    param angle: angle = 15deg
+
+    let photo = image(src, at: uv)
+    let luma  = field luminance(photo)
+
+    compose {
+        fill(#f4efe6)                                        // paper
+        in space rotate(angle, around: center)
+            . repeat(every: (dot, dot), cell: cell) {
+            let ink = 1 - luma at cell.center                // once per cell
+            circle(at: cell.center, radius: 0.5 * dot * sqrt(ink))
+            |> fill(#1a1611)
+        }
+        paper_grain(amount: 0.04) |> blend(multiply)
+    }
+}

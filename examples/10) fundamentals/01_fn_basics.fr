@@ -1,0 +1,13 @@
+// Fundamentals: top-level function declaration and call.
+
+fn half(x: f32) -> f32 {
+    return x * 0.5
+}
+
+canvas fn_basics(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let r = half(uv.x)
+    compose {
+        circle(at: center, radius: r) |> fill(#ffffff)
+    }
+}

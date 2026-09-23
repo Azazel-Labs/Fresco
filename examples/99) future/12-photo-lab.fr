@@ -1,0 +1,33 @@
+// north-star: photo-lab — pass partitioning under real load
+// status: aspirational
+// rung: 5 (grows with each kernel-ladder rung)
+// deltas:
+//   - `param src: image` (ext §23.5)
+//   - samplemap space category made explicit: `quantize(step:)` (ext §23.5)
+//   - kuwahara: local(r), NON-separable => forces the §11 ladder to grow a
+//     documented non-separable column
+//   - auto_levels: `global` histogram => multi-dispatch reduction feeding a uniform
+// done when: dragging paint_r across 0..14px sweeps strategy thresholds and the
+//   workbook filmstrip visualizes the cost model; --explain receipt matches the
+//   written expectations in the extensions doc.
+
+canvas photo_lab(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    param src: image
+    param edge_mix: f32 = 0.0 in 0 .. 1
+    param paint_r: length = 6px in 0px .. 14px
+    param cell: length = 1px in 1px .. 24px
+
+    let photo = image(src, at: uv)
+
+    let pixelated = in space quantize(step: cell) { photo }
+    let edges     = pixelated |> sobel() |> remap(0 .. 0.6, 0 .. 1)     // local(1)
+    let painted   = pixelated |> kuwahara(radius: paint_r)              // local(r)
+    let leveled   = painted   |> auto_levels(low: 0.01, high: 0.99)     // global
+
+    compose {
+        leveled
+        layer grey(edges) |> blend(multiply) |> opacity(edge_mix)
+        vignette(strength: 0.25) |> blend(multiply)
+    }
+}

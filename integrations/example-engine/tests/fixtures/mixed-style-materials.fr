@@ -1,0 +1,11 @@
+surface blue_toon(sp: surf) -> material(standard) {
+    properties { style: Toon(outline_color: #09182c) }
+    compose { base(albedo: #397acc, roughness: 0.5) }
+}
+surface plain(sp: surf) -> material(standard) {
+    compose { base(albedo: #82bd77, roughness: 0.4, metallic: 0.1) }
+}
+surface glass(sp: surf) -> material(unlit) {
+    properties { blend: SurfaceBlend.Translucent }
+    compose { base(albedo: rgba(0.1, 0.6, 0.9, 0.35)) }
+}

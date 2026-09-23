@@ -1,0 +1,66 @@
+// Showcase example — full design language; now compiles in the v0 playground.
+// This still exercises advanced features (scatter, instance lifecycle, signal
+// helpers, capsule/gradient/opacity paths), so treat it as a stress test while
+// those areas continue to evolve.
+//
+// A particle system in a fragment shader, written like a CPU particle
+// system: you describe 240 stars and 3 meteors *forward*, and the compiler
+// derives the bounded per-pixel gather. What --explain would report:
+//
+//   scatter "stars"    240 inst, footprint ≤ 6.2px ⇒ static grid, ≤3 evals/px
+//   scatter "meteors"    3 inst, closed-form flight ⇒ swept bounds, no pre-pass
+//   all effects analytic ⇒ 1 fused fragment pass
+
+canvas night_sky(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+
+    // -- sky ---------------------------------------------------------------
+    let sky = fill(gradient(
+        along: vertical,
+        stops: [
+            stop(at: 0.0, color: #05070f),
+            stop(at: 1.0, color: #16223d),
+        ]
+    ))
+
+    // -- twinkling stars -----------------------------------------------------
+    // Keep this count/runtime path web-preview friendly: a large compact scatter
+    // can produce very large shaders on some targets.
+    let stars = scatter 120 within screen seed 11 strategy procedural {
+        let twinkle = wave(period: rand(1.2s .. 3.6s),
+            shape:  sine,
+            phase:  rand(0 .. 1),
+            range:  0.2 .. 1.0)
+
+        circle(at: instance.pos, radius: rand(0.4px .. 1.2px))
+        |> fill(#eaf2ff)
+        |> glow(reach: rand(2px .. 5px), strength: twinkle)
+        // The glow reach grows this instance's *footprint*, which grows the
+        // grid cell size — §13's footprint analysis, visible in --explain.
+    }
+
+    // -- shooting stars ------------------------------------------------------
+    // Instance lifecycle (§13, as in the sparks example): each meteor lives
+    // 0.7s, then respawns at a fresh seeded position every 5–9s.
+    // age_norm(meteor) runs 0..1 over one life. Because the flight path is
+    // a closed-form function of age, the compiler can bound each meteor's
+    // swept area statically — still no compute pre-pass.
+    let meteors = scatter 3 within region((0, 0) .. (1, 0.55)) seed 4 strategy compact
+    lifetime meteor: 0.7s respawn every rand(5s .. 9s) {
+        let t    = age_norm(meteor)
+        let head = meteor.pos + (0.55uv, 0.20uv) * t
+        let tail = head - (0.16uv, 0.06uv) * (1 - 0.5 * t)   // tail shortens
+
+        compose {
+            capsule(from: tail, to: head, radius: 0.4px) |> fill(#9fb8ff)
+            circle(at: head, radius: 1px) |> fill(#ffffff)
+            circle(at: head, radius: 1px) |> glow(reach: 10px, strength: 1.2)
+        } |> opacity(4 * t * (1 - t))   // parabolic fade in/out over the life
+    }
+
+    compose {
+        sky
+        stars    |> blend(add)
+        meteors  |> blend(screen)
+    }
+}

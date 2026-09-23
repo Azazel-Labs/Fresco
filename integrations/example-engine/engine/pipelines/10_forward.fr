@@ -1,0 +1,148 @@
+// Staged permutation/binding demonstration, not an executable StandardStyle provider.
+// Runtime mesh shading uses core/05_mesh_contract.fr and config/renderer.fr.
+// The BRDF helpers here intentionally illustrate the separate staged pass API.
+import "../core/01_core.fr"
+import "../core/02_functions.fr"
+
+pass fwd_base for standard {
+    stage: raster
+    draw:  per_object
+    blend: opaque
+
+    permutations {
+        @known(compile) ambient:      "flat"|"sh2"|"lightmap"|"lightmap_dir"
+        @known(compile) main:         "none"|"lit"|"shadowed"
+        @known(compile) cascades:     1|2|4
+        @known(compile) cascade_taps: 1|3|5
+        @known(compile) extra_lights: 0|2|4
+        @known(draw)    fog:          FogMode
+    }
+
+    require {
+        main != "shadowed" => disable(cascades, cascade_taps)
+        ambient == "flat" && main == "none" => disable(extra_lights)
+    }
+
+    binding {
+        @group(frame)                                                   camera:        uniform<CameraData>
+        @group(frame)                                                   fog_data:      uniform<FogData>
+        @group(frame) @expect(ambient == "flat")                        ambient_color: uniform<vec3>
+        @group(draw)  @expect(ambient == "sh2")                         ambient_sh:    uniform<SH2>
+        @group(frame) @expect(ambient == "lightmap" | "lightmap_dir")   lightmap_tex:  texture<LightmapRGBM>
+        @group(frame) @expect(ambient == "lightmap_dir")                lightmap_dir:  texture<LightmapDirGL>
+        @group(frame) @expect(main == "lit" | "shadowed")               main_light:    uniform<LightData>
+        @group(frame) @expect(main == "shadowed")                       main_shadow:   uniform<ShadowData>[cascades]
+        @group(frame) @expect(main == "shadowed")                       splits:        uniform<Splits>
+        @group(frame) @expect(main == "shadowed")                       shadow_atlas:  texture<ShadowDepthArray>
+        @group(draw)                                                    extra:         uniform<LightData>[extra_lights]
+    }
+
+    fn shade(sp: Surf, m: standard) -> color {
+        let material_split = split_material(m.albedo.rgb, m.metallic)
+        let diffuse = material_split.diffuse
+        let f0 = material_split.f0
+        let v = normalize(camera.position - sp.position)
+
+        var lit = select ambient {
+            flat:         ambient_color
+            sh2:          eval_sh2(ambient_sh, m.normal)
+            lightmap:     lightmap_tex.at(sp.uv1)
+            lightmap_dir: eval_dir_lightmap(lightmap_tex.at(sp.uv1),
+                lightmap_dir.at(sp.uv1), m.normal)
+        } * diffuse * m.occlusion
+
+        select main {
+            none: {}
+            lit: {
+                lit += brdf(sample_directional(main_light, sp.position),
+                    m.normal, v, diffuse, f0, m.roughness)
+            }
+            shadowed: {
+                let c   = cascade_for<cascades>(sp.view_depth, splits)
+                let vis = shadow_visibility<cascade_taps>(shadow_atlas, main_shadow[c],
+                    sp.position, m.normal)
+                lit += brdf(sample_directional(main_light, sp.position),
+                    m.normal, v, diffuse, f0, m.roughness) * vis
+            }
+        }
+
+        unroll for l in extra {
+            lit += brdf(sample_point(l, sp.position),
+                m.normal, v, diffuse, f0, m.roughness)
+        }
+
+        lit += m.emissive
+        select fog {
+            off:    {}
+            linear: { lit = mix(fog_data.color, lit, fog_linear(fog_data, sp.view_depth)) }
+            exp2:   { lit = mix(fog_data.color, lit, fog_exp2(fog_data, sp.view_depth)) }
+        }
+        return rgba(lit * camera.exposure, m.albedo.a * m.opacity)
+    }
+}
+
+pass fwd_add for standard {
+    stage: raster
+    draw:  per_binding(light)
+    blend: additive
+
+    permutations {
+        @known(compile) kind:        "directional"|"point"|"spot"
+        @known(compile) shadow:      "off"|"on"
+        @known(compile) shadow_taps: 1|3
+        @known(compile) cookie:      "off"|"on"
+        @known(draw) fog:    FogMode
+    }
+
+    require {
+        shadow == "off" => disable(shadow_taps)
+        kind == "point" => disable(cookie)
+    }
+
+    binding {
+        @group(frame)                         camera:       uniform<CameraData>
+        @group(draw)                          light:        uniform<LightData>
+        @group(draw)  @expect(shadow == "on") shadow_data:  uniform<ShadowData>
+        @group(frame) @expect(shadow == "on") shadow_atlas: texture<ShadowDepthArray>
+        @group(draw)  @expect(cookie == "on") cookie_tex:   texture<CookieR>
+        @group(draw)  @expect(cookie == "on") cookie_proj:  uniform<mat4 from world to clip>
+        @group(frame)                         fog_data:     uniform<FogData>
+    }
+
+    fn shade(sp: Surf, m: standard) -> color {
+        let material_split = split_material(m.albedo.rgb, m.metallic)
+        let diffuse = material_split.diffuse
+        let f0 = material_split.f0
+        let v = normalize(camera.position - sp.position)
+
+        var sample_value = unroll match kind {
+            directional: sample_directional(light, sp.position)
+            point:       sample_point(light, sp.position)
+            spot:        sample_spot(light, sp.position)
+        }
+
+        select cookie {
+            off: {}
+            on:  { sample_value.radiance *= cookie_tex.at(project(cookie_proj, sp.position).xy) }
+        }
+
+        select shadow {
+            off: {}
+            on:  { sample_value.attenuation *= shadow_visibility<shadow_taps>(shadow_atlas, shadow_data,
+                    sp.position, m.normal) }
+        }
+
+        var lit = brdf(sample_value, m.normal, v, diffuse, f0, m.roughness)
+
+        select fog {
+            off:    {}
+            linear: { lit *= fog_linear(fog_data, sp.view_depth) }
+            exp2:   { lit *= fog_exp2(fog_data, sp.view_depth) }
+        }
+        return rgba(lit * camera.exposure, 0.0)
+    }
+}
+pipeline(lighting) forward for standard {
+    fwd_base
+    fwd_add
+}

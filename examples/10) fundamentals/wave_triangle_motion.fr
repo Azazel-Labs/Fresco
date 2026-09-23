@@ -1,0 +1,22 @@
+// Basic example: triangle waveform motion.
+// Demonstrates `wave(shape: triangle, ...)` in a tiny runnable scene.
+
+canvas wave_triangle_motion(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let tri_x = wave(period: 3.2s, shape: triangle, range: 0.2 .. 0.8)
+    let tri_r = wave(period: 1.6s, shape: triangle, phase: 0.25, range: 0.05 .. 0.09)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0a1220),
+                stop(at: 1.0, color: #172a42),
+            ]
+        ))
+
+        in space stage {
+            circle(at: (tri_x, 0.5), radius: tri_r) |> fill(#f9a8d4)
+        }
+    }
+}

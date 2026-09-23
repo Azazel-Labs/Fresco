@@ -1,0 +1,46 @@
+[package]
+repository.workspace = true
+name = "fresco-example-engine-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+license = "MIT-0"
+description = "Small native and browser hosts for the Fresco example engine."
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "fresco-example-engine"
+path = "src/main.rs"
+required-features = ["native"]
+
+[features]
+default = ["native"]
+native = ["dep:fresco", "dep:clap", "dep:winit", "dep:pollster"]
+browser = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:js-sys", "dep:console_error_panic_hook"]
+
+[dependencies]
+fresco-artifact.workspace = true
+fresco-example-engine = { workspace = true, features = ["runtime"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+wgpu = { version = "30.0.0", default-features = false, features = ["std", "wgsl", "webgpu"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+fresco = { workspace = true, optional = true }
+clap = { version = "4.6.1", features = ["derive"], optional = true }
+# Keep Wayland window controls without its optional, unmaintained font parser.
+winit = { version = "0.30.13", optional = true, default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita-notitle"] }
+pollster = { version = "0.4", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", features = ["HtmlCanvasElement"], optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+import "lib.fr"
+
+// Demonstrates importing a library module and calling its helper functions.
+// The `ring_field` and `outline_color` helpers live in lib.fr.
+
+canvas iq_distance_demo(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let center_uv = (0.5, 0.5)
+    let d = distance(uv, center_uv) - 0.25
+    let iso = 0.04
+
+    let rf = ring_field(d, iso)
+    let oc = outline_color(d)
+
+    let sample_value = circle(at: center, radius: 25px)
+    compose {
+        fill(rgba(r: oc.r * rf, g: oc.g * rf, b: oc.b * rf, a: 1.0))
+        sample_value |> stroke(2px) |> fill(#ffffff)
+    }
+}

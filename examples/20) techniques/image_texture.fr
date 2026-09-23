@@ -1,0 +1,25 @@
+// Demonstrates explicit texture sampling via `.at(...)` and decode helpers.
+// `brick_tex.at(uv)` samples at an explicit coordinate.
+// `unpack_unorm8(pack_unorm8x4(...), byte)` shows safe round-trip bit packing utilities.
+// `tint(color, amount: ...)` blends the sampled result toward a solid color.
+canvas image_texture(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    [binding(default = "assets/textures/brick_tex.png")]
+    uniform brick_tex: texture
+
+    let wall   = brick_tex.at(uv)
+    let tinted = wall |> tint(#223, amount: 0.4)
+
+    // Utility decode example: pack RGB channels, then decode the blue byte.
+    let packed = pack_unorm8x4(0.2, 0.5, 0.9, 1.0)
+    let blue = unpack_unorm8(packed, byte: 2)
+    let highlight = circle(at: center, radius: 0.12) |> fill(rgba(blue, blue, 1.0, 0.35))
+
+    let card = box(at: (0.5, 0.5), size: (0.6uv, 0.6uv)) |> round(0.04uv)
+
+    compose {
+        tinted
+        highlight
+        card |> stroke(2px) |> fill(#ffffff44)
+    }
+}

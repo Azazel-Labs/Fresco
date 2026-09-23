@@ -1,0 +1,63 @@
+// Technique example: noise dimensions compared side-by-side.
+// Left:  noise1 (1D) -> variation along one axis only.
+// Middle: noise2 (2D) -> planar texture variation.
+// Right: noise3 (3D)  -> adds a third axis (here: time) for richer evolution.
+
+canvas noise_dimensions_side_by_side(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    let n1 = field noise1(uv.x * 12.0 + time * 0.55)
+    let n2 = field noise2(uv * 5.5 + (time * 0.12, -time * 0.09))
+    let n3 = field noise3((uv.x * 5.2 + time * 0.10, uv.y * 5.2 - time * 0.07, time * 0.45))
+
+    let t1 = (n1 + 1.0) * 0.5
+    let t2 = (n2 + 1.0) * 0.5
+    let t3 = (n3 + 1.0) * 0.5
+
+    let stripe = smoothstep(0.42, 0.58, t1)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #070d1b),
+                stop(at: 1.0, color: #15233f),
+            ]
+        ))
+
+        box(at: (0.20, 0.52), size: (0.28, 0.74))
+        |> round(0.03)
+        |> fill(rgba(
+            r: 0.08 + 0.82 * stripe,
+            g: 0.22 + 0.70 * t1,
+            b: 0.42 + 0.46 * (1.0 - stripe),
+            a: 1.0
+        ))
+        |> glow(reach: 0.06, strength: 0.20, color: #8dd9ff)
+
+        box(at: (0.50, 0.52), size: (0.28, 0.74))
+        |> round(0.03)
+        |> fill(rgba(
+            r: 0.16 + 0.74 * t2,
+            g: 0.10 + 0.46 * (1.0 - t2),
+            b: 0.22 + 0.68 * t2,
+            a: 1.0
+        ))
+        |> glow(reach: 0.06, strength: 0.22, color: #ff9ccf)
+
+        box(at: (0.80, 0.52), size: (0.28, 0.74))
+        |> round(0.03)
+        |> fill(rgba(
+            r: 0.12 + 0.86 * t3,
+            g: 0.14 + 0.40 * (1.0 - t3),
+            b: 0.18 + 0.72 * t3,
+            a: 1.0
+        ))
+        |> glow(reach: 0.06, strength: 0.24, color: #ffd48a)
+
+        box(at: (0.50, 0.12), size: (0.94, 0.08))
+        |> round(0.02)
+        |> fill(rgba(r: 1.0, g: 1.0, b: 1.0, a: 0.16))
+        |> blend(screen)
+    }
+}

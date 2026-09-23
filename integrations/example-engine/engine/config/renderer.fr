@@ -1,0 +1,207 @@
+// Renderer selection configures shader specialization and an executable pass recipe.
+const preview_forward_plus: bool = false
+const preview_deferred: bool = false
+
+@renderer("forward", "Forward") @default
+@external(inspector, buffer_view)
+@configure(preview_forward_plus, false) @configure(preview_deferred, false)
+@external(environment_input, lighting_environment) @external(style_values, style_parameters)
+@external(sun_camera, shadow_camera) @image(sun_depth, depth32float)
+@external(presentation, presentation) @image(output, rgba16float)
+@external(studio, scene_background) @external(camera, resolve_camera) @image(forward_depth, depth32float)
+@external(frame, scene) @external(lamps, point_lights) @buffer(bins, 8)
+pipeline(postprocess) renderer_forward {
+    @node(sun_shadow) @draw(shadow_vertex, shadow_fragment, mesh) @depth(sun_depth)
+    @bind(scene, frame) @bind(shadow_camera, sun_camera)
+    preview_mesh
+    @node(clear_opaque) @draw(fullscreen, clear, fullscreen, 3) @color(0, output) @depth(forward_depth)
+    clear_opaque
+    @when(blend != SurfaceBlend.Translucent) @after(clear_opaque)
+    @after(sun_shadow) @draw(vertex, raster, mesh) @color(0, output) @depth(forward_depth)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(scene, frame) @bind(point_lights, lamps) @bind(light_tiles, bins)
+    @attachment(output, load, store) @attachment(forward_depth, load, store)
+    preview_mesh
+    @node(transparent) @transparent_queue(transparency) @when(blend == SurfaceBlend.Translucent) @after(preview_mesh)
+    @after(sun_shadow) @draw(vertex, raster, mesh) @color(0, output) @depth(forward_depth)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(scene, frame) @bind(point_lights, lamps) @bind(light_tiles, bins)
+    @attachment(output, load, store) @attachment(forward_depth, load, store)
+    preview_mesh
+    @after(transparent)
+    @draw(fullscreen, present, fullscreen, 3) @color(0, presentation)
+    @bind(shaded, output) @bind(settings, studio) @bind(resolve, camera)
+    @bind(view_mode, inspector)
+    scene_background
+}
+
+@renderer("forward-plus", "Forward+")
+@configure(preview_forward_plus, true) @configure(preview_deferred, false)
+@external(environment_input, lighting_environment) @external(style_values, style_parameters)
+@external(inspector, buffer_view) @image(lit_color, rgba16float) @image(mesh_depth, depth32float)
+@external(sun_camera, shadow_camera) @image(sun_depth, depth32float)
+@external(presentation, presentation) @image(output, rgba16float)
+@external(studio, scene_background) @external(camera, resolve_camera) @external(depth, depth)
+@external(frame, scene) @external(lamps, point_lights) @buffer(bins, 2097152)
+pipeline(postprocess) renderer_forward_plus {
+    @node(sun_shadow) @draw(shadow_vertex, shadow_fragment, mesh) @depth(sun_depth)
+    @bind(scene, frame) @bind(shadow_camera, sun_camera)
+    preview_mesh
+    @dispatch(cull, 16, 16) @per_invocation(bins, 8)
+    @bind(scene, frame) @bind(lights, lamps) @bind(tiles, bins)
+    tile_culling
+    @node(clear_opaque) @draw(fullscreen, clear, fullscreen, 3) @color(0, lit_color) @depth(mesh_depth)
+    clear_opaque
+    @when(blend != SurfaceBlend.Translucent) @after(clear_opaque)
+    @after(tile_culling) @after(sun_shadow) @draw(vertex, raster, mesh) @color(0, lit_color) @depth(mesh_depth)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(scene, frame) @bind(point_lights, lamps) @bind(light_tiles, bins)
+    @attachment(lit_color, load, store) @attachment(mesh_depth, load, store)
+    preview_mesh
+    @node(transparent) @transparent_queue(transparency) @when(blend == SurfaceBlend.Translucent) @after(preview_mesh)
+    @after(tile_culling) @after(sun_shadow) @draw(vertex, raster, mesh) @color(0, lit_color) @depth(mesh_depth)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(scene, frame) @bind(point_lights, lamps) @bind(light_tiles, bins)
+    @attachment(lit_color, load, store) @attachment(mesh_depth, load, store)
+    preview_mesh
+    @after(transparent)
+    @draw(fullscreen, visualize, fullscreen, 3) @color(0, output)
+    @bind(view_mode, inspector) @bind(shaded, lit_color) @bind(shadow_map, sun_depth) @bind(tiles, bins)
+    @bind(depth_texture, mesh_depth)
+    preview_buffer_view
+    @after(preview_buffer_view)
+    @draw(fullscreen, present, fullscreen, 3) @color(0, presentation)
+    @bind(shaded, output) @bind(settings, studio) @bind(resolve, camera)
+    @bind(view_mode, inspector)
+    scene_background
+}
+
+@renderer("deferred", "Deferred")
+@configure(preview_forward_plus, true) @configure(preview_deferred, true)
+@external(environment_input, lighting_environment) @external(style_values, style_parameters)
+@external(inspector, buffer_view) @image(lit_color, rgba16float) @image(mesh_depth, depth32float)
+@external(sun_camera, shadow_camera) @image(sun_depth, depth32float)
+@external(presentation, presentation) @image(output, rgba16float)
+@external(studio, scene_background) @external(camera, resolve_camera) @external(depth, depth)
+@external(frame, scene) @external(lamps, point_lights)
+@buffer(bins, 2097152) @table_data(models, DrawRecord, shading_model) @table_data(styles, DrawRecord, style_id) @table_data(style_offsets, DrawRecord, style_settings_offset)
+@image(albedo, rgba8unorm_srgb) @image(normal, rgba16float)
+@image(emissive, rgba16float) @image(identity, rg32uint) @image(surface_uv, rg32float) @image(z_buffer, depth32float)
+pipeline(postprocess) renderer_deferred {
+    @node(sun_shadow) @draw(shadow_vertex, shadow_fragment, mesh) @depth(sun_depth)
+    @bind(scene, frame) @bind(shadow_camera, sun_camera)
+    preview_mesh
+    @dispatch(cull, 16, 16) @per_invocation(bins, 8)
+    @bind(scene, frame) @bind(lights, lamps) @bind(tiles, bins)
+    tile_culling
+    @node(clear_geometry) @draw(fullscreen, clear, fullscreen, 3)
+    @color(0, albedo) @color(1, normal) @color(2, emissive) @color(3, identity) @color(4, surface_uv) @depth(z_buffer)
+    clear_gbuffer
+    @node(opaque) @after(clear_geometry) @after(sun_shadow) @after(tile_culling) @when(blend != SurfaceBlend.Translucent)
+    @draw(vertex, geometry, mesh) @color(0, albedo) @color(1, normal)
+    @color(2, emissive) @color(3, identity) @color(4, surface_uv) @depth(z_buffer)
+    @attachment(albedo, load, store) @attachment(normal, load, store)
+    @attachment(emissive, load, store) @attachment(identity, load, store) @attachment(z_buffer, load, store)
+    @attachment(surface_uv, load, store)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(scene, frame) @bind(point_lights, lamps) @bind(light_tiles, bins)
+    preview_mesh
+    @node(clear_lighting) @after(clear_geometry)
+    @draw(fullscreen, clear, fullscreen, 3) @color(0, lit_color)
+    clear_opaque
+    @after(opaque) @after(clear_geometry) @after(clear_lighting)
+    @draw(fullscreen, lighting, instance, 3) @color(0, lit_color)
+    @attachment(lit_color, load, store)
+    @bind(albedo_texture, albedo) @bind(normal_texture, normal)
+    @bind(surface_uv_texture, surface_uv)
+    @bind(emissive_texture, emissive) @bind(identity_texture, identity)
+    @bind(depth_texture, z_buffer) @bind(resolve, camera)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(lights, lamps) @bind(tiles, bins) @bind(materials, models) @bind(styles, styles) @bind(style_offsets, style_offsets)
+    lighting_resolve
+    @node(transparent) @transparent_queue(transparency) @after(lighting_resolve) @after(tile_culling) @when(blend == SurfaceBlend.Translucent)
+    @after(sun_shadow) @draw(vertex, raster, mesh) @color(0, lit_color) @depth(z_buffer)
+    @attachment(lit_color, load, store) @attachment(z_buffer, load, store)
+    @bind(shadow_camera, sun_camera) @bind(shadow_map, sun_depth) @bind(environment, environment_input) @bind(style_settings, style_values) @bind(scene, frame) @bind(point_lights, lamps) @bind(light_tiles, bins)
+    preview_mesh
+    @after(lighting_resolve) @after(transparent)
+    @draw(fullscreen, visualize, fullscreen, 3) @color(0, output)
+    @bind(view_mode, inspector) @bind(shaded, lit_color) @bind(shadow_map, sun_depth) @bind(tiles, bins)
+    @bind(depth_texture, z_buffer) @bind(albedo_texture, albedo) @bind(normal_texture, normal)
+    @bind(emissive_texture, emissive) @bind(identity_texture, identity)
+    deferred_buffer_view
+    @after(deferred_buffer_view)
+    @draw(fullscreen, present, fullscreen, 3) @color(0, presentation)
+    @bind(shaded, output) @bind(settings, studio) @bind(resolve, camera)
+    @bind(view_mode, inspector)
+    scene_background
+}
+
+provide StandardStyle for renderer_forward {
+    ForwardLighting { lights: shader_service(transparent); factories: preview_static }
+    transparent {
+        queue: transparency
+        complete_opaque: all(preview_mesh)
+        inspection: all(scene_background)
+        presentation: all(scene_background)
+        color: output
+        depth: forward_depth
+    }
+    SurfaceUV { surface.uv: shader_output(preview_mesh.vertex.uv); factories: preview_static }
+    DrawShadingResources { shading_instance_id: draw_data(preview_mesh.shading_instance_id); factories: preview_static }
+    PreparedGeometry { mesh.prepared: preview_mesh.prepare; factories: preview_static }
+    frame = frame
+    after_opaque {
+        complete_opaque: all(preview_mesh)
+        transparency: all(transparent)
+        inspection: all(scene_background)
+        presentation: all(scene_background)
+        color: output
+        depth: forward_depth
+        order: stable_draw_order
+    }
+}
+
+provide StandardStyle for renderer_forward_plus {
+    ForwardLighting { lights: shader_service(transparent); factories: preview_static }
+    transparent {
+        queue: transparency
+        complete_opaque: all(preview_mesh)
+        inspection: all(preview_buffer_view)
+        presentation: all(scene_background)
+        color: lit_color
+        depth: mesh_depth
+    }
+    SurfaceUV { surface.uv: shader_output(preview_mesh.vertex.uv); factories: preview_static }
+    DrawShadingResources { shading_instance_id: draw_data(preview_mesh.shading_instance_id); factories: preview_static }
+    PreparedGeometry { mesh.prepared: preview_mesh.prepare; factories: preview_static }
+    frame = frame
+    after_opaque {
+        complete_opaque: all(preview_mesh)
+        transparency: all(transparent)
+        inspection: all(preview_buffer_view)
+        presentation: all(scene_background)
+        color: lit_color
+        depth: mesh_depth
+        order: stable_draw_order
+    }
+}
+
+provide StandardStyle for renderer_deferred {
+    ForwardLighting { lights: shader_service(transparent); factories: preview_static }
+    transparent {
+        queue: transparency
+        complete_opaque: all(lighting_resolve)
+        inspection: all(deferred_buffer_view)
+        presentation: all(scene_background)
+        color: lit_color
+        depth: z_buffer
+    }
+    SurfaceUV { surface.uv: shader_output(opaque.geometry.surface_uv); factories: preview_static }
+    DrawShadingResources { shading_instance_id: draw_data(lighting_resolve.shading_instance_id); factories: preview_static }
+    PreparedGeometry { mesh.prepared: opaque.prepare; factories: preview_static }
+    frame = frame
+    after_opaque {
+        complete_opaque: all(lighting_resolve)
+        transparency: all(transparent)
+        inspection: all(deferred_buffer_view)
+        presentation: all(scene_background)
+        color: lit_color
+        depth: z_buffer
+        order: stable_draw_order
+    }
+}

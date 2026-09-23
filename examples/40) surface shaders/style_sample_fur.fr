@@ -1,0 +1,129 @@
+// Procedural shell fur: opaque roots, per-draw density, and lit translucent shells.
+// Shells receive scene shadows but do not cast additional shell shadows.
+struct FurVertex { world_position: vec3; normal: vec3; uv: vec2; height: f32 }
+struct FurVarying {
+    @semantic(position) clip: vec4
+    world_position: vec3
+    normal: vec3
+    uv: vec2
+    height: f32
+}
+
+fn density_hash(cell: uvec2, seed: u32) -> f32 {
+    var x = wrapping_add(wrapping_mul(cell.x, 1664525u), cell.y)
+    x = wrapping_add(x, seed)
+    x = x ^ (x >> 16u)
+    x = wrapping_mul(x, 2246822519u)
+    x = x ^ (x >> 13u)
+    return f32(x & 65535u) / 65535.0
+}
+
+compute FurDensity(resolution: u32, seed: u32) -> texture2d<r32float, read> {
+    requires resolution >= 1u && resolution <= 512u
+    output field: texture2d<r32float, write>(resolution, resolution)
+    workgroup_size: (8, 8, 1)
+    dispatch threads(resolution, resolution, 1u)
+    @compute fn main(id: uvec3) {
+        if id.x >= resolution || id.y >= resolution { return }
+        field.store(id.xy, density_hash(id.xy, seed))
+    }
+    return field
+}
+
+compute FurShellVertices(geometry: PreparedMesh, layers: u32, length: f32, wind: vec3, time: f32) -> buffer<FurVertex, read> {
+    requires layers >= 1u && layers <= 32u
+    requires length >= 0.0
+    output vertices: buffer<FurVertex, write>(checked_mul(geometry.vertex_count, layers))
+    workgroup_size: (64, 1, 1)
+    dispatch threads(checked_mul(geometry.vertex_count, layers), 1u, 1u)
+    @compute fn main(id: uvec3) {
+        let count = geometry.vertex_count * layers
+        if id.x >= count { return }
+        let layer = id.x / geometry.vertex_count
+        let index = id.x % geometry.vertex_count
+        let source = geometry.vertices[index]
+        let height = f32(layer + 1u) / f32(layers)
+        let bounded_wind = wind / max(1.0, sqrt(dot(wind, wind)))
+        let bend = bounded_wind * sin(time + source.world_position.x) * length * height * height
+        vertices[id.x] = FurVertex(source.world_position + source.geometric_normal * length * height + bend,
+                                  source.geometric_normal, source.uv, height)
+    }
+    return vertices
+}
+
+fn fur_response(albedo: vec3, normal: vec3, light: DirectLight) -> vec3 {
+    let wrapped = clamp((dot(normal, light.direction) + 0.4) / 1.4, 0.0, 1.0)
+    return albedo * wrapped / 3.14159265 * light.radiance * light.attenuation * light.visibility
+}
+
+draw FurShell(geometry: PreparedMesh, vertices: buffer<FurVertex, read>, layer: u32, layers: u32, length: f32,
+              density: texture2d<r32float, read>, density_sampler: sampler, tint: vec3, opacity: f32,
+              view: PreviewScene, lights: LightingService,
+              color: attachment<rgba16float, preserve_update>, depth: attachment<depth32float, test_only>) {
+    requires vertices.count == checked_mul(geometry.vertex_count, layers)
+    requires layer < layers
+    raster geometry using vertices base_vertex checked_mul(layer, geometry.vertex_count)
+    visibility: geometry.bounds.expand_world(2.0 * length)
+    sort_position: geometry.bounds.center
+    cull: back
+    depth { compare: less_equal; write: false }
+    blend { all: premultiplied }
+    attachments { color: load_store; depth: load_store }
+    @vertex fn vertex(index: u32) -> FurVarying {
+        let v = vertices[index]
+        return FurVarying(view.proj * view.view * vec4(v.world_position, 1.0), v.world_position, v.normal, v.uv, v.height)
+    }
+    @fragment fn fragment(input: FurVarying) -> vec4 {
+        let density_value = density.sample_level(density_sampler, input.uv, 0.0).r
+        if density_value < input.height { discard_fragment() }
+        let alpha = clamp(opacity * (1.0 - 0.8 * input.height), 0.0, 1.0)
+        let normal = normalize_or(input.normal, vec3(0.0, 1.0, 0.0))
+        var rgb = tint * lights.indirect(input.world_position, normal).irradiance
+        for light in lights.direct_samples(input.world_position, normal) {
+            rgb += fur_response(tint, normal, light)
+        }
+        return vec4(rgb * alpha, alpha)
+    }
+}
+
+style MeadowFur for standard : StandardStyle {
+    requires PreparedGeometry, SurfaceUV, DrawShadingResources, ForwardLighting
+    requires transparent
+    requires blend == SurfaceBlend.Opaque && !two_sided
+    static param layers: u32 in [1, 32] = 12u
+    static param density_resolution: u32 in [1, 512] = 128u
+    param seed: u32 = 7u
+    param fur_length: f32 in [0.0, 0.25] = 0.025
+    param fur_tint: color = #8c6239
+    param shell_opacity: f32 in [0.0, 1.0] = 0.22
+    param wind: vec3 = vec3(0.3, 0.0, 0.1)
+    shading_input density: texture2d<r32float, read> scope draw
+    shading_input density_sampler: sampler scope draw
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        let density_value = density.sample_level(density_sampler, surface.uv, 0.0).r
+        return fur_response(surface.albedo * mix(0.6, 1.0, density_value), surface.normal, light)
+    }
+    for self {
+        let field = FurDensity(resolution: density_resolution, seed: seed)
+        bind shading.density = field
+        bind shading.density_sampler = nearest_repeat
+        let vertices = FurShellVertices(geometry: mesh.prepared, layers: layers, length: fur_length, wind: wind, time: frame.time)
+        at transparent as target {
+            static for ordinal in 0u..layers {
+                let layer = layers - 1u - ordinal
+                FurShell(geometry: mesh.prepared, vertices: vertices, layer: layer, layers: layers, length: fur_length,
+                         density: field, density_sampler: nearest_repeat, tint: fur_tint.rgb, opacity: shell_opacity,
+                         view: frame, lights: lights, color: target.color, depth: target.depth)
+            }
+        }
+    }
+}
+
+surface chestnut_fur(sp: surf) -> material(standard) {
+    properties { style: MeadowFur(layers: 12u, fur_length: 0.025, fur_tint: #8c6239) }
+    compose { base(albedo: #69482f, roughness: 0.9, metallic: 0.0) }
+}
+surface pale_fur(sp: surf) -> material(standard) {
+    properties { style: MeadowFur(layers: 20u, fur_length: 0.06, fur_tint: #ddd3b9) }
+    compose { base(albedo: #b5ac93, roughness: 1.0, metallic: 0.0) }
+}

@@ -1,0 +1,77 @@
+#pragma check.shape_aa_min_px = 1.5
+#pragma check.shape_aa_max_px = 3.0
+#pragma check.shape_aa_style = gradient
+#pragma check.projective_footprint_max_px = 64.0
+// Independent engine: no example-engine imports or standard material policy.
+struct SamplePoint {
+    @semantic(coord) uv: vec2
+    second: vec2
+    @semantic(time) clock: f32
+    @semantic(resolution) size: vec2
+    position: vec3
+    normal: vec3
+}
+@context(SamplePoint, sp)
+@composition(Pigment, material, weight)
+material_properties Pigment { channel @compose(mix) tint: color }
+vertex_interface Corner { point: vec3 }
+vertex_format Triangle { required { point: vec3 } }
+struct Interpolated { @semantic(position) clip: vec4 }
+struct Pixels { @location(0) paint: vec4
+ @location(6) tag: u32 }
+struct ViewInput { depth: f32; gain: f32; padding: vec2 }
+vertex_factory plain for Triangle {
+    binding { @group(2) @binding(0) view: uniform<ViewInput> }
+    fn transform(v: Triangle) -> mat4 { return mat4(vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 1.0, 0.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0)) }
+}
+@factory(plain) pass ink for Pigment {
+    stage: raster
+    draw: per_object
+    cull: none
+    depth { write: false; compare: always }
+    blend { all: replace }
+    @vertex fn project(v: Corner) -> Interpolated { return Interpolated(vec4(v.point.xy, view.depth, 1.0)) }
+    @evaluate(surface) fn sample(sp: SamplePoint) -> Pigment {}
+    @fragment fn pack_pixels(v: Interpolated) -> Pixels {
+        let sp = SamplePoint(vec2(0.0), vec2(0.0), 0.0, vec2(64.0), vec3(0.0), vec3(0.0, 0.0, 1.0))
+        return Pixels(sample(sp).tint * view.gain, u32(37))
+    }
+}
+@factory(plain) pass measure for Pigment {
+    stage: raster
+    draw: per_object
+    cull: none
+    depth { write: true; compare: less }
+    @vertex fn project(v: Corner) -> Interpolated {
+        return Interpolated(vec4(v.point.xy, view.depth, 1.0))
+    }
+}
+struct Screen { @builtin(position) position: vec4 }
+@shader pass display {
+    stage: raster
+    draw: fullscreen
+    binding {
+        @group(0) paint: texture_2d<f32>
+        @group(0) stamps: texture_2d<u32>
+    }
+    @vertex fn cover(@builtin(vertex_index) index: u32) -> Screen {
+        let p = vec2(f32((index << u32(1)) & u32(2)), f32(index & u32(2)))
+        return Screen(vec4(p * 2.0 - 1.0, 0.0, 1.0))
+    }
+    @fragment fn show(@builtin(position) pixel: vec4) -> color {
+        let xy = ivec2(pixel.xy)
+        let tag = textureLoad(stamps, xy, i32(0)).x
+        if tag == u32(37) { return textureLoad(paint, xy, i32(0)) }
+        return vec4(1.0, 0.0, 1.0, 1.0)
+    }
+}
+@renderer("ink", "Ink on paper") @default
+@image(measured, depth32float) @image(measured_again, depth32float) @external(first_view, camera_a) @external(second_view, camera_b)
+@image(paint, rgba8unorm) @image(stamps, r32uint) @external(screen, presentation)
+pipeline(postprocess) print for Pigment {
+    @node(front) @draw_depth(project, mesh, 3) @depth(measured) @bind(view, first_view) measure
+    @node(back) @after(front) @draw_depth(project, mesh, 3) @depth(measured_again) @bind(view, second_view) measure
+    @after(back) @bind(view, second_view) @draw(project, pack_pixels, mesh) @color(0, paint) @color(6, stamps) ink
+    @after(ink) @draw(cover, show, fullscreen) @color(0, screen)
+    @bind(paint, paint) @bind(stamps, stamps) display
+}

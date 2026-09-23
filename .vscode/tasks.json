@@ -1,0 +1,246 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "xtask: check",
+            "type": "shell",
+            "command": "cargo xtask check",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: check-fast",
+            "type": "shell",
+            "command": "cargo xtask check-fast",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: check-timing",
+            "type": "shell",
+            "command": "cargo xtask check-timing",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: test",
+            "type": "shell",
+            "command": "cargo xtask test",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: clippy",
+            "type": "shell",
+            "command": "cargo xtask clippy",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: fmt",
+            "type": "shell",
+            "command": "cargo xtask fmt",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: gate-status",
+            "type": "shell",
+            "command": "cargo xtask gate-status",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: ci",
+            "type": "shell",
+            "command": "cargo xtask ci",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: ci-strict",
+            "type": "shell",
+            "command": "cargo xtask ci-strict",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: snapshots-refresh",
+            "type": "shell",
+            "command": "cargo xtask snapshots-refresh",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "fresco: fmt examples",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "run",
+                "-p",
+                "fresco-cli",
+                "--",
+                "fmt",
+                "examples",
+                "integrations/example-engine"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: perf iq_distance_gallery (chrome dump)",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "xtask",
+                "timed-run",
+                "examples/90) gallery/iq_distance_gallery_original_direct.fr",
+                "--trace",
+                "chrome",
+                "--timings",
+                "--output",
+                "target/tmp/iq_distance_gallery_original_direct.wgsl"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: perf iq_distance_gallery (tracy live)",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "xtask",
+                "timed-run",
+                "examples/90) gallery/iq_distance_gallery_original_direct.fr",
+                "--trace",
+                "tracy",
+                "--timings",
+                "--output",
+                "target/tmp/iq_distance_gallery_original_direct.wgsl"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "xtask: ci + ci-strict",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "xtask: ci",
+                "xtask: ci-strict"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: install",
+            "type": "shell",
+            "command": "npm install",
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: dev",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: dev (vite only)",
+            "type": "shell",
+            "command": "npm run dev:vite",
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: dev (vite clean)",
+            "type": "shell",
+            "command": "npm run dev:vite:clean",
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: build",
+            "type": "shell",
+            "command": "npm run build",
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: perf iq_distance_gallery",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "perf:compile:iq"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "wasm web: perf iq_distance_gallery (fast)",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "run",
+                "perf:compile:iq:fast"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/crates/fresco-wasm/web"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

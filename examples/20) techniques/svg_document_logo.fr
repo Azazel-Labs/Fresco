@@ -1,0 +1,21 @@
+// Basic example: `svg` import from a triple-quoted SVG document string.
+
+canvas svg_document_logo(ctx: CanvasContext) -> color {
+    let logo = svg("""
+        <svg viewBox='0 0 100 100'>
+        <path d='M10 10 L90 10 L90 90 L10 90 Z'/>
+        <path d='M26 26 L74 26 L50 74 Z'/>
+        </svg>
+        """, fill_rule: even_odd)
+
+        compose {
+            fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #111827),
+                stop(at: 1.0, color: #1f2937),
+            ]
+            ))
+            logo |> fill(#f97316)
+        }
+    }

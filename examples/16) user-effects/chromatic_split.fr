@@ -1,0 +1,29 @@
+// §16.1 User-Defined Effects — Example: chromatic split
+//
+// Demonstrates:
+//   - A `local(spread)` locality effect (reads a neighborhood of radius `spread`)
+//   - No fusion rule — each call remains independent in the output
+//
+// The effect samples the layer at three offset positions and returns them as
+// the red, green, and blue channels, producing a chromatic-aberration look.
+
+effect chromatic_split(spread: f32) local(spread) {
+    let left = self at (coord - (spread, 0.0))
+    let right = self at (coord + (spread, 0.0))
+    layer rgba(r: left.r, g: self.g, b: right.b, a: self.a)
+}
+
+canvas chromatic_split_demo(ctx: CanvasContext) -> color {
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1324),
+                stop(at: 1.0, color: #1d2f4f),
+            ]
+        ))
+        circle(at: center, radius: 120px)
+        |> fill(mix(#1a1a2e, #ff6b6b, checker(scale: 0.08uv, at: center)))
+        |> chromatic_split(0.003)
+    }
+}

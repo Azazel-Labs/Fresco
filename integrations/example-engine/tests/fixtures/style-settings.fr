@@ -1,0 +1,20 @@
+// Same implementation, two independent material settings records.
+style Adjustable for standard : StandardStyle {
+    param gain: f32 = 0.5 in 0.0 .. 1.0
+    param tint: color = #fff
+    param direction: vec3 = vec3(1.0, 0.0, 0.0)
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        return vec3(0.0)
+    }
+    fn finish(surface: StandardSurface, context: ShadingContext, lighting: LightingResult) -> vec3 {
+        return tint.rgb * gain + direction * 0.0
+    }
+}
+surface first(sp: surf) -> material(standard) {
+    properties { style: Adjustable(gain: 0.25) }
+    compose { base(albedo: #fff) }
+}
+surface second(sp: surf) -> material(standard) {
+    properties { style: Adjustable(gain: 0.75) }
+    compose { base(albedo: #fff) }
+}

@@ -1,0 +1,128 @@
+// Engine-owned fullscreen inspectors. These read the actual recipe resources.
+
+struct BufferViewInputs { mode: uvec4 }
+
+@shader pass preview_buffer_view {
+    stage: raster
+    draw: fullscreen
+    binding {
+        @group(0) @binding(0) view_mode: uniform<BufferViewInputs>
+        @group(0) @binding(1) shaded: texture_2d<f32>
+        @group(0) @binding(2) shadow_map: texture_depth_2d
+        @group(0) @binding(3) tiles: buffer<u32>
+        @group(0) @binding(4) depth_texture: texture_depth_2d
+    }
+    @vertex fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenPosition {
+        let p = vec2(f32((index << u32(1)) & u32(2)), f32(index & u32(2)))
+        return ScreenPosition(vec4(p * 2.0 - 1.0, 0.0, 1.0))
+    }
+    @fragment fn visualize(@builtin(position) pixel: vec4) -> vec4 {
+        let xy = ivec2(pixel.xy)
+        let size = textureDimensions(shaded)
+        let mode = view_mode.mode.x
+        if mode == u32(0) { return textureLoad(shaded, xy, i32(0)) }
+        if mode == u32(1) {
+            let uv = pixel.xy / vec2(size)
+            let at = min(ivec2(uv * vec2(textureDimensions(shadow_map))), ivec2(textureDimensions(shadow_map)) - ivec2(1))
+            return vec4(vec3(textureLoad(shadow_map, at, i32(0))), 1.0)
+        }
+        if mode == u32(2) {
+            let columns = (size.x + u32(15)) / u32(16)
+            let tile = u32(pixel.y) / u32(16) * columns + u32(pixel.x) / u32(16)
+            var count = 0.0
+            for index in 0 .. 64 {
+                count += f32((tiles[tile * u32(2) + index / u32(32)] >> (index % u32(32))) & u32(1))
+            }
+            // Counts remain visible for small scenes; red reaches 64 lights/tile.
+            let intensity = log2(1.0 + count) / log2(65.0)
+            return vec4(intensity, intensity * intensity, 1.0 - intensity, 1.0)
+        }
+        if mode == u32(3) {
+            // Raw device depth, remapped to expose differences near the far end.
+            let z = textureLoad(depth_texture, xy, i32(0))
+            return vec4(vec3(pow(z, 32.0)), 1.0)
+        }
+        return vec4(1.0, 0.0, 1.0, 1.0)
+    }
+}
+
+@shader pass deferred_buffer_view {
+    stage: raster
+    draw: fullscreen
+    binding {
+        @group(0) @binding(0) view_mode: uniform<BufferViewInputs>
+        @group(0) @binding(1) shaded: texture_2d<f32>
+        @group(0) @binding(2) shadow_map: texture_depth_2d
+        @group(0) @binding(3) tiles: buffer<u32>
+        @group(0) @binding(4) depth_texture: texture_depth_2d
+        @group(0) @binding(5) albedo_texture: texture_2d<f32>
+        @group(0) @binding(6) normal_texture: texture_2d<f32>
+        @group(0) @binding(7) emissive_texture: texture_2d<f32>
+        @group(0) @binding(8) identity_texture: texture_2d<u32>
+    }
+    @vertex fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenPosition {
+        let p = vec2(f32((index << u32(1)) & u32(2)), f32(index & u32(2)))
+        return ScreenPosition(vec4(p * 2.0 - 1.0, 0.0, 1.0))
+    }
+    @fragment fn visualize(@builtin(position) pixel: vec4) -> vec4 {
+        let size = textureDimensions(shaded)
+        var sample_pixel = pixel.xy
+        var mode = view_mode.mode.x
+        if mode == u32(11) {
+            // The overview uses exactly the same decoding as individual views.
+            let grid = pixel.xy / vec2(size) * vec2(4.0, 3.0)
+            let cell = uvec2(grid)
+            mode = cell.y * u32(4) + cell.x
+            if mode > u32(10) { return vec4(0.025, 0.025, 0.025, 1.0) }
+            let local = fract(grid)
+            if local.x < 0.008 || local.y < 0.008 { return vec4(0.025, 0.025, 0.025, 1.0) }
+            // Letterbox each cell to preserve the scene's original aspect ratio.
+            let uv = vec2(local.x, (local.y - 0.125) / 0.75)
+            if uv.y < 0.0 || uv.y >= 1.0 { return vec4(0.025, 0.025, 0.025, 1.0) }
+            sample_pixel = min(uv * vec2(size), vec2(size) - vec2(1.0))
+        }
+        let xy = ivec2(sample_pixel)
+        if mode == u32(0) { return textureLoad(shaded, xy, i32(0)) }
+        if mode == u32(1) {
+            let uv = sample_pixel / vec2(size)
+            let at = min(ivec2(uv * vec2(textureDimensions(shadow_map))), ivec2(textureDimensions(shadow_map)) - ivec2(1))
+            return vec4(vec3(textureLoad(shadow_map, at, i32(0))), 1.0)
+        }
+        if mode == u32(2) {
+            let columns = (size.x + u32(15)) / u32(16)
+            let tile = u32(sample_pixel.y) / u32(16) * columns + u32(sample_pixel.x) / u32(16)
+            var count = 0.0
+            for index in 0 .. 64 {
+                count += f32((tiles[tile * u32(2) + index / u32(32)] >> (index % u32(32))) & u32(1))
+            }
+            // Counts remain visible for small scenes; red reaches 64 lights/tile.
+            let intensity = log2(1.0 + count) / log2(65.0)
+            return vec4(intensity, intensity * intensity, 1.0 - intensity, 1.0)
+        }
+        if mode == u32(3) {
+            // Raw device depth, remapped to expose differences near the far end.
+            let z = textureLoad(depth_texture, xy, i32(0))
+            return vec4(vec3(pow(z, 32.0)), 1.0)
+        }
+        let id = textureLoad(identity_texture, xy, i32(0)).r
+        if id == u32(0) { return vec4(0.0) }
+        let packed = textureLoad(normal_texture, xy, i32(0))
+        let emission = textureLoad(emissive_texture, xy, i32(0))
+        if mode == u32(4) { return vec4(textureLoad(albedo_texture, xy, i32(0)).rgb, 1.0) }
+        if mode == u32(5) {
+            var n = vec3(packed.xy, 1.0 - abs(packed.x) - abs(packed.y))
+            let t = clamp(-n.z, 0.0, 1.0)
+            n.x += select(t, -t, n.x >= 0.0)
+            n.y += select(t, -t, n.y >= 0.0)
+            return vec4(normalize(n) * 0.5 + vec3(0.5), 1.0)
+        }
+        if mode == u32(6) { return vec4(vec3(packed.z), 1.0) }
+        if mode == u32(7) { return vec4(vec3(packed.w), 1.0) }
+        if mode == u32(8) { return vec4(emission.rgb / (vec3(1.0) + emission.rgb), 1.0) }
+        if mode == u32(9) { return vec4(vec3(emission.a), 1.0) }
+        // Hash the integer identity before converting to a display color.
+        let hash = id * u32(1664525) + u32(1013904223)
+        return vec4(vec3(f32(hash & u32(255)), f32((hash >> u32(8)) & u32(255)), f32((hash >> u32(16)) & u32(255))) / 255.0, 1.0)
+    }
+}
+

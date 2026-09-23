@@ -1,0 +1,29 @@
+// Demonstrates dynamic array params (`array<T>`) and direct indexing.
+canvas dynamic_array_equalizer(ctx: CanvasContext) -> color {
+    let time = context(time)
+    param bands: array<f32> = [0.3, 0.6, 0.45]
+    let low = bands[0]
+    let mid = bands[1]
+    let high = bands[2]
+    let idx = time * 4.0
+    let pulse = bands[idx]
+
+    compose {
+        fill(#0b1020)
+
+        box(at: (0.28, 0.16 + low * 0.35), size: (0.12, low * 0.7))
+        |> round(0.012)
+        |> fill(#38bdf8)
+
+        box(at: (0.50, 0.16 + mid * 0.35), size: (0.12, mid * 0.7))
+        |> round(0.012)
+        |> fill(#22d3ee)
+
+        box(at: (0.72, 0.16 + high * 0.35), size: (0.12, high * 0.7))
+        |> round(0.012)
+        |> fill(#5eead4)
+
+        circle(at: (0.5, 0.86), radius: 0.02 + pulse * 0.08)
+        |> fill(#f59e0b)
+    }
+}

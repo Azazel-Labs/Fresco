@@ -1,0 +1,739 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nickdarnell.github.io/fresco/contracts/manifest-pass-plan.contract.v1.json",
+  "title": "Fresco manifest pass-plan contract",
+  "type": "object",
+  "required": [
+    "canvases"
+  ],
+  "properties": {
+    "build_profile": {
+      "type": "string",
+      "enum": [
+        "all",
+        "editor",
+        "runtime"
+      ]
+    },
+    "canvases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "pass_plan"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pass_plan": {
+            "$ref": "#/$defs/passPlan"
+          },
+          "engine_pass": {
+            "$ref": "#/$defs/enginePass"
+          }
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/surface"
+      }
+    },
+    "vertex_factories": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/vertexFactory"
+      }
+    },
+    "config_axes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/configAxis"
+      }
+    }
+  },
+  "$defs": {
+    "vertexFactory": {
+      "type": "object",
+      "required": [
+        "name",
+        "vertex_format",
+        "bindings",
+        "attributes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vertex_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transform_entry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/vertexFactoryBinding"
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/vertexAttribute"
+          }
+        },
+        "satisfies_interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "array_stride": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "vertexFactoryBinding": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1
+        },
+        "group_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binding": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "vertexAttribute": {
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "shader_location",
+        "required",
+        "defaulted"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shader_location": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gpu_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "defaulted": {
+          "type": "boolean"
+        }
+      }
+    },
+    "enginePass": {
+      "type": "object",
+      "required": [
+        "pipeline",
+        "pass",
+        "interface",
+        "vertex_entry",
+        "fragment_entry",
+        "vertex_count",
+        "instance_uniform_group",
+        "instance_uniform_binding",
+        "variants"
+      ],
+      "properties": {
+        "pipeline": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vertex_entry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fragment_entry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vertex_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "instance_uniform_group": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "instance_uniform_binding": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/enginePassVariant"
+          }
+        }
+      }
+    },
+    "enginePassVariant": {
+      "type": "object",
+      "required": [
+        "key",
+        "bindings",
+        "vertex_entry",
+        "fragment_entry"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/enginePassVariantBinding"
+          }
+        },
+        "vertex_entry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fragment_entry": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "enginePassVariantBinding": {
+      "type": "object",
+      "required": [
+        "axis",
+        "value"
+      ],
+      "properties": {
+        "axis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "configAxis": {
+      "type": "object",
+      "required": [
+        "pipeline",
+        "pass",
+        "axis",
+        "known_mode",
+        "axis_class",
+        "inclusion",
+        "included_in_build"
+      ],
+      "properties": {
+        "pipeline": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axis_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inclusion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "included_in_build": {
+          "type": "boolean"
+        }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "required": [
+        "name",
+        "material_ty",
+        "surface_requirements"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "material_ty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "surface_requirements": {
+          "$ref": "#/$defs/surfaceRequirements"
+        },
+        "mesh_passes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/meshPass" }
+        },
+        "settings": {
+          "$ref": "#/$defs/surfaceSettings"
+        }
+      }
+    },
+    "meshPass": {
+      "type": "object",
+      "required": [
+        "pass",
+        "factory",
+        "entries"
+      ],
+      "properties": {
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "factory",
+              "entries"
+            ],
+            "properties": {
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "function",
+                    "entry",
+                    "stage",
+                    "outputs"
+                  ],
+                  "properties": {
+                    "function": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "entry": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "stage": {
+                      "enum": [
+                        "vertex",
+                        "fragment"
+                      ]
+                    },
+                    "outputs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "location",
+                          "ty"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "factory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "function",
+              "entry",
+              "stage",
+              "outputs"
+            ],
+            "properties": {
+              "function": {
+                "type": "string",
+                "minLength": 1
+              },
+              "entry": {
+                "type": "string",
+                "minLength": 1
+              },
+              "stage": {
+                "enum": [
+                  "vertex",
+                  "fragment"
+                ]
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "location",
+                    "ty"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "surfaceSettings": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "properties",
+        "usages"
+      ],
+      "properties": {
+        "implementations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "contract", "symbol", "id", "available", "editable"],
+            "properties": {
+              "name": { "type": "string" },
+              "contract": { "type": "string" },
+              "symbol": { "type": "string" },
+              "id": { "type": "integer", "minimum": 1 },
+              "available": { "type": "array", "items": { "type": "string" } },
+              "editable": { "type": "boolean" }
+            }
+          }
+        },
+        "evaluation_axes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "properties": {
+          "type": "array"
+        },
+        "usages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pass_states": {
+          "type": "object"
+        },
+        "recipe_conditions": {
+          "type": "object"
+        }
+      }
+    },
+    "surfaceRequirements": {
+      "type": "object",
+      "required": [
+        "uv_channels"
+      ],
+      "properties": {
+        "uv_channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uvChannelRequirement"
+          }
+        },
+        "vertex_stage": {
+          "$ref": "#/$defs/surfaceVertexStage"
+        }
+      }
+    },
+    "surfaceVertexStage": {
+      "type": "object",
+      "required": [
+        "entry_point",
+        "fields"
+      ],
+      "properties": {
+        "entry_point": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "uvChannelRequirement": {
+      "type": "object",
+      "required": [
+        "selector",
+        "stream_index",
+        "semantic",
+        "components",
+        "required",
+        "status"
+      ],
+      "properties": {
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stream_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic": {
+          "type": "string",
+          "minLength": 1
+        },
+        "components": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "passPlan": {
+      "type": "object",
+      "required": [
+        "passes",
+        "edges",
+        "targets"
+      ],
+      "properties": {
+        "passes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pass"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/edge"
+          }
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        }
+      }
+    },
+    "pass": {
+      "type": "object",
+      "required": [
+        "id",
+        "stage",
+        "locality",
+        "start_layer",
+        "end_layer",
+        "count",
+        "kernel_strategy"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "locality": {
+          "type": "string"
+        },
+        "start_layer": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_layer": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kernel_strategy": {
+          "type": "string"
+        },
+        "kernel_radius_px": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "kernel_levels": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "entry_point": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/passInput"
+          }
+        },
+        "output_target": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "passInput": {
+      "type": "object",
+      "required": [
+        "from_pass",
+        "target_id",
+        "binding"
+      ],
+      "properties": {
+        "from_pass": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "binding": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": [
+        "from",
+        "to",
+        "reason"
+      ],
+      "properties": {
+        "from": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "to": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "id",
+        "format",
+        "scale",
+        "lifetime"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lifetime": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+// Explicit engine rendering policy; these are choices, not compiler defaults.
+#pragma check.shape_aa_min_px = 1.5
+#pragma check.shape_aa_max_px = 3.0
+#pragma check.shape_aa_style = gradient
+#pragma check.projective_footprint_max_px = 64.0
+
+import "frame.fr"
+@group(3) group frame
+
+struct CanvasContext {
+    @semantic(coord) uv: vec2
+    frame: FrameGlobals
+}
+
+struct ScreenVarying {
+    clip_pos: vec4
+    uv: vec2
+}
+
+@entry(canvas, draw)
+interface Canvas {
+    fn draw(@context ctx: CanvasContext) -> color
+}
+
+pass present for Canvas {
+    stage: raster
+    draw: fullscreen
+    binding { @group(frame) frame: uniform<FrameGlobals> }
+    fn vertex(vertex_id: u32) -> ScreenVarying {
+        let p = fullscreen_triangle_position(vertex_id)
+        return ScreenVarying(clip_pos: vec4(p, 0.0, 1.0), uv: p * 0.5 + vec2(0.5, 0.5))
+    }
+    fn shade(v: ScreenVarying, content: Canvas) -> color {
+        let sample = CanvasContext(uv: v.uv, frame: frame)
+        return content.draw(sample)
+    }
+}
+
+pipeline display for Canvas { present }

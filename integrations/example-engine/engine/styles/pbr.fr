@@ -1,0 +1,48 @@
+import "contract.fr"
+
+// Default standard-material PBR response, authored as ordinary typed functions.
+// Importing other implementations does not change this authored default.
+
+fn pbr_direct_response(albedo: vec3, roughness: f32, metallic: f32, n: vec3, v: vec3, l: vec3) -> vec3 {
+    let nv_raw = dot(n, v)
+    let nl = dot(n, l)
+    // GGX reflection is defined only when both directions face the surface.
+    if nv_raw <= 0.0 || nl <= 0.0 { return vec3(0.0) }
+    let h = (v + l) * inverse_sqrt(max(dot(v + l, v + l), 0.00000001))
+    let nv = max(nv_raw, 0.0001)
+    let nh = max(dot(n, h), 0.0)
+    let vh = max(dot(v, h), 0.0)
+    let alpha = roughness * roughness
+    let a2 = alpha * alpha
+    let d0 = nh * nh * (a2 - 1.0) + 1.0
+    let d = a2 / max(3.14159265 * d0 * d0, 0.0000001)
+    let gv = nl * sqrt(nv * nv * (1.0 - a2) + a2)
+    let gl = nv * sqrt(nl * nl * (1.0 - a2) + a2)
+    let visibility = 0.5 / max(gv + gl, 0.00001)
+    let f0 = mix(vec3(0.04), albedo, metallic)
+    let f = f0 + (vec3(1.0) - f0) * pow(1.0 - vh, 5.0)
+    let diffuse = (vec3(1.0) - f) * (1.0 - metallic) * albedo / 3.14159265
+    return (diffuse + d * visibility * f) * nl
+}
+
+fn pbr_indirect_response(albedo: vec3, metallic: f32, occlusion: f32, irradiance: vec3, specular_fill: f32) -> vec3 {
+    return (albedo * (1.0 - metallic) + mix(vec3(0.04), albedo, metallic) * specular_fill) * irradiance * occlusion
+}
+
+
+// Standard (GGX): metallic-roughness microfacet shading.
+// 1. GGX for the microfacet distribution.
+// 2. Smith visibility for masking and shadowing.
+// 3. Schlick Fresnel for angle-dependent reflectivity.
+// 4. Lambertian diffuse, reduced by metallic and Fresnel terms.
+style StandardGGX for standard : StandardStyle {
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        return pbr_direct_response(surface.albedo, surface.roughness, surface.metallic,
+            surface.normal, context.view_direction, light.direction)
+            * light.radiance * light.attenuation * light.visibility
+    }
+    fn indirect(surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 {
+        return pbr_indirect_response(surface.albedo, surface.metallic, surface.occlusion,
+            light.irradiance, light.specular_fill)
+    }
+}

@@ -1,0 +1,14 @@
+// These static properties are defined by engine/core/07_surface_properties.fr.
+surface masked_leaf(sp: surf) -> material(unlit) {
+    properties {
+        profile: SurfaceProfile.Unlit
+        blend: SurfaceBlend.Masked
+        two_sided: true
+        mask_cutoff: 0.5
+    }
+    let p = (sp.uv - vec2(0.5)) * vec2(2.0, 1.0)
+    let coverage = 1.0 - smoothstep(0.32, 0.38, length(p))
+    compose {
+        base(albedo: rgba(0.12, 0.65, 0.2, coverage))
+    }
+}

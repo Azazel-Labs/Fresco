@@ -1,0 +1,38 @@
+// Fundamentals: `L through space S` — the §23.6 sampling contract.
+//
+// `L through space S` re-evaluates an existing layer at the S-mapped sample
+// coordinate. This is the dual of `in space S { ... }`:
+//
+//   in space S { ... }    — draw new content inside a transformed space
+//   L through space S     — warp the sample point and evaluate L there
+//
+// Use cases: refraction, lens distortion, CRT curvature, magnifiers.
+// The compiler inlines the evaluation when L is point-pure.
+
+canvas through_space_refraction(ctx: CanvasContext) -> color {
+    let time = context(time)
+    // A simple scene: coloured circle on a dark background.
+    let fg = circle(at: center, radius: 0.22) |> fill(#38bdf8)
+
+    // Ripple warp: small sinusoidal displacement that varies over time.
+    let offset = (sin(coord.x * 10.0 + time * 1.8) * 0.018, cos(coord.y * 10.0 + time * 1.4) * 0.018)
+
+    // A named space for a magnifier lens (scale around the canvas centre).
+    space lens = scale(factor: 1.35, around: center)
+
+    compose {
+        // Dark background.
+        fill(#0a1220)
+
+        // The unmodified scene as a reference layer.
+        fg
+
+        // The same scene evaluated through the ripple warp.
+        // Each pixel samples fg at a displaced coordinate, producing a
+        // wave-like refraction effect.
+        fg through space warp(by: offset) |> opacity(0.6) |> blend(add)
+
+        // The scene evaluated through the magnifier lens.
+        fg through space lens |> opacity(0.4) |> blend(screen)
+    }
+}

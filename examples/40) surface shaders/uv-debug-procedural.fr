@@ -1,0 +1,33 @@
+// UV debug surface sample (procedural only, no texture inputs).
+
+surface uv_debug(sp: surf) -> material(unlit) {
+    let uv = sp.uv
+    let tiled = uv * 10.0
+    let cell = floor(tiled)
+    let local = fract(tiled)
+
+    // Distance to nearest cell border.
+    let edge = min(min(local.x, 1.0 - local.x), min(local.y, 1.0 - local.y))
+
+    // Thin anti-aliased grid line.
+    let grid = 1.0 - smoothstep(0.0, 0.03, edge)
+
+    // UV heatmap: U in red, V in green, with blue falloff.
+    let heat = rgba(uv.x, uv.y, 1.0 - 0.5 * (uv.x + uv.y), 1.0)
+
+    // Per-cell tint so islands are easier to distinguish.
+    let h = fract(sin(cell.x * 127.1 + cell.y * 311.7) * 43758.547)
+    let tint = rgba(h, fract(h * 1.37), fract(h * 2.11), 1.0)
+
+    let base_col = mix(heat, tint, 0.18)
+    let with_grid = mix(base_col, rgba(1.0, 1.0, 1.0, 1.0), grid * 0.85)
+
+    // Highlight U=0 and V=0 axes.
+    let axis_u = 1.0 - smoothstep(0.0, 0.01, abs(uv.x))
+    let axis_v = 1.0 - smoothstep(0.0, 0.01, abs(uv.y))
+    let axis_colored = mix(mix(with_grid, #ff4040, axis_u), #40ff40, axis_v)
+
+    compose {
+        base(albedo: axis_colored)
+    }
+}

@@ -1,0 +1,29 @@
+// north-star: hull-panel — greebles without geometry; emissive animation
+// status: aspirational
+// rung: 8
+// deltas:
+//   - `inset_bevel(depth:, width:)` — normal-channel effect from panel-shape
+//     gradient (design doc §10.2 bevel, producing tangent-space normals)
+//   - `emit(color:)` channel effect + glow targeting the emissive channel
+//   - repeat space in UV on a surface (2D machinery transferring wholesale)
+// done when: panels read as recessed under host lighting with zero displacement;
+//   the running light animates via the signal; silhouette-unchanged limitation
+//   stated in emitted docs.
+
+surface hull(sp: surf, time: signal) -> material {
+    let panels = in space repeat(every: (0.21, 0.13), cell: cell) {
+        box(at: cell.center, size: (0.19, 0.11)) |> round(0.008)
+        |> inset_bevel(depth: 0.4, width: 0.012)
+    }
+    let strip = box(at: (0.5, 0.5), size: (1.0, 0.015))
+    let pulse = wave(period: 2.2s, shape: saw, range: 0 .. 1)
+
+    compose {
+        base(albedo: #6b7280, roughness: 0.45, metallic: 0.9)
+        panels
+        layer material(albedo: #30363f, roughness: 0.7)
+        mask: field(fbm(sp.uv * 3) |> remap(0.6 .. 0.9, 0 .. 1))
+        strip |> emit(color: #5eead4 * pulse)
+        strip |> glow(reach: 0.02, strength: 0.6, channel: emissive)
+    }
+}

@@ -1,0 +1,17 @@
+// Demonstrates shape interpolation via `mix(shape_a, shape_b, t)`.
+// Because shapes are distance fields, the interpolation stays in the shape domain
+// and can still feed `fill`, `stroke`, and analytic glow.
+
+canvas shape_morph_mix(ctx: CanvasContext) -> color {
+    let t = wave(period: 3s, shape: sine, range: 0 .. 1)
+    let a = star(at: (0.5, 0.5), outer: 0.22, inner: 0.10, points: 5)
+    let b = circle(at: (0.5, 0.5), radius: 0.19)
+    let sample_value = mix(a, b, t)
+
+    compose {
+        fill(#0b0e17)
+        sample_value |> fill(#ffb347)
+        sample_value |> stroke(width: 2px) |> fill(#fff7e6)
+        sample_value |> glow(reach: 24px, strength: 0.18 + 0.22 * t, color: #ffb347) |> blend(add)
+    }
+}

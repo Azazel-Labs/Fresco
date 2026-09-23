@@ -1,0 +1,15 @@
+// Minimal parser fixture: explicit stages, constructors, and return bodies.
+struct ProbeInput { uv: vec2 }
+struct ProbeVarying { position: vec4; uv: vec2 }
+interface Probe { fn draw(input: ProbeInput) -> color }
+pass present_probe for Probe {
+    stage: raster
+    draw: fullscreen
+    fn vertex(vertex_id: u32) -> ProbeVarying {
+        let p = fullscreen_triangle_position(vertex_id)
+        return ProbeVarying(position: vec4(p, 0.0, 1.0), uv: p)
+    }
+    fn shade(v: ProbeVarying, target: Probe) -> color {
+        return target.draw(ProbeInput(uv: v.uv))
+    }
+}

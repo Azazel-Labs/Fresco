@@ -1,0 +1,70 @@
+// Prepared linear material data shared by every executable renderer.
+// UVs retain f32 precision in every renderer. Coverage is handled separately.
+struct StandardSurface {
+    albedo: vec3
+    roughness: f32
+    metallic: f32
+    occlusion: f32
+    emissive: vec3
+    normal: vec3
+    uv: vec2
+}
+struct ShadingContext { world_position: vec3; view_direction: vec3 }
+struct DirectLight {
+    direction: vec3
+    radiance: vec3
+    attenuation: f32
+    visibility: f32
+}
+// specular_fill is the engine's existing approximation for environment specular.
+struct IndirectLight { irradiance: vec3; specular_fill: f32 }
+struct LightingResult { direct: vec3; indirect: vec3 }
+interface LightingService {
+    fn direct_samples(position: vec3, normal: vec3) -> iterator<DirectLight>
+    fn indirect(position: vec3, normal: vec3) -> IndirectLight
+}
+capability ForwardLighting { lights: LightingService }
+
+struct OpaqueTarget {
+    color: attachment<rgba16float, preserve_update>
+    depth: attachment<depth32float, test_only>
+}
+capability PreparedGeometry { mesh.prepared: PreparedMesh }
+capability SurfaceUV { surface.uv: vec2 }
+capability DrawShadingResources { shading_instance_id: draw_instance_id }
+contract StandardStyle for standard {
+    optional capability ForwardLighting
+    optional capability PreparedGeometry
+    optional capability SurfaceUV
+    optional capability DrawShadingResources
+    input frame: PreviewScene
+    point after_opaque: OpaqueTarget {
+        port: opaque
+        scope: view
+        accepts: raster_draws
+        composition: ordered_draws(engine.stable_draw_order)
+        after: complete_opaque
+        before: transparency, inspection, presentation
+    }
+
+    optional point transparent: OpaqueTarget {
+        scope: view
+        accepts: raster_draws
+        composition: global_transparent_queue
+        after: complete_opaque
+        before: inspection, presentation
+    }
+
+    // Complete per-light linear HDR contribution. The renderer never reweights it.
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3
+
+    // Indirect illumination excludes emission.
+    fn indirect(surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 {
+        return surface.albedo * (1.0 - surface.metallic) * light.irradiance * surface.occlusion
+    }
+
+    // Called once after all lighting; blending and display conversion come later.
+    fn finish(surface: StandardSurface, context: ShadingContext, lighting: LightingResult) -> vec3 {
+        return lighting.direct + lighting.indirect + surface.emissive
+    }
+}

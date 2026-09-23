@@ -1,0 +1,8 @@
+// Embedded demo: no loose source files or network assets are required.
+canvas demo(ctx: CanvasContext) -> color {
+    param speed: f32 = 1.0 in 0.0 .. 3.0
+    [binding(default = "example://checker")]
+    uniform checker: texture
+    let pulse = 0.5 + 0.5 * sin(time() * speed)
+    checker.at(ctx.uv * 4.0) |> tint(rgba(ctx.uv.x, ctx.uv.y, pulse, 1.0), amount: 0.5)
+}

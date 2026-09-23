@@ -1,0 +1,36 @@
+// Test: checker and stripe patterns with filtering control
+// This test demonstrates the filtering builtin for controlling pattern prefiltering.
+//
+// The filtering builtin sets the filtering state:
+//   - filtering(on): enable analytic prefiltering (requires footprint)
+//   - filtering(off): force unfiltered point-sampling
+//
+// By default, patterns use Auto mode (filter when footprint available).
+
+canvas patterns_test(ctx: CanvasContext) -> color {
+    // Test unfiltered patterns (explicit off)
+    filtering(off);
+    let check_unfiltered = checker(scale: 0.1uv, at: (0.20, 0.5))
+    let stripe_unfiltered = stripe(along: x, scale: 0.08uv, at: (0.50, 0.5))
+
+    // Test auto-filtered patterns (default behavior)
+    filtering(on);
+    let check_filtered = checker(scale: 0.1uv, at: (0.80, 0.5))
+
+    compose {
+        // Background
+        fill(#1a1a2e)
+
+        // Unfiltered checker (left third)
+        box(at: (0.20, 0.5), size: (0.25, 0.8))
+        |> fill(mix(#1a1a2e, #ff6b6b, check_unfiltered))
+
+        // Unfiltered stripe (middle third)
+        box(at: (0.50, 0.5), size: (0.25, 0.8))
+        |> fill(mix(#1a1a2e, #4ecdc4, stripe_unfiltered))
+
+        // Filtered checker (right third)
+        box(at: (0.80, 0.5), size: (0.25, 0.8))
+        |> fill(mix(#1a1a2e, #a8e6cf, check_filtered))
+    }
+}

@@ -1,0 +1,40 @@
+[package]
+repository.workspace = true
+name = "fresco-example-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+license = "MIT-0"
+description = "Inspectable Fresco example engine and embedded authored contracts."
+
+[dependencies]
+naga = { version = "30.0.0", optional = true, features = ["wgsl-in"] }
+fresco-artifact.workspace = true
+thiserror = "2.0"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
+wgpu = { version = "30.0.0", optional = true, default-features = false, features = ["std", "parking_lot", "dx12", "metal", "vulkan", "wgsl", "webgpu"] }
+wgpu-naga-bridge = { version = "30.0.0", optional = true }
+
+[features]
+default = ["runtime"]
+runtime = ["dep:wgpu", "dep:naga", "dep:wgpu-naga-bridge", "fresco-artifact/naga", "images"]
+images = ["dep:image"]
+
+[dev-dependencies]
+fresco.workspace = true
+naga = { version = "30.0.0", features = ["wgsl-in", "wgsl-out"] }
+pollster = "0.4"
+
+[[example]]
+name = "offscreen"
+required-features = ["runtime"]
+
+[[example]]
+name = "owned_compute"
+required-features = ["runtime"]
+
+[lints]
+workspace = true

@@ -1,0 +1,130 @@
+// Independent authored-helper fixture for parsing, documentation, and overload tests.
+// mask(lo, hi, x) -> f32
+// Turn a scalar field into a 0..1 mask with smoothstep.
+// - lo: lower threshold where the mask starts rising from 0.
+// - hi: upper threshold where the mask reaches 1.
+// - x: sampled scalar field value to threshold.
+fn mask(lo: f32, hi: f32, x: f32) -> f32 {
+    return smoothstep(lo, hi, x)
+}
+
+// remap01(lo, hi, x) -> f32
+// Remap a scalar from [lo, hi] into the normalized 0..1 range.
+// - lo: source range minimum.
+// - hi: source range maximum.
+// - x: value to normalize into 0..1.
+fn remap01(lo: f32, hi: f32, x: f32) -> f32 {
+    return clamp((x - lo) / max(hi - lo, 0.000001), 0.0, 1.0)
+}
+
+// band(lo, hi, feather, x) -> f32
+// Create a soft band/window between two thresholds.
+// - lo: point where the band begins.
+// - hi: point where the band ends.
+// - feather: softness used for both the rising and falling edges.
+// - x: sampled scalar field value to window.
+fn band(lo: f32, hi: f32, feather: f32, x: f32) -> f32 {
+    let rise_hi = lo + feather
+    let fall_lo = hi - feather
+    return smoothstep(lo, rise_hi, x) * (1 - smoothstep(fall_lo, hi, x))
+}
+
+// grounded(height, falloff) -> f32
+// Bias an effect toward lower surface heights.
+// - height: normalized surface height where 0 is low and 1 is high.
+// - falloff: height range over which the grounding fades out.
+fn grounded(height: f32, falloff: f32) -> f32 {
+    return smoothstep(0.0, falloff, 1.0 - height)
+}
+
+// erode(mask, by, strength) -> f32
+// Erode a mask by another field and a strength factor.
+// - mask: the original coverage mask to preserve or remove.
+// - by: erosion driver, usually another 0..1 mask like damage or curvature.
+// - strength: erosion amount, where larger values remove more of the mask.
+fn erode(mask: f32, by: f32, strength: f32) -> f32 {
+    return mask * (1.0 - by * strength)
+}
+
+// coverage(value, gain, bias, extra) -> f32
+// Bias and grow a mask from a field with gain and extra contribution.
+// - value: source field value that drives the resulting coverage.
+// - gain: main multiplier applied to the source field.
+// - bias: constant baseline coverage added before clamping.
+// - extra: additional contribution, often driven by wear or another control.
+fn coverage(value: f32, gain: f32, bias: f32, extra: f32) -> f32 {
+    return clamp(bias + value * (gain + extra), 0.0, 1.0)
+}
+
+// sign_nonzero(x) -> f32
+// Return -1 for negative inputs and +1 for zero or positive inputs.
+fn sign_nonzero(x: f32) -> f32 {
+    return x < 0.0 ? -1.0 : 1.0
+}
+
+// clamp01(x) -> f32
+// Clamp a scalar into the normalized 0..1 range.
+fn clamp01(x: f32) -> f32 {
+    return clamp(x, 0.0, 1.0)
+}
+
+// color_mix(from, to, t) -> color
+// Linearly blend two colors by `t`.
+fn color_mix(from: color, to: color, t: f32) -> color {
+    return mix(from, to, t)
+}
+
+// rgb(r, g, b) -> color
+// Build an opaque sRGB color from red, green, and blue channels.
+fn rgb(r: f32, g: f32, b: f32) -> color {
+    return rgba(r: r, g: g, b: b, a: 1.0)
+}
+
+// grey(value) -> layer
+// Build a grayscale layer from a scalar value.
+fn grey(value: f32) -> layer {
+    return fill(rgb(value, value, value))
+}
+
+// rgb24(packed: f32) -> color
+// Decode a packed 24-bit RGB value from scalar input.
+// This version sanitizes arbitrary scalar input through clamp+round.
+fn rgb24(packed: f32) -> color {
+    let c = clamp(floor(packed + 0.5), 0.0, 16777215.0)
+    let r8 = bit_extract(c, 16.0, 8.0)
+    let g8 = bit_extract(c, 8.0, 8.0)
+    let b8 = bit_extract(c, 0.0, 8.0)
+
+    return rgba(r: r8 / 255.0, g: g8 / 255.0, b: b8 / 255.0, a: 1.0)
+}
+
+// rgb24(packed: i32) -> color
+// Decode packed 0xRRGGBB using integer-style specialization.
+fn rgb24(packed: i32) -> color {
+    let r8 = bit_extract(packed, 16.0, 8.0)
+    let g8 = bit_extract(packed, 8.0, 8.0)
+    let b8 = bit_extract(packed, 0.0, 8.0)
+
+    return rgba(r: r8 / 255.0, g: g8 / 255.0, b: b8 / 255.0, a: 1.0)
+}
+
+// rgb24(packed: u32) -> color
+// Decode packed 0xRRGGBB using unsigned integer specialization.
+fn rgb24(packed: u32) -> color {
+    let r8 = bit_extract(packed, 16.0, 8.0)
+    let g8 = bit_extract(packed, 8.0, 8.0)
+    let b8 = bit_extract(packed, 0.0, 8.0)
+
+    return rgba(r: r8 / 255.0, g: g8 / 255.0, b: b8 / 255.0, a: 1.0)
+}
+
+// rgba32(packed: u32) -> color
+// Decode packed 0xRRGGBBAA using unsigned integer specialization.
+fn rgba32(packed: u32) -> color {
+    let r8 = bit_extract(packed, 24.0, 8.0)
+    let g8 = bit_extract(packed, 16.0, 8.0)
+    let b8 = bit_extract(packed, 8.0, 8.0)
+    let a8 = bit_extract(packed, 0.0, 8.0)
+
+    return rgba(r: r8 / 255.0, g: g8 / 255.0, b: b8 / 255.0, a: a8 / 255.0)
+}

@@ -1,0 +1,31 @@
+// north-star: kaleido-bloom — angular mirror-repeat space with bleeding effects
+// status: aspirational
+// rung: 2
+// deltas:
+//   - `kaleido(sectors:, center:, roll:)` space (polar + angular mirror_repeat) (ext §23.1)
+//   - bleed rings derived from effect footprints (glow reach crosses wedge seams)
+// done when: no visible seams at wedge boundaries with glow enabled;
+//   --explain prints `kaleido: footprint 18px => bleed ring 1, N wedge evals/pixel`.
+
+canvas kaleido_bloom(ctx: CanvasContext) -> color {
+    param sectors: i32 = 8 in 3 .. 16
+    let swirl = wave(period: 9s, shape: sine, range: -20deg .. 20deg)
+
+    space k = kaleido(sectors: sectors, center: center, roll: swirl)
+
+    compose {
+        fill(#0b0e17)
+        in space k {
+            let petal = capsule(from: (0.5, 0.52), to: (0.62, 0.78), radius: 0.035)
+            |> round(0.01)
+            compose {
+                petal |> fill(gradient(along: y, stops: [
+                        stop(at: 0.0, color: #ff2d78),
+                        stop(at: 1.0, color: #ffb347),
+                ]))
+                petal |> glow(reach: 18px, strength: 0.5)
+                circle(at: (0.56, 0.66), radius: 0.012) |> fill(#fff7e6)
+            }
+        }
+    }
+}

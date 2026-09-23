@@ -1,0 +1,15 @@
+// Basic example: `svg_path` import for supported line-only path data.
+
+canvas svg_path_badge(ctx: CanvasContext) -> color {
+    let outer = svg_path(
+        "M 0.16 0.18 L 0.84 0.18 L 0.84 0.82 L 0.16 0.82 Z",
+        fill_rule: even_odd,
+    )
+    let notch = svg_path("M 0.34 0.34 L 0.66 0.34 L 0.50 0.64 Z")
+
+    compose {
+        fill(#0b1320)
+        outer |> fill(#38bdf8)
+        notch |> fill(#f8fafc)
+    }
+}

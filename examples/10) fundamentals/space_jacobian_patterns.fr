@@ -1,0 +1,30 @@
+// Test: explicit in-space Jacobian computation for pattern filtering.
+// This test demonstrates automatic footprint computation from explicit
+// `in space` transforms.
+
+canvas space_jacobian_patterns(ctx: CanvasContext) -> color {
+    // Define an explicit space chain for transformed sampling.
+    space warped = rotate(45deg) . scale(0.5)
+
+    compose {
+        // Background
+        fill(#1a1a2e)
+
+        in space warped {
+            filtering(on)
+
+            // Auto-filtered checker (left third)
+            box(at: (0.25, 0.5), size: (0.28, 0.8))
+            |> fill(mix(#1a1a2e, #ff6b6b, checker(scale: 0.1uv, at: (0.25, 0.5))))
+
+            // Auto-filtered stripe (middle third)
+            box(at: (0.5, 0.5), size: (0.30, 0.8))
+            |> fill(mix(#1a1a2e, #4ecdc4, stripe(along: x, scale: 0.08uv, at: (0.5, 0.5))))
+
+            // Force unfiltered (right third)
+            filtering(off)
+            box(at: (0.75, 0.5), size: (0.28, 0.8))
+            |> fill(mix(#1a1a2e, #a8e6cf, checker(scale: 0.1uv, at: (0.75, 0.5))))
+        }
+    }
+}

@@ -1,0 +1,23 @@
+// Advanced example: scatter lifecycle strands with deterministic variation.
+
+canvas scatter_lifetime_strands(ctx: CanvasContext) -> color {
+    let sky = fill(gradient(
+        along: y,
+        stops: [
+            stop(at: 0.0, color: #050811),
+            stop(at: 1.0, color: #101c34),
+        ]
+    ))
+
+    let strands = scatter 24 within region((0.10, 0.12) .. (0.90, 0.82)) seed 101 strategy compact
+    lifetime strand: 1.0s respawn every rand(2.5s .. 6s) {
+        let wobble = wave(period: 6s, shape: triangle, phase: strand.index01, range: -0.05 .. 0.05)
+        let top = strand.pos + (wobble, 0.12)
+        capsule(from: strand.pos, to: top, radius: 0.004) |> fill(#bde0ff80)
+    }
+
+    compose {
+        sky
+        strands |> blend(add)
+    }
+}

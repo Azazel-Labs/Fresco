@@ -1,0 +1,50 @@
+compute ShellVertices(geometry: PreparedMesh, layers: u32) -> buffer<vec4, read> {
+    output vertices: buffer<vec4, write>(checked_mul(geometry.vertex_count, layers))
+    workgroup_size: (64, 1, 1)
+    dispatch threads(checked_mul(geometry.vertex_count, layers), 1u, 1u)
+    @compute fn main(id: uvec3) {
+        let index = id.x % geometry.vertex_count
+        let layer = id.x / geometry.vertex_count
+        let v = geometry.vertices[index]
+        vertices[id.x] = select(vec4(0.0), vec4(v.world_position + v.geometric_normal * (f32(layer) + 1.0) * 0.03, 1.0), geometry.bounds.valid)
+    }
+    return vertices
+}
+
+draw Shell(geometry: PreparedMesh, vertices: buffer<vec4, read>, layer: u32, limit: u32, expansion: f32,
+           view: PreviewScene, color: attachment<rgba16float, preserve_update>,
+           depth: attachment<depth32float, test_only>) {
+    requires vertices.count == checked_mul(geometry.vertex_count, 3u)
+    requires layer < limit
+    raster geometry using vertices base_vertex checked_mul(layer, geometry.vertex_count)
+    visibility: geometry.bounds.expand_world(expansion)
+    sort_position: geometry.bounds.center
+    cull: none
+    blend { all: premultiplied }
+    depth { write: false; compare: less_equal }
+    attachments { color: load_store; depth: load_store }
+    @vertex fn vertex(index: u32) -> clip_position {
+        return view.proj * view.view * vertices[index]
+    }
+    @fragment fn fragment() -> vec4 { return select(vec4(0.0, 0.0, 0.1, 0.1), vec4(0.1, 0.0, 0.0, 0.1), geometry.bounds.valid) }
+}
+
+style Shells for standard : StandardStyle {
+    param limit: u32 = 3u
+    param expansion: f32 = 0.2
+    requires PreparedGeometry
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    for self {
+        let vertices = ShellVertices(geometry: mesh.prepared, layers: 3u)
+        at transparent as target {
+            static for layer in 0..3 {
+                Shell(geometry: mesh.prepared, vertices: vertices, layer: layer, limit: limit, expansion: expansion, view: frame,
+                      color: target.color, depth: target.depth)
+            }
+        }
+    }
+}
+surface item(sp: surf) -> material(standard) {
+    properties { style: Shells }
+    compose { base(albedo: #fff) }
+}

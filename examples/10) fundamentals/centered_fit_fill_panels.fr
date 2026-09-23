@@ -1,0 +1,19 @@
+// Basic example: centered space aspect modes.
+// Demonstrates `centered(aspect: fit)` and `centered(aspect: fill)`.
+
+canvas centered_fit_fill_panels(ctx: CanvasContext) -> color {
+    space fit_stage = centered(aspect: fit)
+    space fill_stage = centered(aspect: fill)
+
+    compose {
+        fill(#0c1426)
+
+        in space fit_stage {
+            box(at: (0.5, 0.5) + (-0.28, 0), size: (0.30, 0.48)) |> fill(#5dd2ff)
+        }
+
+        in space fill_stage {
+            box(at: (0.5, 0.5) + (0.28, 0), size: (0.30, 0.48)) |> fill(#ff9f6b)
+        }
+    }
+}

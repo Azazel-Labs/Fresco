@@ -1,0 +1,50 @@
+// north-star: sky — the volumetric cloud system, Level 2
+// status: aspirational
+// rung: 10 (preview quality), 11 (rewrites + adaptive + temporal)
+// deltas: volume/ray3/density/radiance (ext §26.2), march clause + jitter +
+//   adaptive (ext §26.3), lit_by along-ray locality, band/profile/extinction/
+//   sheet/powder/ambient stdlib (ext §28.1), per-ray weather hoisting,
+//   beer_lambert analytic rewrite, band-restricted marching (ext §26.4),
+//   temporal_accumulate on previous_frame (ext §28.3)
+// done when: --explain matches the full receipt written in ext §28.2, including
+//   `band-restricted marching` and `rewrite: beer_lambert fired`; rung 11 adds
+//   `budget 32 + temporal blend 0.9 ~= quality of 96`.
+
+volume sky(ray: ray3, time: signal) -> radiance {
+    param coverage:   f32 = 0.5  in 0 .. 1
+    param storminess: f32 = 0.2  in 0 .. 1
+    param wind:       vec2 = (12.0, 3.0)          // m/s, planar
+
+    let sun = directional(azimuth: 40deg, elevation: 28deg, color: #fff4e0)
+
+    // 2D weather field: evaluated once per ray at layer entry (hoisted)
+    let weather = field2 fbm(xz(coord) * 0.0004 + wind * time * 0.0004)
+
+    fn deck(base: length, top: length, kind: profile,
+        scale: f32, erode: f32) -> density {
+        let h      = band(altitude: base .. top, feather: 0.12)
+        let shaped = field3 fbm3(coord * scale + (wind * time, 0) * scale)
+            * profile(kind, h)
+        let detail = field3 worley3(coord * scale * 5.5)
+        density remap(shaped - detail * erode - (1 - coverage) * weather,
+            0.02 .. 0.30, 0 .. 1) * extinction(kind)
+    }
+
+    compose {   // front-to-back transmittance fold
+        deck(base: 1500m, top: 4200m, kind: cumulus, scale: 0.00075, erode: 0.32)
+        |> scatter_absorb(sigma_s: 0.92, sigma_a: 0.04)
+        |> lit_by(sun, steps: 6)
+        |> powder(strength: 0.35 + storminess * 0.4)
+        |> ambient(sky_top: #8db8e8, sky_bottom: #dfe9f4)
+
+        deck(base: 6200m, top: 7000m, kind: stratus, scale: 0.0016, erode: 0.15)
+        |> scatter_absorb(sigma_s: 0.45, sigma_a: 0.02)
+        |> lit_by(sun, steps: 3)
+
+        sheet(at: 9000m, thickness: 120m,
+            density: field2 fbm(xz(coord) * 0.0009) |> remap(0.55 .. 0.8, 0 .. 0.3))
+        |> scatter_absorb(sigma_s: 0.2, sigma_a: 0.01)
+        |> lit_by(sun, analytic: true)
+    }
+} march(budget: 96, jitter: blue_noise,
+    adaptive: coarse_when(T > 0.96), max_dist: 30000m)

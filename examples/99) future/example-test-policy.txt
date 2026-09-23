@@ -1,0 +1,2 @@
+# Applies to this folder and nested example files.
+allow-compile-failures

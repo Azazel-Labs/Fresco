@@ -1,0 +1,41 @@
+// north-star: holo-card — holographic foil trading card
+// (community ask: "holograph foil card")
+// status: aspirational
+// rung: 8 (also runs as a canvas with pointer-driven tilt — consumer on-ramp)
+// deltas:
+//   - `material(unlit)` variant: view-dependent terms sanctioned here (ext §25.3)
+//   - `spectral_ramp(t)`, `fresnel(view, n)`, `hash_dir3` stdlib
+//   - scatter with per-instance micro-normals in the instance tables;
+//     view-dependent `emit` per fleck (ext §23.9 footprint discipline + view terms)
+//   - `band_sweep(along:, width:)` — tilt-following sheen
+// done when: filmstrip over `tilt` reproduces the wiggle-the-card-under-the-light
+//   motion; glitter pings are stable (no shimmer crawl) under small tilt deltas.
+
+surface holo_card(sp: surf, time: signal) -> material(unlit) {
+    param tilt: vec2 = (0, 0)
+    let view = view_or_tilt(sp, tilt)
+
+    let n_micro = normal_from(field fbm(sp.uv * 40) * 0.3)
+    let facing  = field dot(view, n_micro)
+
+    let bands = field wrap(sp.uv.x * 2.5 + facing * 3.0 + fbm(sp.uv * 8) * 0.25,
+        range: 0 .. 1)
+    let rainbow = layer spectral_ramp(bands)
+
+    let glitter = scatter 1200 within region((0,0) .. (1,1)) seed 11 strategy compact {
+        let g = hash_dir3(fleck.index01)
+        let ping = pow(max(dot(view, g), 0), 48)
+        circle(at: fleck.pos, radius: 0.0035)
+        |> emit(color: spectral_ramp(hash(fleck.index01)) * ping * 2.5)
+    }
+
+    let foil = card_foil_regions()      // border | name plate | art halo shapes
+
+    compose {
+        base(albedo: image(card_art, at: sp.uv))
+        rainbow |> blend(screen) |> opacity(0.55)            mask: foil
+        glitter                                              mask: foil
+        emit(color: rainbow * fresnel(view, n_micro) * 0.4)  mask: foil
+        band_sweep(along: tilt, width: 0.18) |> blend(screen) |> opacity(0.3)
+    }
+}

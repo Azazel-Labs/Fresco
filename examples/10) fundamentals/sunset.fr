@@ -1,0 +1,36 @@
+// Smooth-union hills, an analytic glow composed additively, and a
+// blur-over-fill that the rewrite pass turns into a soften band —
+// run with --explain to see the receipts.
+
+canvas sunset(ctx: CanvasContext) -> color {
+    space sun_stage = centered(aspect: preserve)
+    let sun = circle(at: (0.5, 0.38), radius: 0.16uv)
+
+    // Fresco UV uses a bottom-origin vertical axis, so ground anchors are near y=0.
+    let hill_l = circle(at: (0.25, 0.05), radius: 0.35uv)
+    let hill_r = circle(at: (0.80, 0.00), radius: 0.45uv)
+    let hills = (
+        hill_l |
+        hill_r) |> smooth(0.08uv
+    )
+
+    let haze = sun |> fill(#ffb066) |> blur(24px)
+
+    compose {
+        fill(#1a2440)
+
+        in space sun_stage {
+            sun |> glow(reach: 60px, strength: 0.6, color: #ffcf5c)   |> blend(add)
+            haze                                                      |> blend(screen)
+            sun |> fill(#ffcf5c)
+        }
+
+        hills |> fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1f14),
+                stop(at: 1.0, color: #2f5a3b),
+            ]
+        ))
+    }
+}

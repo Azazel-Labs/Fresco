@@ -1,0 +1,147 @@
+// Executable deferred decode and lighting; attachments are declared by the renderer recipe.
+struct ResolveInputs {
+    inverse_view_projection: mat4
+    camera: vec4
+    viewport: uvec2
+    padding: uvec2
+}
+struct ScreenPosition {
+    @builtin(position) position: vec4
+}
+@factory(preview_static) pass lighting_resolve {
+    stage: raster
+    draw: fullscreen
+    binding {
+        @group(0) @binding(0) albedo_texture: texture_2d<f32>
+        @group(0) @binding(1) normal_texture: texture_2d<f32>
+        @group(0) @binding(2) emissive_texture: texture_2d<f32>
+        @group(0) @binding(3) identity_texture: texture_2d<u32>
+        @group(0) @binding(4) depth_texture: texture_depth_2d
+        @group(0) @binding(5) resolve: uniform<ResolveInputs>
+        @group(0) @binding(6) lights: buffer<vec4>
+        @group(0) @binding(7) tiles: buffer<u32>
+        @group(0) @binding(8) materials: buffer<u32>
+        @group(0) @binding(12) styles: buffer<u32>
+        @group(0) @binding(13) style_offsets: buffer<u32>
+        @group(0) @binding(15) surface_uv_texture: texture_2d<f32>
+    }
+
+    fn preview_visibility(position: vec3, n: vec3) -> f32 {
+        let projected = shadow_camera.world_to_shadow * vec4(position, 1.0)
+        let uv = vec2(projected.x * 0.5 + 0.5, 0.5 - projected.y * 0.5)
+        if uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0 || projected.z <= 0.0 || projected.z >= 1.0 { return 1.0 }
+        let size = ivec2(textureDimensions(shadow_map))
+        let texel = uv * vec2(size) - vec2(0.5)
+        let pixel = ivec2(floor(texel))
+        let fraction = fract(texel)
+        let facing = max(dot(n, preview_safe_normalize(environment.direction.xyz)), 0.0)
+        let bias = 0.0015 + 3.0 / f32(min(size.x, size.y)) * sqrt(max(1.0 - facing * facing, 0.0)) / max(facing, 0.1)
+        var visibility = 0.0
+        // Bilinear interpolation of a 3x3 comparison filter avoids texel jumps.
+        for y in 0 .. 4 {
+            for x in 0 .. 4 {
+                let sample_pixel = clamp(pixel + ivec2(i32(x) - i32(1), i32(y) - i32(1)), ivec2(0), size - ivec2(1))
+                let z = textureLoad(shadow_map, sample_pixel, i32(0))
+                let wx = select(select(1.0, fraction.x, x == u32(3)), 1.0 - fraction.x, x == u32(0))
+                let wy = select(select(1.0, fraction.y, y == u32(3)), 1.0 - fraction.y, y == u32(0))
+                visibility += select(0.0, 1.0, projected.z - bias <= z) * wx * wy
+            }
+        }
+        return visibility / 9.0
+    }
+    // Out-of-table IDs produce no response; valid selections are compiler generated.
+    @dispatch(StandardStyle, direct, style_settings, draw)
+    fn style_direct(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    @dispatch(StandardStyle, indirect, style_settings, draw)
+    fn style_indirect(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 { return vec3(0.0) }
+    @dispatch(StandardStyle, finish, style_settings, draw)
+    fn style_finish(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, lighting: LightingResult) -> vec3 { return vec3(0.0) }
+
+    fn preview_point_light(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, light: vec4, energy: vec4) -> vec3 {
+        let sample = preview_point_light_sample(context.world_position, light)
+        // Empty slots and samples outside the finite light volume are not lights.
+        if sample.w <= 0.0 || energy.w <= 0.0 || max(max(energy.x, energy.y), energy.z) <= 0.0 { return vec3(0.0) }
+        return style_direct(response, settings_offset, surface, context, DirectLight(sample.xyz, energy.rgb * energy.w, sample.w, 1.0))
+    }
+
+    fn scene_environment(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext) -> LightingResult {
+        let hemisphere = mix(environment.ground.rgb, environment.sky.rgb, surface.normal.y * 0.5 + 0.5)
+        let fill = style_indirect(response, settings_offset, surface, context, IndirectLight(hemisphere, environment.settings.y))
+        var sun = vec3(0.0)
+        if max(max(environment.radiance.x, environment.radiance.y), environment.radiance.z) > 0.0 {
+            let visibility = select(1.0, preview_visibility(context.world_position, surface.normal), environment.direction.w > 0.0)
+            sun = style_direct(response, settings_offset, surface, context, DirectLight(preview_safe_normalize(environment.direction.xyz), environment.radiance.rgb, 1.0, visibility))
+        }
+        return LightingResult(sun, fill)
+    }
+
+    @vertex fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenPosition {
+        let p = vec2(f32((index << u32(1)) & u32(2)), f32(index & u32(2)))
+        return ScreenPosition(vec4(p * 2.0 - 1.0, 0.0, 1.0))
+    }
+    fn oct_decode(p: vec2) -> vec3 {
+        var n = vec3(p, 1.0 - abs(p.x) - abs(p.y))
+        let t = clamp(-n.z, 0.0, 1.0)
+        n.x += select(t, -t, n.x >= 0.0)
+        n.y += select(t, -t, n.y >= 0.0)
+        return normalize(n)
+    }
+    @fragment fn lighting(@builtin(position) pixel: vec4) -> vec4 {
+        let xy = ivec2(pixel.xy)
+        let identity = textureLoad(identity_texture, xy, i32(0)).rg
+        if identity.y != shading_instance_id { discard_fragment() }
+        let id = identity.x
+        let model = materials[id]
+        let response = styles[id]
+        let settings_offset = style_offsets[id]
+        let albedo = textureLoad(albedo_texture, xy, i32(0)).rgb
+        let emission = textureLoad(emissive_texture, xy, i32(0))
+        if model == u32(0) || model == u32(2) || environment.settings.x == 0.0 { return vec4(albedo + emission.rgb, 1.0) }
+        let packed = textureLoad(normal_texture, xy, i32(0))
+        let n = oct_decode(packed.xy)
+        let z = textureLoad(depth_texture, xy, i32(0))
+        let uv = pixel.xy / vec2(resolve.viewport)
+        let world = resolve.inverse_view_projection * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, z, 1.0)
+        let position = world.xyz / world.w
+        let v = preview_safe_normalize(resolve.camera.xyz - position)
+        let surface = StandardSurface(albedo, packed.z, packed.w, emission.a, emission.rgb, n, textureLoad(surface_uv_texture, xy, i32(0)).xy)
+        let context = ShadingContext(position, v)
+        var lighting = scene_environment(response, settings_offset, surface, context)
+        let columns = (resolve.viewport.x + u32(15)) / u32(16)
+        let tile = u32(pixel.y) / u32(16) * columns + u32(pixel.x) / u32(16)
+        for index in 0 .. 64 {
+            let mask = tiles[tile * u32(2) + index / u32(32)]
+            if ((mask >> (index % u32(32))) & u32(1)) != u32(0) {
+                let light = lights[index * u32(2)]
+                let energy = lights[index * u32(2) + u32(1)]
+                lighting.direct += preview_point_light(response, settings_offset, surface, context, light, energy)
+            }
+        }
+        return vec4(style_finish(response, settings_offset, surface, context, lighting), 1.0)
+    }
+}
+
+// Initialize frame attachments once, even when the scene has no opaque draws.
+@shader pass clear_gbuffer {
+    stage: raster
+    draw: fullscreen
+    @vertex fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenPosition {
+        let p = vec2(f32((index << u32(1)) & u32(2)), f32(index & u32(2)))
+        return ScreenPosition(vec4(p * 2.0 - 1.0, 0.0, 1.0))
+    }
+    @fragment fn clear() -> PreviewGBuffer {
+        return PreviewGBuffer(vec4(0.0), vec4(0.0), vec4(0.0), uvec2(0u), vec2(0.0))
+    }
+}
+
+// Establish attachment contents even when this view has no opaque objects.
+@shader pass clear_opaque {
+    stage: raster
+    draw: fullscreen
+    @vertex fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenPosition {
+        let x = f32((index << u32(1)) & u32(2))
+        let y = f32(index & u32(2))
+        return ScreenPosition(vec4(x * 2.0 - 1.0, y * 2.0 - 1.0, 0.0, 1.0))
+    }
+    @fragment fn clear(input: ScreenPosition) -> vec4 { return vec4(0.0) }
+}

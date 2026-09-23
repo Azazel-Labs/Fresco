@@ -1,0 +1,9 @@
+canvas textured(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    [binding(default = "assets/textures/brick_tex.png")]
+    uniform image: texture
+    compose {
+        image.at(uv)
+        circle(at: center, radius: 0.2) |> stroke(2px) |> fill(#ffffff)
+    }
+}

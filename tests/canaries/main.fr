@@ -1,0 +1,17 @@
+import "palette.fr"
+
+canvas canary(ctx: CanvasContext) -> color {
+    param gain: f32 = 0.5
+    param levels: array<f32, 3> = [0.25, 0.5, 0.75]
+    let uv = context(coord)
+    let dt = context(delta_time)
+    let size = context(resolution)
+    compose {
+        fill(rgba(uv.x * gain, 0.125/s + dt, size.x / 512.0, 1.0))
+        circle(at: (0.5, 0.5), radius: 0.15) |> fill(accent(levels[2]))
+        for i in 0..3 {
+            box(at: (0.25 + i * 0.25, 0.85), size: (0.1, levels[i] * 0.1))
+                |> fill(accent(levels[i]))
+        }
+    }
+}

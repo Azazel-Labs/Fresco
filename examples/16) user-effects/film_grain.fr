@@ -1,0 +1,22 @@
+// §16.1 User-Defined Effects — Example: film grain
+//
+// Demonstrates:
+//   - A `point` locality effect (inlined per-pixel, no neighborhood reads)
+//   - A composition rewrite rule that fuses two grain calls into one
+//
+// The rewrite rule `film_grain(a) compose film_grain(b) => film_grain(a)`
+// means that when two grain calls are composed, the outer one wins.
+// (Phase 3 will add guard expressions for more nuanced fusion like max(a, b).)
+
+effect film_grain(amount: f32) point {
+    fill(rgba(r: amount * 0.5, g: amount * 0.5, b: amount * 0.5, a: 1.0))
+
+    rewrite film_grain(a) compose film_grain(b) => film_grain(a)
+}
+
+canvas film_grain_demo(ctx: CanvasContext) -> color {
+    compose {
+        fill(rgba(r: 0.15, g: 0.12, b: 0.10, a: 1.0))
+        film_grain(0.08)
+    }
+}

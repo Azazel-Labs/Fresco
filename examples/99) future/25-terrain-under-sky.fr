@@ -1,0 +1,31 @@
+// north-star: terrain-under-sky — clouds meet the rest of the world (Level 3)
+// status: aspirational
+// rung: 11
+// deltas:
+//   - a volume's sun transmittance exposed as a field2 over the ground plane,
+//     cached as a low-res target refreshed on change (ext §29)
+//   - volume reads host depth as t_max => clouds composite behind geometry (ext §26.5)
+//   - long-period signals driving weather (the day cycle)
+// done when: cloud shadows crawl across the terrain from ONE line; --explain
+//   prints `sky.sun_transmittance: cached 512^2 r16f, refreshed on delta > 0.1s`;
+//   mountains occlude clouds via host depth with no Fresco scene ownership.
+
+surface terrain_shadowed(sp: surf, time: signal) -> material {
+    compose {
+        // ...the 20-terrain-splat stack...
+        base(albedo: image(grass_tex, at: sp.uv * 24), roughness: 0.9)
+        layer material(albedo: image(rock_tex, at: sp.uv * 16), roughness: 0.8)
+        mask: field smoothstep(0.35, 0.55, 1 - dot(sp.normal, up))
+        // the one line this file exists for:
+        darken(by: 1 - sky.sun_transmittance at xz(sp.position))
+    }
+}
+
+// day cycle: the whole sky becomes four scrubbables
+canvas day(ctx: CanvasContext) -> color {
+    let time = context(time)
+    let day_t = wrap(time, 0 .. 120s)
+    sky(coverage: 0.35 + 0.3 * wave(period: 120s, shape: sine),
+        storminess: ramp(from: 60s, over: 20s) * 0.7,
+        sun: directional(elevation: mix(5deg, 60deg, sin01(day_t / 120s))))
+}

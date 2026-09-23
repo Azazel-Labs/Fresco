@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fresco example engine</title>
+<link rel="stylesheet" href="style.css">
+<main>
+  <h1>Fresco example engine</h1>
+  <p>A small browser host for the same Rust renderer used by the native executable.</p>
+  <div class="layout">
+    <section>
+      <label for="sample">Sample</label>
+      <select id="sample" disabled>
+        <option value="demo.fr">Canvas: animated texture</option>
+        <option value="mesh.fr">Mesh: material parameters</option>
+        <option value="forward_plus.fr">Mesh: forward+ point lights</option>
+        <option value="deferred.fr">Mesh: deferred metallic material</option>
+        <option value="particles.fr">Particles: drifting sparks</option>
+      </select>
+      <label for="renderer">Renderer</label>
+      <select id="renderer" disabled>
+        <option value="forward">Forward</option>
+        <option value="forward-plus">Forward+</option>
+            <option value="deferred">Deferred</option>
+      </select>
+      <label for="source">Fresco source</label>
+      <textarea id="source" spellcheck="false" aria-label="Fresco source"></textarea>
+      <div class="controls">
+        <button id="compile" disabled>Compile</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="reset" disabled>Reset time</button>
+        <button id="rebuild" disabled>Rebuild GPU</button>
+      </div>
+      <label for="parameters">Parameters (JSON)</label>
+      <textarea id="parameters" spellcheck="false" aria-label="Parameters JSON" rows="3">{}</textarea>
+      <button id="apply-parameters" disabled>Apply parameters</button>
+      <label for="mesh">Surface preview mesh</label>
+      <select id="mesh" disabled>
+        <option value="sphere">Sphere</option>
+        <option value="plane">Plane</option>
+        <option value="box">Box</option>
+      </select>
+      <button id="reset-camera" disabled>Reset camera</button>
+      <p>Drag the material preview to orbit; scroll to zoom.</p>
+      <div class="textures">
+        <label for="texture-name">Texture</label>
+        <select id="texture-name" disabled aria-label="Texture name"></select>
+        <label for="texture-file">Replace with a PNG or JPEG</label>
+        <input id="texture-file" type="file" accept="image/png,image/jpeg" disabled>
+      </div>
+      <p id="status" role="status">Loading compiler and renderer…</p>
+      <pre id="diagnostics" role="log"></pre>
+    </section>
+    <section class="preview"><canvas id="canvas" aria-label="Rendered Fresco canvas"></canvas></section>
+  </div>
+  <p>Supports canvas, mesh, and compute-particle stages with frame uniforms, parameters, and PNG/JPEG textures. Unsupported resources or passes produce diagnostics.</p>
+</main>
+<script type="module" src="main.js"></script>
+</html>

@@ -1,0 +1,20 @@
+// §16.1 User-Defined Effects — Rewrite with locality-visible receipt
+//
+// Demonstrates:
+//   - local(...) effect carrying a compose rewrite
+//   - rewrite note plus locality counts in `--explain`
+
+effect neighborhood(radius: f32) local(radius) {
+    fill(rgba(r: 0.6, g: 0.8, b: 1.0, a: 1.0))
+
+    rewrite neighborhood(a) compose neighborhood(b) => neighborhood(a) when a > b
+}
+
+canvas rewrite_locality_receipt_demo(ctx: CanvasContext) -> color {
+    compose {
+        circle(at: center, radius: 0.2)
+        |> fill(#9ecbff)
+        |> neighborhood(0.01)
+        |> neighborhood(0.03)
+    }
+}

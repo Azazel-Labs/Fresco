@@ -1,0 +1,152 @@
+// Shape gallery laid out as logical cells so placement is easier to reason about.
+
+canvas all_shapes_gallery(ctx: CanvasContext) -> color {
+    // Global authored board.
+    space stage = centered(aspect: preserve)
+    // Recenter 0..1 authored layout into centered coordinates.
+    space viewbox = translate((-0.5, 0.5))
+    // One place to scale/reframe the whole gallery to the viewport.
+    space fit = scale(0.88)
+    // UI-style top-to-bottom row ordering.
+    space grid = orientation(y: down)
+
+    // 8x4 cell lattice: each tile is authored in local 0..1 coordinates.
+    space cell_fit = scale(0.11)
+
+    space col0 = translate((0.0625, 0.0))
+    space col1 = translate((0.1875, 0.0))
+    space col2 = translate((0.3125, 0.0))
+    space col3 = translate((0.4375, 0.0))
+    space col4 = translate((0.5625, 0.0))
+    space col5 = translate((0.6875, 0.0))
+    space col6 = translate((0.8125, 0.0))
+    space col7 = translate((0.9375, 0.0))
+
+    space row0 = translate((0.0, 0.125))
+    space row1 = translate((0.0, 0.375))
+    space row2 = translate((0.0, 0.625))
+    space row3 = translate((0.0, 0.875))
+
+    // Reusable per-column tile spaces to avoid repeating `colN + cell_fit` chains.
+    space tile0 = col0 . cell_fit
+    space tile1 = col1 . cell_fit
+    space tile2 = col2 . cell_fit
+    space tile3 = col3 . cell_fit
+    space tile4 = col4 . cell_fit
+    space tile5 = col5 . cell_fit
+    space tile6 = col6 . cell_fit
+    space tile7 = col7 . cell_fit
+
+    // Row 0
+    let s_circle = circle(at: (0.5, 0.5), radius: 0.33)
+    let s_ring = ring(at: (0.5, 0.5), radius: 0.36, width: 3px)
+    let s_line = line(from: (0.18, 0.82), to: (0.82, 0.18), thickness: 5px)
+    let s_polyline = polyline(points: [(0.16, 0.72), (0.36, 0.28), (0.58, 0.66), (0.82, 0.30)], thickness: 4px, closed: false)
+    let s_sector = sector(at: (0.5, 0.5), radius: 0.40, from: -0.8, to: 2.2, steps: 12)
+    let s_arc = arc(at: (0.5, 0.5), radius: 0.38, width: 4px, from: -0.3, to: 2.9, steps: 12)
+    let s_superellipse = superellipse(at: (0.5, 0.5), radii: (0.40, 0.28), power: 3.8, steps: 16)
+    let s_rounded_polygon = rounded_polygon(points: [(0.20, 0.34), (0.80, 0.34), (0.70, 0.78), (0.30, 0.78)], round: 0.06, fill_rule: non_zero)
+
+    // Row 1
+    let s_plus = plus(at: (0.5, 0.5), size: (0.72, 0.72), thickness: 5px)
+    let s_x_cross = x_cross(at: (0.5, 0.5), size: (0.72, 0.72), thickness: 5px)
+    let s_crescent = crescent(at: (0.5, 0.5), radius: 0.34, offset: (0.16, -0.04))
+    let s_lens = lens(at: (0.5, 0.5), radius: 0.30, separation: 0.28)
+    let s_heart = heart(at: (0.5, 0.54), size: 0.38, steps: 16)
+    let s_gear = gear(at: (0.5, 0.5), inner: 0.18, outer: 0.36, teeth: 9)
+    let s_starburst = starburst(at: (0.5, 0.5), inner: 0.10, outer: 0.38, rays: 12)
+    let s_rhombus = rhombus(at: (0.5, 0.5), size: (0.68, 0.72))
+
+    // Row 2
+    let s_parallelogram = parallelogram(at: (0.5, 0.5), size: (0.68, 0.56), skew: 0.10)
+    let s_droplet = droplet(at: (0.5, 0.5), size: 0.40, steps: 16)
+    let s_capsule = capsule(from: (0.24, 0.72), to: (0.76, 0.28), radius: 0.14)
+    let s_box = box(at: (0.5, 0.5), size: (0.70, 0.54)) |> round(0.10)
+    let s_ngon = ngon(at: (0.5, 0.5), radius: 0.36, sides: 6)
+    let s_ellipse = ellipse(at: (0.5, 0.5), radii: (0.40, 0.28))
+    let s_star = star(at: (0.5, 0.5), outer: 0.36, inner: 0.17, points: 5)
+    let s_flower = flower(at: (0.5, 0.5), outer: 0.36, inner: 0.22, points: 7)
+
+    // Row 3
+    let s_triangle = triangle(a: (0.20, 0.80), b: (0.80, 0.80), c: (0.50, 0.20))
+    let s_trapezoid = trapezoid(at: (0.5, 0.52), top: 0.36, bottom: 0.70, height: 0.58)
+    let s_polygon2 = polygon2(points: [(0.22, 0.34), (0.76, 0.22), (0.88, 0.52), (0.66, 0.84), (0.28, 0.78)], fill_rule: even_odd)
+    let s_polygon3 = polygon3(points: [(0.20, 0.34, 0.01), (0.78, 0.30, -0.02), (0.88, 0.62, 0.04), (0.52, 0.86, -0.01), (0.18, 0.72, 0.02)], fill_rule: non_zero, plane_mode: explicit)
+    let s_dilate = circle(at: (0.5, 0.5), radius: 0.24) |> dilate(0.09) |> stroke(3px)
+    let s_smooth = (
+        circle(at: (0.42, 0.56), radius: 0.22) |
+        box(at: (0.62, 0.44), size: (0.38, 0.30))) |> smooth(radius: 0.12
+    )
+    let s_svg_path = svg_path("M 0.20 0.78 L 0.36 0.28 L 0.50 0.52 L 0.64 0.28 L 0.80 0.78 L 0.50 0.62 Z")
+    let s_svg = svg("""
+        <svg viewBox='0 0 100 100'>
+        <path d='M20 72 L50 20 L80 72 L68 72 L50 42 L32 72 Z'/>
+        </svg>
+        """)
+
+        compose {
+            fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0a0f1c),
+                stop(at: 1.0, color: #16253f),
+            ]
+            ))
+
+            in space stage . fit . viewbox . grid {
+                compose {
+                    in space row0 {
+                        compose {
+                            in space tile0 { s_circle |> fill(#60a5fa) }
+                            in space tile1 { s_ring |> fill(#93c5fd) }
+                            in space tile2 { s_line |> fill(#c4b5fd) }
+                            in space tile3 { s_polyline |> fill(#a78bfa) }
+                            in space tile4 { s_sector |> fill(#fde68a) }
+                            in space tile5 { s_arc |> fill(#f59e0b) }
+                            in space tile6 { s_superellipse |> fill(#fda4af) }
+                            in space tile7 { s_rounded_polygon |> fill(#fb7185) }
+                        }
+                    }
+
+                    in space row1 {
+                        compose {
+                            in space tile0 { s_plus |> fill(#86efac) }
+                            in space tile1 { s_x_cross |> fill(#34d399) }
+                            in space tile2 { s_crescent |> fill(#67e8f9) }
+                            in space tile3 { s_lens |> fill(#22d3ee) }
+                            in space tile4 { s_heart |> fill(#f472b6) }
+                            in space tile5 { s_gear |> fill(#fbbf24) }
+                            in space tile6 { s_starburst |> fill(#fcd34d) }
+                            in space tile7 { s_rhombus |> fill(#fca5a5) }
+                        }
+                    }
+
+                    in space row2 {
+                        compose {
+                            in space tile0 { s_parallelogram |> fill(#c084fc) }
+                            in space tile1 { s_droplet |> fill(#a78bfa) }
+                            in space tile2 { s_capsule |> fill(#93c5fd) }
+                            in space tile3 { s_box |> fill(#38bdf8) }
+                            in space tile4 { s_ngon |> fill(#22d3ee) }
+                            in space tile5 { s_ellipse |> fill(#818cf8) }
+                            in space tile6 { s_star |> fill(#f97316) }
+                            in space tile7 { s_flower |> fill(#fb7185) }
+                        }
+                    }
+
+                    in space row3 {
+                        compose {
+                            in space tile0 { s_triangle |> fill(#86efac) }
+                            in space tile1 { s_trapezoid |> fill(#4ade80) }
+                            in space tile2 { s_polygon2 |> fill(#f59e0b) }
+                            in space tile3 { s_polygon3 |> fill(#e879f9) }
+                            in space tile4 { s_dilate |> fill(#bfdbfe) }
+                            in space tile5 { s_smooth |> fill(#f8fafc) }
+                            in space tile6 { s_svg_path |> fill(#f8fafc) }
+                            in space tile7 { s_svg |> fill(#86efac) }
+                        }
+                    }
+                }
+            }
+        }
+    }

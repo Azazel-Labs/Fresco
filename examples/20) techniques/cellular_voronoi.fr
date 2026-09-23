@@ -1,0 +1,293 @@
+/*
+Cellular spaces: sample guide
+
+`cells` partitions the current coordinate plane and evaluates content in the
+selected owner's local frame. It supports five layouts and filters ownership
+and shape occupancy together across pixel boundaries.
+
+```fresco
+in space cells(layout: voronoi, every: 0.16, jitter: 1.0,
+               seed: 37, sampling: grid4x4, cell: tile) {
+    circle(at: tile.center, radius: 0.047)
+        |> fill(mix(#54dfc8, #f0bc69, tile.rand))
+}
+```
+
+The usual engine declarations are required, including explicit rendering policy.
+
+Ownership and coordinates
+------------------------------------------------
+
+| Layout | Owner | Site / motif placement |
+| --- | --- | --- |
+| `square` | Unit lattice square | Center of its square |
+| `brick` | Square shifted half a column on odd rows | Center of the shifted square |
+| `hex` | Nearest site on a staggered triangular lattice | Row pitch is `sqrt(3)/2`, odd rows shifted half a column |
+| `jittered` | Original unit lattice square | Site displaced inside that square |
+| `voronoi` | Nearest displaced site | One bounded, seeded site per generating square |
+
+Coordinates are divided by `every` before ownership is evaluated. Scalar `every`
+uses the same scale on both axes; a vec2 scales axes independently. Hexagons are
+regular for equal scales, and stretched for unequal scales. Nearest-site distance
+is measured in normalized lattice coordinates, before these scales are reapplied.
+Negative coordinates use floor-based cells, including odd-row staggering.
+
+The mapped sample coordinate is `(normalized_position - site + 0.5) * every`.
+The bound cell exposes:
+
+| Member | Meaning |
+| --- | --- |
+| `id: vec2` | Signed integer-valued generating column/row, stable across queries and frame time |
+| `center: vec2` | Site in the mapped local frame: `every / 2`, suitable for `circle(at: tile.center, ...)` |
+| `uv: vec2` | Local coordinate divided by `every`; can extend outside `[0, 1]` in irregular/hex cells |
+| `rand: f32` | Stable `[0, 1)` value from integer mixing of the ID and seed |
+| `local: vec2` | Normalized position relative to the site: `uv - (0.5, 0.5)` |
+| `angle: angle` | Direction around the site in the normalized plane, in radians; zero points right and positive is counterclockwise |
+| `edge_distance: scalar` | Inward distance to the nearest ownership edge, in normalized cell units |
+
+Querying the boundary
+------------------------------------------------
+
+Every `cells` layout exposes the same geometry methods:
+
+```fresco
+let outer_track = tile.inset_distance(by: 0.037)
+let pixel_track = tile.inset_distance(by: 2px)
+let contact = tile.boundary_point(angle: 30deg)
+```
+
+`inset_distance` is zero on the requested inset contour and positive away from
+it. Plain numbers use normalized lattice units; explicit `px` expressions use
+screen pixels. Pixel conversion projects the continuous incoming coordinate
+Jacobian onto each boundary normal, so stretching and rotation do not use an
+incorrect single cell-wide pixel scale. The result remains a normalized distance
+field. Pixel width is a local differential measurement under nonlinear transforms.
+The query uses the cell's captured frame, like `tile.uv`, even in a nested space.
+
+The field is the absolute minimum inward half-plane distance after offsetting
+the faces. It is exact inside the inset polygon; outside it, especially beyond
+corners, it is a contour field rather than an exact Euclidean SDF. Insets large
+enough to collapse the polygon have no zero contour. Signed offsets are allowed;
+an outset lies outside cell ownership and is clipped by the cellular block.
+
+`boundary_point` intersects a ray from the site with the cell boundary and returns
+local **drawing coordinates**, matching `tile.center` and suitable for `circle(at:
+...)`. Angles are measured in the normalized cell plane; a vec2 `every` stretches
+the result. This is an angular query, not equal-distance perimeter traversal.
+The site is not necessarily the polygon centroid. Jittered cells retain square
+boundaries despite their displaced sites. Voronoi queries use actual neighbor
+bisectors, including for pixel insets, and emit a bounded 7×7 face search only
+when queried. Regular layouts use direct formulas. Legacy `repeat` bindings do
+not expose these geometry queries.
+
+See [hex circuitry](<../90) gallery/hex_circuit.fr>) for contour lighting
+that uses these methods while preserving the original compact scalar field math.
+
+`center` is not the parent-space/world-space site. This follows the existing
+`repeat(..., cell: ...)` local-center convention. Existing repeat cells also gain
+`.rand` with seed zero; `hash(cell)` retains its existing behavior and is not an
+alias for the new integer hash.
+
+The nearest-site search examines a 5×5 candidate window. For jitter at most one,
+each site remains within its generating square: the square containing the query
+has a site at distance at most `sqrt(2)`, while any excluded square is at least
+two units away. The window also covers the staggered hex lattice. Equal-distance
+ties choose the first site in row-major candidate order. There is no arbitrary
+unbounded Voronoi point cloud or per-frame rebuilding of random sites.
+
+Clipping and filtering
+------------------------------------------------
+
+Only the selected owner contributes at each sample. A large circle, glow, or
+other motif is clipped to its ownership region; it does not accumulate into
+neighbors. Use scatter when independently overlapping instances are required.
+Voronoi searches neighboring sites to establish ownership, not to composite all
+their motifs. `jittered` deliberately keeps square ownership, so a shifted motif
+may be clipped by its original square.
+
+`sampling` explicitly selects one of four `CellSampling` variants:
+
+| Variant | Positions per screen pixel |
+| --- | --- |
+| `center` | One point at the pixel center; no supersampling |
+| `grid2x2` | 4 points on a regular 2×2 grid |
+| `grid3x3` | 9 points on a regular 3×3 grid |
+| `grid4x4` | 16 points on a regular 4×4 grid |
+
+Grid points lie at the centers of equal subdivisions of the incoming screen-pixel
+footprint. Odd grids are supported; `grid3x3` includes the pixel center. `center`
+can alias or miss thin features. Use it to disable supersampling; zero samples
+would not produce a color and is not an option. The former `samples: 4` and
+`samples: 16` syntax is replaced by `sampling: grid2x2` and `sampling: grid4x4`.
+Sampling variants resolve in this argument's context, so `center` elsewhere
+continues to mean the coordinate anchor. Qualified forms such as
+`sampling: CellSampling.center` are also accepted.
+
+Each sample reevaluates the space
+chain, owner, cell context, and body. Shape fills use inside/outside occupancy
+inside this integration rather than applying analytical AA a second time. Color
+is alpha-weighted across samples. Authored `px` geometry retains its original size.
+The compiler emits bounded shader loops for the coverage grid and nearest-site
+search, sharing one copy of the shading body across samples. Increasing the sampling grid
+increases runtime work without multiplying the generated WGSL body. Search order
+and tie-breaking remain row-major.
+Nested cellular spaces share the outermost cellular block's grid; their sampling
+arguments do not multiply its work or increase its quality. `--explain` records
+the ownership model, requested outer-grid budget, and candidate count.
+
+This is bounded numerical filtering, not exact area integration. Features smaller
+than sample spacing can be missed; strongly nonlinear incoming footprints are
+approximated by their pixel derivatives. A discontinuous parent mapping can already
+have lost the original footprint: where possible, put preceding repeat/polar
+mappings in the same chain as `cells`, so each sample reevaluates them from the
+continuous input. Explicit texture sampling and procedural patterns retain their
+own filtering semantics. There is no claim of perfect AA
+for arbitrary shader math or automatic support for overlapping instances.
+
+Checked constraints and scope
+------------------------------------------------
+
+- `layout`, `every`, `seed`, and `sampling` are required. The period must be positive,
+  finite, and known at compile time. Runtime/pixel-dependent periods are rejected.
+- `seed` is a compile-time integer in `0..65535`. It changes site placement and
+  `.rand`, not the lattice ID numbering. Randomness is independent of invocation
+  order and time.
+- `jitter` is required for `jittered` and `voronoi`, with compile-time range `0..1`.
+  Zero leaves sites centered; one permits displacement up to half a cell per axis.
+  Other layouts reject the argument rather than ignoring it.
+- `cell:` binds only the immediate `in space` body, matching repeat-cell scope.
+  Named spaces can contain the mapping without introducing a cell binding.
+- `cells` must be the final transform in its chain. Put later transforms in a
+  nested `in space` block so their Jacobians are evaluated in the actual selected
+  local frame. Transforming the plane before `cells` and nesting cells are supported.
+- Coordinates use f32. Keep normalized lattice coordinates within the precision
+  range needed by the application; very large IDs lose subcell precision. The
+  signed-ID integer hash assumes coordinates fit i32. This is not an arbitrary-
+  precision world-coordinate system.
+
+Following an inset contour
+------------------------------------------------
+
+`tile.contour(inset: ...)` creates a closed path around the ownership polygon.
+It works with square, brick, hex, jittered, and Voronoi cells. The default inset
+is zero. Bare offsets use normalized cell units; `2px` offsets every supporting
+edge inward by two screen pixels. Constant negative insets are rejected;
+an animated inset is clamped to zero before clipping.
+
+```fresco
+let track = tile.contour(inset: 0.037)
+let pulse = chase(along: track, speed: 20px/s, tail: 3px,
+    direction: clockwise, phase: tile.rand)
+let wire = band(track.distance, width: 0.5px, profile: soft)
+let halo = band(track.distance, width: 3px, profile: soft)
+```
+
+The contour exposes:
+
+- `distance`: unsigned Euclidean distance to the nearest contour segment, in
+  normalized cell units. Unlike `inset_distance`, this is also Euclidean beyond
+  polygon corners.
+- `progress`: nearest position along the perimeter, from 0 to 1, measured by
+  normalized arc length. It advances counterclockwise in the cell plane.
+- `length`: perimeter in normalized cell units.
+- `point(at: 0.25)`: point one quarter of the way around, in local drawing
+  coordinates (the same space as `tile.center`). Parameters wrap every 1.
+
+The start is the beginning of the edge whose outward normal has the smallest
+nonnegative angle from +x. This is deterministic per cell. At an exact tie for
+nearest edge, the first enumerated edge wins; progress is discontinuous on the
+medial axis and at the wrap seam. A collapsed contour has zero length/progress,
+an effectively infinite distance (so bands vanish), and `point` returns the
+site. It contributes no chase light.
+
+`chase` produces brightness, not a drawing layer. Choose exactly one motion source:
+
+- `speed: 20px/s` follows the contour at twenty screen pixels per second.
+  Fresco rate literals already incorporate `context(time)`; do not multiply
+  them by time again. This argument accepts a displacement signal, so a bare
+  constant fixes the head position rather than advancing it. Normalized rates
+  such as `0.2/s` measure normalized cell distance per second.
+- `lap: 6s` completes each contour in six seconds. Larger contours move faster.
+
+`direction` is `clockwise` (default) or `counterclockwise` in the normalized cell
+plane; reflected transforms also reflect that direction on screen. `phase` is
+an initial offset in laps. `tail: 0.03` is a fraction of a lap; `tail: 3px` is a
+screen distance. Brightness halves at the specified tail length and decays
+exponentially behind the head. Pixel tails require pixel speed or a lap duration.
+The perimeter and nearest-point calculation use the screen metric when pixel
+motion/tails are requested, so anisotropic transforms do not change the speed.
+This is the local screen metric from the incoming coordinate Jacobian; under
+nonlinear/projective transforms it is a local approximation, not an integrated
+screen-space curve length. Animated geometry can also move the path itself.
+
+`band(distance, width: ..., profile: ...)` is a reusable scalar brightness mask:
+
+- `solid` (default): full brightness up to 40% of the full width, smoothly falling
+  to zero at 60% of the width.
+- `soft`: exponential falloff, half brightness at half the full width.
+
+Widths must be positive. A direct contour `distance` supports pixel widths using
+the exact screen-space segment distance. Other scalar distances use their
+existing coordinate units and Fresco's ordinary pixel conversion. The existing
+four-argument `band(lo, hi, feather, x)` overload remains available.
+
+All contour queries for the same inset/sample share geometry lowering. Regular
+cells use four/six edges; Voronoi uses bounded loops over neighboring supporting
+planes. This avoids shader-source growth from unrolling, but Voronoi contour
+queries do more GPU work than regular cells. No extra rendering passes are added.
+
+
+Contour type, motion modes, and the original circuit look
+------------------------------------------------
+
+`contour` is a registered geometry value type. `let outer = tile.contour(...)`
+infers it; an explicit declaration is `contour outer = tile.contour(...)`.
+It is neither a layer nor a runtime GPU resource. Its calculations are emitted
+only when its members or a consuming helper are used.
+
+`edge_distance` is the signed inward half-plane field of the inset boundary.
+`band(outer.edge_distance, ...)` preserves the original circuit's straight-edge
+falloff, including its corner treatment. `distance` remains the unsigned
+Euclidean distance to the actual finite segments.
+
+`chase` defaults to `motion: perimeter`. `motion: angular` with `lap:` or `head:` instead
+follows the angle around the cell site, reproducing the original circuit's
+motion. Angular motion uses fractional tails and does not accept pixel speed;
+use perimeter motion for `speed: 20px/s`. The gallery intentionally uses angular
+motion and normalized widths to match its original appearance at any resolution.
+
+Regular square, brick, and hex contours with normalized insets now use a single
+ordered edge walk without clipping arrays. Their normalized length is analytic.
+Angular motion plus an edge-distance band needs no perimeter walk at all.
+Pixel-offset and irregular contours retain the general bounded clipping path.
+
+Editor suggestions offer named arguments after `(`, commas, spaces, and newlines,
+then show in-scope contour values in `along:`. Accepting an argument name requests
+its value suggestions immediately. Member and enum suggestions remain constrained
+to the receiver or argument type.
+
+`head:` supplies an explicit travel position in laps, as an alternative to `lap:`
+or `speed:`. It lets related lights share an authored animation signal without
+reconstructing that clock independently. The restored gallery uses this to retain
+its original shared orbit and slower inner pulse exactly.
+
+Language-wide rules: ../../LANGUAGE.md (Cellular ownership and filtering).
+*/
+
+// Change voronoi to jittered to keep square ownership with displaced motifs.
+// square, brick, and hex use the same contract but omit the jitter argument.
+canvas cellular_voronoi(ctx: CanvasContext) -> color {
+    compose {
+        fill(#101827)
+        in space centered(aspect: preserve)
+            .rotate(12deg)
+            .cells(layout: voronoi, every: 0.16, jitter: 1.0,
+                   seed: 37, sampling: grid4x4, cell: tile) {
+            compose {
+                fill(mix(#132b3c, #26535d, tile.rand))
+                circle(at: tile.center, radius: 0.047)
+                    |> fill(mix(#54dfc8, #f0bc69, tile.rand))
+            }
+        }
+    }
+}

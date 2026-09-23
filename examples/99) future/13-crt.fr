@@ -1,0 +1,37 @@
+// north-star: crt — the `through` contract, warp spaces, piecewise Jacobians
+// status: aspirational
+// rung: 6
+// deltas:
+//   - `L through space S` sampling contract: inline when point-pure, sample
+//     materialized target otherwise, receipt says which (ext §23.6)
+//   - `barrel(amount:, center:)` space; `channel(r|g|b)` point effect
+//   - `phosphor_triad` stdlib pattern
+// done when: --explain prints `through barrel: inlined (operand point-pure)`
+//   for a procedural scene AND `sampled rtN` when the scene contains a blur;
+//   both orderings of blur-vs-warp are expressible and visibly different.
+
+canvas crt(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    param curvature: f32 = 0.12 in 0 .. 0.3
+
+    let scene = my_game_frame(uv, time)              // any layer
+    space tube = barrel(amount: curvature, center: center)
+
+    let scan = field 0.82 + 0.18 * cos(coord.y / 2px * 3.14159)
+    let mask = field phosphor_triad(coord / 1px)
+    let bezel = box(at: center, size: (0.96, 0.94)) |> round(0.06)
+
+    compose {
+        fill(#000)
+        (compose {
+                scene through space tube
+                layer grey(scan) |> blend(multiply)
+                layer mask       |> blend(multiply)
+                scene through space tube . translate(1.5px, 0)
+                |> channel(r) |> opacity(0.25) |> blend(add)
+                bezel |> inner_glow(reach: 30px, strength: 0.35)
+        }) mask: bezel
+        bezel |> stroke(3px) |> fill(#1a1d24)
+    }
+}

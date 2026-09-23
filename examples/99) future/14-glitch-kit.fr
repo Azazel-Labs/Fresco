@@ -1,0 +1,52 @@
+// north-star: glitch-kit — cyberpunk glitch as reusable effects over any scene
+// (community ask: shadertoy.com/view/XtyXzW-style corruption)
+// status: aspirational
+// rung: 6
+// deltas:
+//   - USER-DEFINED SAMPLEMAP SPACES: `space name(args) samplemap { expr -> coord }`
+//     (ext §23.5 category, promoted to a user seam)
+//   - `frame_bucket(time, dt)` — quantized time for held glitch states
+//   - `rand_signal(a .. b)` — seeded per-occurrence pulse spacing
+//   - datamosh line composes `previous_frame` with a samplemap (feedback x through)
+// done when: whole file is ONE pass over a point-pure scene; the glitch mask
+//   (itself a rendered layer, per XtyXzW's mask-model trick) gates all corruption;
+//   --explain lists each samplemap as inlined.
+
+space slice_shift(rows: length, chance: f32, amount: length, t: signal) samplemap {
+    let band = quantize(coord.y, step: rows)
+    let go = step(1 - chance, hash(band, frame_bucket(t, 80ms)))
+    coord + (go * amount * hash_signed(band), 0)
+}
+
+space block_jitter(cell: (length, length), chance: f32, t: signal) samplemap {
+    let id = quantize2(coord, step: cell)
+    let go = step(1 - chance, hash(id, frame_bucket(t, 120ms)))
+    coord + go * (hash_signed(id) * 24px, hash_signed(id, salt: 1) * 8px)
+}
+
+canvas glitched(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    let burst = pulse(every: rand_signal(1.5s .. 4s), width: 180ms, ease: out_expo)
+    let g = 0.15 + 0.85 * burst
+
+    let scene = my_scene(uv, time)
+    let zone  = glitch_zone(uv, time)     // a mask LAYER — the "glitch model" trick
+
+    compose {
+        scene
+        (compose {
+                scene through space slice_shift(rows: 18px, chance: 0.12 * g,
+                amount: 40px * g, t: time)
+                through space block_jitter(cell: (48px, 24px),
+                chance: 0.05 * g, t: time)
+                scene |> chromatic_split(spread: 3px * g) |> blend(over) |> opacity(0.7)
+                scanline_tear(at: wave(period: 0.9s, shape: saw), height: 3px) |> blend(add)
+                // datamosh: history smeared through the block map during bursts
+                previous_frame through space block_jitter(cell: (64px, 32px),
+                chance: 0.3, t: time)
+                |> opacity(0.5 * burst)
+        }) mask: zone
+        posterize(levels: mix(256, 6, g * 0.5))
+    }
+}

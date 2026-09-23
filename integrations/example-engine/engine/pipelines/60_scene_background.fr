@@ -1,0 +1,27 @@
+// Reusable procedural scene sky, composited behind ordinary scene geometry.
+struct SceneBackground { zenith: vec4, horizon: vec4 }
+@shader pass scene_background {
+    stage: raster
+    draw: fullscreen
+    binding {
+        @group(0) @binding(0) shaded: texture_2d<f32>
+        @group(0) @binding(1) settings: uniform<SceneBackground>
+        @group(0) @binding(2) resolve: uniform<ResolveInputs>
+        @group(0) @binding(3) view_mode: uniform<BufferViewInputs>
+    }
+    @vertex fn fullscreen(@builtin(vertex_index) index: u32) -> ScreenPosition {
+        let p = vec2(f32((index << u32(1)) & u32(2)), f32(index & u32(2)))
+        return ScreenPosition(vec4(p * 2.0 - 1.0, 0.0, 1.0))
+    }
+    @fragment fn present(@builtin(position) pixel: vec4) -> vec4 {
+        let foreground = textureLoad(shaded, ivec2(pixel.xy), i32(0))
+        if settings.horizon.a == 0.0 || view_mode.mode.x != u32(0) { return foreground }
+        let uv = pixel.xy / vec2(resolve.viewport)
+        let far = resolve.inverse_view_projection * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0)
+        let ray = normalize(far.xyz / far.w - resolve.camera.xyz)
+        let horizon = settings.horizon.rgb
+        let backdrop = mix(horizon, settings.zenith.rgb, smoothstep(0.0, 0.8, ray.y))
+        // Authored mesh blending produces premultiplied color over transparent black.
+        return vec4(foreground.rgb + backdrop * (1.0 - foreground.a), 1.0)
+    }
+}

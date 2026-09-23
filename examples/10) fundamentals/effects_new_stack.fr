@@ -1,0 +1,24 @@
+// Basic example: newly added analytic effects and morphology helpers.
+
+canvas effects_new_stack(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+
+    let core = circle(at: (0.5, 0.5), radius: 0.11)
+    let ring = core |> dilate(radius: 0.035) |> erode(radius: 0.01)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1220),
+                stop(at: 1.0, color: #1d3557),
+            ]
+        ))
+
+        in space stage {
+            ring |> soften(radius: 0.018, color: #93c5fdff)
+            ring |> inner_glow(reach: 0.06, strength: 0.8, color: #7dd3fcaa) |> blend(add)
+            ring |> bevel(width: 3px, strength: 0.7) |> blend(add)
+        }
+    }
+}

@@ -1,0 +1,3 @@
+// Executable payloads use output structs in 05_mesh_contract.fr.
+// Renderer recipes bind those locations to image formats; there is no separate
+// descriptive packing declaration that can disagree with the executing shader.

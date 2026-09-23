@@ -1,0 +1,99 @@
+// A torch built from individual simulated flame tongues, smoke puffs, and embers.
+// One bounded emitter selects three particle families by stable birth ID.
+fn torch_random(id: f32, salt: f32) -> f32 {
+    return fract(sin(id * 127.1 + salt * 311.7) * 43758.5453)
+}
+
+fn torch_spawn<T>(p: T, id: f32) -> T {
+    let family = torch_random(id, 1.0)
+    let r = torch_random(id, 2.0)
+    let angle = torch_random(id, 3.0) * 6.2831853
+    var next = p
+    next.position = vec4(cos(angle) * 0.055, -0.65, sin(angle) * 0.055, 0.0)
+    if family < 0.62 {
+        next.lifespan = 0.45 + r * 0.4
+        next.velocity = vec4(cos(angle) * 0.12, 0.65 + r * 0.5, sin(angle) * 0.12, 0.0)
+        next.position.w = 0.46
+    } else if family < 0.9 {
+        next.lifespan = 1.4 + r * 1.1
+        next.position.y = -0.3
+        next.velocity = vec4(cos(angle) * 0.1, 0.4 + r * 0.2, sin(angle) * 0.1, 0.0)
+        next.position.w = 0.28
+    } else {
+        next.lifespan = 0.7 + r * 1.0
+        next.velocity = vec4(cos(angle) * 0.4, 0.9 + r * 0.7, sin(angle) * 0.4, 0.0)
+        next.position.w = 0.075
+    }
+    return next
+}
+
+fn torch_motion<T>(p: T, dt: f32) -> T {
+    let family = torch_random(p.id, 1.0)
+    let life = clamp(p.age / max(p.lifespan, 0.001), 0.0, 1.0)
+    let phase = torch_random(p.id, 4.0) * 6.2831853
+    var next = p
+    if family < 0.62 {
+        next.velocity.x += sin(p.age * 9.0 + phase) * 0.65 * dt
+        next.velocity.z += cos(p.age * 7.0 + phase) * 0.45 * dt
+        next.position.w = mix(0.46, 0.2, life)
+    } else if family < 0.9 {
+        next.velocity.x += (0.10 + sin(p.age * 2.0 + phase) * 0.13) * dt
+        next.velocity.y += 0.08 * dt
+        next.position.w = mix(0.28, 0.85, life)
+    } else {
+        next.velocity.y -= 0.65 * dt
+        next.position.w = mix(0.075, 0.025, life)
+    }
+    next.position = vec4(p.position.xyz + next.velocity.xyz * dt, next.position.w)
+    return next
+}
+
+emitter torch_system {
+    spawn_rate: 95.0
+    burst_count: 12
+    max_lifespan: 2.5
+    spawn { torch_spawn(id) }
+    update { torch_motion(dt) }
+}
+
+texture_type TorchSprite {
+    r: red
+    g: green
+    b: blue
+    a: alpha
+}
+
+surface torch(sp: surf) -> material(unlit) {
+    properties {
+        blend: SurfaceBlend.Translucent
+        two_sided: true
+    }
+    param flame_tex: texture<TorchSprite> = "assets/particles/torch_flame.png"
+    param smoke_tex: texture<TorchSprite> = "assets/particles/torch_smoke.png"
+    param ember_tex: texture<TorchSprite> = "assets/particles/torch_ember.png"
+    param flame_intensity: f32 = 1.5 in 0.2 .. 3.0
+    param smoke_opacity: f32 = 0.18 in 0.0 .. 0.5
+    param ember_intensity: f32 = 2.0 in 0.2 .. 4.0
+
+    let life = clamp(sp.particle_age / max(sp.particle_lifespan, 0.001), 0.0, 1.0)
+    let family = torch_random(sp.particle_id, 1.0)
+    let phase = torch_random(sp.particle_id, 4.0) * 6.2831853
+    let fade = smoothstep(0.0, 0.12, life) * (1.0 - smoothstep(0.45, 1.0, life))
+    // File textures are top-left oriented; billboard UVs are bottom-left oriented.
+    let uv = vec2(sp.uv.x, 1.0 - sp.uv.y)
+    let spin = phase + sp.particle_age * 0.25
+    let q = uv - vec2(0.5)
+    let smoke_uv = vec2(cos(spin) * q.x - sin(spin) * q.y,
+                        sin(spin) * q.x + cos(spin) * q.y) + vec2(0.5)
+    // Sample all inputs uniformly; avoid derivative-based sampling in divergent branches.
+    let flame = flame_tex.at(uv)
+    let smoke = smoke_tex.at(clamp(smoke_uv, vec2(0.0), vec2(1.0)))
+    let ember = ember_tex.at(uv)
+    let flame_color = rgba(flame.red * flame_intensity, flame.green * flame_intensity, flame.blue * flame_intensity, flame.alpha * fade * 0.65)
+    let smoke_color = rgba(smoke.red * 0.38, smoke.green * 0.36, smoke.blue * 0.34, smoke.alpha * fade * smoke_opacity)
+    let ember_color = rgba(ember.red * ember_intensity, ember.green * ember_intensity, ember.blue * ember_intensity, ember.alpha * fade)
+    let ink = family < 0.62 ? flame_color : (family < 0.9 ? smoke_color : ember_color)
+    compose {
+        base(albedo: ink)
+    }
+}

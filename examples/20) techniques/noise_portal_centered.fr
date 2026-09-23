@@ -1,0 +1,20 @@
+// Advanced example: centered space + procedural noise modulating portal rings.
+
+canvas noise_portal_centered(ctx: CanvasContext) -> color {
+    let time = context(time)
+    space stage = centered(aspect: fit)
+    let n = field noise2((0.5, 0.5) + (time * 0.03, 0.0))
+
+    in space stage {
+        let outer = circle(at: (0.5, 0.5), radius: 0.42 + n * 0.02)
+        let inner = circle(at: (0.5, 0.5), radius: 0.25 + n * 0.01)
+        let ring = outer - inner
+
+        compose {
+            fill(#070d18)
+            ring |> fill(#69b9ff) |> blend(screen)
+            ring |> glow(reach: 0.18, strength: 0.34, color: #6bd1ff) |> blend(add)
+            inner |> fill(#0b1730)
+        }
+    }
+}

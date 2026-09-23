@@ -1,0 +1,30 @@
+// Demonstrates param arrays, `each (v, i) in values` compile-time loop with
+// index binding, and `anchor: shape` gradients.
+// Graduated from examples/99) future/11-bar-chart.fr.
+
+canvas bar_chart(ctx: CanvasContext) -> color {
+    param values: array<f32, 12> = [0.3, 0.5, 0.42, 0.61, 0.55, 0.7,
+        0.66, 0.8, 0.74, 0.9, 0.85, 0.95] in 0 .. 1
+    param accent: color = #5eead4
+    let reveal = ramp(from: 0s, over: 0.9s, ease: out_cubic)
+
+    compose {
+        fill(#0e1420)
+
+        each (v, i) in values {
+            let slot = distribute(i, len(values), start: 0.08, end: 0.92)
+            let x = slot.center
+            let w = slot.size
+            let h = v * 0.7 * reveal
+            box(at: (x, 0.12 + h / 2), size: (w - 2px, h))
+            |> round(0.008)
+            |> fill(gradient(along: y, anchor: shape, stops: [
+                    stop(at: 0.0, color: #1e3a5f),
+                    stop(at: 1.0, color: accent),
+            ]))
+        }
+
+        box(at: (0.5, 0.115), size: (0.88, 0.002))
+        |> fill(#334155)
+    }
+}

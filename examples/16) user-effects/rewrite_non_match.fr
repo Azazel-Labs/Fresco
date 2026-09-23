@@ -1,0 +1,22 @@
+// §16.1 User-Defined Effects — Rewrite pattern that intentionally does not match
+//
+// Demonstrates:
+//   - rewrite pattern is effect-name specific
+//   - composing different effects does not trigger unrelated rules
+
+effect grain(amount: f32) point {
+    fill(rgba(r: amount, g: amount, b: amount, a: 1.0))
+
+    rewrite grain(a) compose grain(b) => grain(a)
+}
+
+effect hue_shift(amount: f32) point {
+    fill(rgba(r: amount, g: amount * 0.5, b: amount * 0.25, a: 1.0))
+}
+
+canvas rewrite_non_match_demo(ctx: CanvasContext) -> color {
+    compose {
+        fill(#101218)
+        fill(#000000) |> grain(0.2) |> hue_shift(0.8)
+    }
+}

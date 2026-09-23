@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+staged_rs="$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.rs$' || true)"
+
+if [ -z "$staged_rs" ]; then
+  exit 0
+fi
+
+echo "[pre-commit] Running rustfmt on staged Rust files..."
+echo "$staged_rs" | while IFS= read -r file; do
+  [ -n "$file" ] || continue
+  rustfmt --edition 2024 "$file"
+  git add "$file"
+done

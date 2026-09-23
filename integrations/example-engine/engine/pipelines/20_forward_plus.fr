@@ -1,0 +1,148 @@
+// Staged clustered-pipeline vocabulary, not an executable StandardStyle provider. The executable basic tiled mesh path
+// lives in core/05_mesh_contract.fr and runtime/forward_plus.rs; see
+// docs/example-engine-forward-plus.md for supported behavior.
+import "../core/01_core.fr"
+import "../core/02_functions.fr"
+
+pass cluster_cull {
+    stage: compute
+
+    permutations {
+        @known(pipeline) tile_size:       8|16|32
+        @known(pipeline) depth_slices:    1|16|32|64
+        @known(pipeline) max_per_cluster: 64|128|256
+    }
+
+    group_size: (tile_size, tile_size, 1)
+
+    dispatch host {
+        x: div_ceil($viewport.x, tile_size)
+        y: div_ceil($viewport.y, tile_size)
+        z: depth_slices
+    }
+
+    binding {
+        @group(frame)  camera:         uniform<CameraData>
+        @group(frame)  lights:         buffer<LightData>
+        @group(pass)   clusters:       buffer<Cluster> readwrite
+        @group(pass)   cluster_lights: buffer<u32> readwrite
+    }
+
+    fn main(gid: uvec3, lid: uvec3) {
+        let grid    = cluster_grid(camera, tile_size, depth_slices)
+        let idx     = cluster_index(gid, grid)
+        let base    = cluster_base(idx, max_per_cluster)
+        let frustum = cluster_frustum(camera, gid, tile_size, depth_slices)
+        var n = 0u
+        for i in 0 .. count(lights) {
+            let l = lights[i]
+            let hit = match l.kind {
+                LightKind.directional: true
+                LightKind.point:       sphere_vs_frustum(l.position, l.range, frustum)
+                LightKind.spot:        cone_vs_frustum(l.position, l.direction, l.range, l.cos_outer, frustum)
+            }
+
+            if (hit && n < max_per_cluster)
+            {
+                cluster_lights[base + n] = i
+                n += 1u
+            }
+        }
+        clusters[idx] = Cluster(offset: base, count: n)
+    }
+}
+
+pass fp_shade for standard {
+    stage: raster
+    draw:  per_object
+    blend: opaque
+    reads: cluster_cull
+
+    permutations {
+        @known(compile) ambient:       "flat"|"sh2"|"lightmap"|"lightmap_dir"
+        @known(compile) main:          "none"|"lit"|"shadowed"
+        @known(compile) cascades:      1|2|4
+        @known(compile) cascade_taps:  1|3|5
+        @known(pipeline) tile_size:    8|16|32
+        @known(pipeline) depth_slices: 1|16|32|64
+        @known(draw) fog:              FogMode
+    }
+
+    require {
+        main != "none" => ambient != "lightmap" && ambient != "lightmap_dir"
+        main != "shadowed" => disable(cascades, cascade_taps)
+    }
+
+    binding {
+        @group(frame)                                                   camera:         uniform<CameraData>
+        @group(frame)                                                   lights:         buffer<LightData>
+        @group(frame)                                                   shadows:        buffer<ShadowData>
+        @group(frame)                                                   shadow_atlas:   texture<ShadowDepthArray>
+        @group(pass)                                                    clusters:       buffer<Cluster>
+        @group(pass)                                                    cluster_lights: buffer<u32>
+        @group(frame)                                                   fog_data:       uniform<FogData>
+        @group(frame) @expect(ambient == "flat")                        ambient_color:  uniform<vec3>
+        @group(draw)  @expect(ambient == "sh2")                         ambient_sh:     uniform<SH2>
+        @group(frame) @expect(ambient == "lightmap" | "lightmap_dir")   lightmap_tex:   texture<LightmapRGBM>
+        @group(frame) @expect(ambient == "lightmap_dir")                lightmap_dir:   texture<LightmapDirGL>
+        @group(frame) @expect(main == "lit" | "shadowed")               main_light:     uniform<LightData>
+        @group(frame) @expect(main == "shadowed")                       main_shadow:    uniform<ShadowData>[cascades]
+        @group(frame) @expect(main == "shadowed")                       splits:         uniform<Splits>
+    }
+
+    fn shade(sp: Surf, m: standard) -> color {
+        let material_split = split_material(m.albedo.rgb, m.metallic)
+        let diffuse = material_split.diffuse
+        let f0 = material_split.f0
+        let v = normalize(camera.position - sp.position)
+
+        var lit = select ambient {
+            flat:         ambient_color
+            sh2:          eval_sh2(ambient_sh, m.normal)
+            lightmap:     lightmap_tex.at(sp.uv1)
+            lightmap_dir: eval_dir_lightmap(lightmap_tex.at(sp.uv1),
+                lightmap_dir.at(sp.uv1), m.normal)
+        } * diffuse * m.occlusion
+
+        select main {
+            none: {}
+            lit: {
+                lit += brdf(sample_directional(main_light, sp.position),
+                    m.normal, v, diffuse, f0, m.roughness)
+            }
+            shadowed: {
+                let c   = cascade_for<cascades>(sp.view_depth, splits)
+                let vis = shadow_visibility<cascade_taps>(shadow_atlas, main_shadow[c],
+                    sp.position, m.normal)
+                lit += brdf(sample_directional(main_light, sp.position),
+                    m.normal, v, diffuse, f0, m.roughness) * vis
+            }
+        }
+
+        let cl = clusters[cluster_of(camera, sp.screen, sp.view_depth,
+                tile_size, depth_slices)]
+
+        for i in 0 .. cl.count {
+            let l = lights[cluster_lights[cl.offset + i]]
+            var sample_value = sample_any(l, sp.position)
+            if l.shadow_slot >= 0 {
+                sample_value.attenuation *= shadow_visibility<3>(shadow_atlas, shadows[l.shadow_slot],
+                    sp.position, m.normal)
+            }
+            lit += brdf(sample_value, m.normal, v, diffuse, f0, m.roughness)
+        }
+
+        lit += m.emissive
+        select fog {
+            off:    {}
+            linear: { lit = mix(fog_data.color, lit, fog_linear(fog_data, sp.view_depth)) }
+            exp2:   { lit = mix(fog_data.color, lit, fog_exp2(fog_data, sp.view_depth)) }
+        }
+        return rgba(lit * camera.exposure, m.albedo.a * m.opacity)
+    }
+}
+
+pipeline(lighting) forward_plus for standard {
+    cluster_cull
+    fp_shade
+}

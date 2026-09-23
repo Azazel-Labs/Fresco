@@ -1,0 +1,42 @@
+// Clean centered grid display.
+// `lines(...)` is for repeated periodic families (full grid bands).
+// `gridline(...)` is for single exact infinite lines (axes/guides).
+
+canvas gridlines(ctx: CanvasContext) -> color {
+    space plot = centered(aspect: preserve)
+    space viewbox = translate((0.5, 0.5))
+
+    let minor = lines(along: x, every: 0.08uv) | lines(along: y, every: 0.08uv)
+    let major = lines(along: x, every: 0.40uv) | lines(along: y, every: 0.40uv)
+    let axes = gridline(along: x, at: 0.0) | gridline(along: y, at: 0.0)
+    let center_dot = circle(at: (0.0, 0.0), radius: 5px)
+    let center_ring = circle(at: (0.0, 0.0), radius: 0.14uv) |> stroke(2px)
+    let frame = box(at: (0.0, 0.0), size: (1.84uv, 1.84uv)) |> stroke(2px)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1220),
+                stop(at: 1.0, color: #111c31),
+            ]
+        ))
+
+        in space plot {
+            in space viewbox {
+                compose {
+                    // Repeated families: use `lines`.
+                    minor |> stroke(1px) |> fill(#1f314e) |> opacity(0.42)
+                    major |> stroke(1.5px) |> fill(#36557f) |> opacity(0.78)
+
+                    // Singleton guides: use `gridline`.
+                    axes |> stroke(2px) |> fill(#89ace2)
+
+                    center_ring |> fill(#7fb4ff) |> opacity(0.85)
+                    center_dot |> fill(#ffd37a)
+                    frame |> fill(#4f6f9e) |> opacity(0.55)
+                }
+            }
+        }
+    }
+}

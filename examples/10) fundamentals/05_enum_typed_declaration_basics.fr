@@ -1,0 +1,20 @@
+// Fundamentals: enum-typed local declarations and qualified enum variants in
+// normal expressions.
+
+enum BlendKind { Normal, Multiply, Screen }
+
+canvas enum_typed_declaration_basics(ctx: CanvasContext) -> color {
+    BlendKind selected = BlendKind.Screen
+    // Enum variants currently lower to scalar ordinals in declaration order.
+    // Normal=0, Multiply=1, Screen=2.
+    let selected_radius = 0.05 * (selected + 1.0)
+    let normal_radius = 0.05 * (BlendKind.Normal + 1.0)
+    let multiply_radius = 0.05 * (BlendKind.Multiply + 1.0)
+
+    compose {
+        fill(#101018)
+        circle(at: (0.25, 0.5), radius: normal_radius) |> fill(#7fd1ff)
+        circle(at: (0.50, 0.5), radius: multiply_radius) |> fill(#ffd67f)
+        circle(at: (0.75, 0.5), radius: selected_radius) |> fill(#ff9bc7)
+    }
+}

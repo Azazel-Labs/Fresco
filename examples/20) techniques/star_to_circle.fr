@@ -1,0 +1,23 @@
+// Advanced example: shape morphing via distance-field lerp.
+// Demonstrates `mix(shape, shape, t)` with `ease(t, in_out_cubic)` for smooth morphing.
+// The mid-morph topology pinch is expected — it is a known property of SDF lerp.
+
+canvas star_to_circle(ctx: CanvasContext) -> color {
+    let t = wave(period: 3s, shape: sine, range: 0 .. 1)
+
+    let a = star(at: center, outer: 0.22, inner: 0.10, points: 5)
+    let b = circle(at: center, radius: 0.18)
+    let sample_value = mix(a, b, ease(t, in_out_cubic))
+
+    space stage = centered(aspect: preserve)
+
+    compose {
+        fill(#0b0e17)
+
+        in space stage {
+            sample_value |> fill(#ffb347)
+            sample_value |> stroke(2px) |> fill(#fff7e6)
+            sample_value |> glow(reach: 24px, strength: 0.4 * t)
+        }
+    }
+}

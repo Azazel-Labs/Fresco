@@ -1,0 +1,30 @@
+// Showcase example: layered aurora ribbons over a horizon glow.
+// Intended as a visually rich but still v0-compilable sample.
+
+canvas aurora_corridor(ctx: CanvasContext) -> color {
+    let sky = fill(gradient(
+        along: y,
+        stops: [
+            stop(at: 0.0, color: #04060d),
+            stop(at: 1.0, color: #10223f),
+        ]
+    ))
+
+    let drift_a = wave(period: 12s, shape: saw, range: -0.15 .. 0.15)
+    let drift_b = wave(period: 9s, shape: saw, range: -0.12 .. 0.12)
+
+    let ribbon_a = capsule(from: (0.05 + drift_a, 0.72), to: (0.95 + drift_a, 0.64), radius: 0.03)
+    let ribbon_b = capsule(from: (0.02 + drift_b, 0.60), to: (0.98 + drift_b, 0.52), radius: 0.024)
+
+    let horizon = box(at: (0.5, 0.18), size: (1.1, 0.24)) |> round(0.08)
+
+    compose {
+        sky
+        horizon |> fill(#0a1530) |> blend(screen)
+        horizon |> glow(reach: 0.20, strength: 0.24, color: #66b8ff) |> blend(add)
+        ribbon_a |> fill(#84ffd6aa) |> blend(screen)
+        ribbon_a |> glow(reach: 0.10, strength: 0.42, color: #72ffd4) |> blend(add)
+        ribbon_b |> fill(#8bc6ffaa) |> blend(screen)
+        ribbon_b |> glow(reach: 0.12, strength: 0.30, color: #7da6ff) |> blend(add)
+    }
+}

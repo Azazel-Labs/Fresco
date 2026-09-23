@@ -1,0 +1,33 @@
+// Basic example: side-by-side blend mode comparison.
+// Demonstrates `over`, `add`, `screen`, and `multiply`.
+
+canvas blend_modes_comparison(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+
+    let base_left = circle(at: (0.22, 0.5), radius: 0.16)
+    let top_left = circle(at: (0.30, 0.5), radius: 0.16)
+
+    let base_mid = circle(at: (0.46, 0.5), radius: 0.16)
+    let top_mid = circle(at: (0.54, 0.5), radius: 0.16)
+
+    let base_right = circle(at: (0.70, 0.5), radius: 0.16)
+    let top_right = circle(at: (0.78, 0.5), radius: 0.16)
+
+    compose {
+        fill(#0f1728)
+
+        in space stage {
+            base_left |> fill(#5bc0ff)
+            top_left |> fill(#ff7dbb) |> blend(over)
+
+            base_mid |> fill(#5bc0ff)
+            top_mid |> fill(#ff7dbb) |> blend(add)
+
+            base_right |> fill(#5bc0ff)
+            top_right |> fill(#ff7dbb) |> blend(screen)
+
+            box(at: (0.5, 0.18), size: (0.90, 0.08)) |> fill(#98ffb8)
+            box(at: (0.5, 0.18), size: (0.70, 0.05)) |> fill(#5b6cff) |> blend(multiply)
+        }
+    }
+}

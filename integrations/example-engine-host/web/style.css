@@ -1,0 +1,19 @@
+:root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; background: #15191f; color: #e1e7ef; }
+body { margin: 0; }
+main { max-width: 1200px; margin: auto; padding: 24px; }
+h1 { font-size: 28px; margin: 0; }
+p { color: #aebed0; }
+.layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+label { display: block; margin-bottom: 8px; }
+textarea { box-sizing: border-box; width: 100%; min-height: 320px; resize: vertical; padding: 14px; background: #0d1117; color: #ebf2fa; border: 1px solid #516074; border-radius: 6px; font: 14px/1.6 monospace; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+button { padding: 8px 12px; border: 1px solid #6683a6; border-radius: 5px; background: #233247; color: white; cursor: pointer; }
+button:disabled { opacity: .5; cursor: wait; }
+.preview { min-width: 0; }
+#parameters { min-height: 90px; margin-bottom: 8px; }
+.textures { margin-top: 16px; }
+.textures select { min-width: 180px; margin-bottom: 10px; padding: 6px; }
+.controls { margin-bottom: 16px; }
+canvas { display: block; width: 100%; aspect-ratio: 1; background: #000; border-radius: 6px; touch-action: none; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; color: #ffc0b7; }
+@media (max-width: 750px) { .layout { grid-template-columns: 1fr; } }

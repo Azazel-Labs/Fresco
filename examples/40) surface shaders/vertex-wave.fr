@@ -1,0 +1,40 @@
+// Vertex wave surface sample: authored vertex-stage bending plus a simple lit material.
+
+surface vertex_wave(sp: surf) -> material {
+    let time = context(time)
+    param bend: f32 = 0.12 in 0 .. 0.25
+    param pulse: f32 = 0.05 in 0 .. 0.18
+    param crest: color = #7fe0ff
+
+    let around = sp.uv.x * 6.28318
+    let vertical = sp.uv.y * 6.28318
+    let band = band(0.18, 0.82, feather: 0.16, x: sp.uv.y)
+    let wobble = sin(around + time * 1.6) * bend * band
+    let inflation = (sin(vertical - time * 2.2) * 0.5 + 0.5) * pulse
+
+    vertex {
+        position: (
+            sp.position.x + sp.normal.x * inflation,
+            sp.position.y + wobble + sp.normal.y * inflation,
+            sp.position.z + sp.normal.z * inflation
+        )
+        normal: normalize((
+            sp.normal.x,
+            sp.normal.y + cos(around + time * 1.6) * band * 0.35,
+            sp.normal.z
+        ))
+    }
+
+    let crest_mask = band(0.42, 0.58, feather: 0.08, x: sin(around + time * 1.6) * 0.5 + 0.5)
+    let glow_mask = band(0.35, 0.65, feather: 0.12, x: sin(vertical - time * 2.2) * 0.5 + 0.5)
+
+    compose {
+        base(
+            albedo: mix(#15304c, crest, crest_mask),
+            roughness: 0.18,
+            metallic: 0.08)
+        layer material(
+            emissive: crest.rgb * 0.35,
+            weight: glow_mask)
+    }
+}

@@ -1,0 +1,26 @@
+* text=auto eol=lf
+
+# Explicit source/config rules also cover files Git might misclassify.
+*.rs text eol=lf
+*.fr text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.js text eol=lf
+*.sh text eol=lf
+
+# Binary assets must never undergo newline conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff2 binary
+*.ttf binary
+*.wasm binary
+*.pdf binary
+*.zip binary

@@ -1,0 +1,58 @@
+// Basic example: field noise primitives (`noise2`, `fbm`, `wrap`).
+// `noise2` adds coarse jitter, `fbm` layers turbulence, and `wrap` turns the
+// result into repeating bands.
+
+canvas noise_fbm_wrap_field(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    let p = uv * 6.0 + (time * 0.08, time * 0.03)
+    let low = field noise2(p * 1.25)
+    let high = field fbm(p * 3.5, octaves: 5)
+    let bands = field wrap(x: low * 0.25 + high * 1.35, range: -1.0 .. 1.0)
+
+    let low_t = (low + 1.0) * 0.5
+    let high_t = (high + 1.0) * 0.5
+    let bands_t = (bands + 1.0) * 0.5
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #08111f),
+                stop(at: 1.0, color: #101d33),
+            ]
+        ))
+
+        box(at: (0.22, 0.50), size: (0.28, 0.72))
+        |> round(0.03)
+        |> fill(rgba(r: 0.10 + 0.10 * low_t, g: 0.22 + 0.42 * low_t, b: 0.32 + 0.54 * low_t, a: 1.0))
+        |> glow(reach: 0.05, strength: 0.18, color: #88e3ff)
+
+        box(at: (0.50, 0.50), size: (0.28, 0.72))
+        |> round(0.03)
+        |> fill(rgba(r: 0.32 + 0.62 * high_t, g: 0.08 + 0.22 * high_t, b: 0.22 + 0.40 * high_t, a: 1.0))
+        |> glow(reach: 0.06, strength: 0.20, color: #ff8fd6)
+
+        box(at: (0.78, 0.50), size: (0.28, 0.72))
+        |> round(0.03)
+        |> fill(rgba(r: 0.18 + 0.82 * bands_t, g: 0.10 + 0.36 * (1.0 - bands_t), b: 0.14 + 0.62 * bands_t, a: 1.0))
+        |> glow(reach: 0.05, strength: 0.22, color: #ffe08a)
+
+        circle(at: (0.22, 0.50), radius: 0.11)
+        |> fill(rgba(r: 0.70 + 0.25 * low_t, g: 0.95, b: 1.0, a: 0.65))
+        |> glow(reach: 0.04, strength: 0.20, color: #b7f3ff)
+
+        circle(at: (0.50, 0.50), radius: 0.11)
+        |> fill(rgba(r: 1.0, g: 0.50 + 0.30 * high_t, b: 0.20 + 0.50 * high_t, a: 0.68))
+        |> glow(reach: 0.04, strength: 0.22, color: #ffb86b)
+
+        circle(at: (0.78, 0.50), radius: 0.11)
+        |> fill(rgba(r: 1.0, g: 0.26 + 0.34 * bands_t, b: 0.76 + 0.20 * bands_t, a: 0.68))
+        |> glow(reach: 0.04, strength: 0.22, color: #ffd36e)
+
+        box(at: (0.50, 0.50), size: (0.92, 0.12))
+        |> round(0.02)
+        |> fill(rgba(r: 1.0, g: 1.0, b: 1.0, a: 0.20))
+        |> blend(screen)
+    }
+}

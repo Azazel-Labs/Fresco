@@ -1,0 +1,22 @@
+// Example: Vec3 array parameters
+// Shows how to use array<vec3, N> for 3D vector arrays
+
+canvas demo(ctx: CanvasContext) -> color {
+    param directions: array<vec3, 4> = [
+        (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.0, 0.0, 1.0),
+        (0.707, 0.707, 0.0)
+    ]
+
+    compose {
+        fill(#faf5ff)
+
+        // Use vec3 data for visualization
+        // Project 3D directions onto 2D plane
+        for dir in directions {
+            circle(at: (dir.x * 0.3, dir.y * 0.3), radius: 0.05)
+            |> fill(#8b5cf6)
+        }
+    }
+}

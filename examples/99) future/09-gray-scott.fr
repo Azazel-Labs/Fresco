@@ -1,0 +1,26 @@
+// north-star: gray-scott — reaction-diffusion grid feeding a canvas
+// status: aspirational
+// rung: 4
+// deltas:
+//   - runnable `grid` programs (specced §14, never exercised)
+//   - grid state sampled as field<T> in a canvas; partitioner treats it as a cut
+//   - `dt` ambient in grids; `laplacian(neighbors(1))` stdlib
+// done when: patterns form; --explain shows grid dispatch + ping-pong + canvas
+//   pass sampling grid state with NO user-visible plumbing.
+
+grid gray_scott(cell: chem, size: (512, 512), edges: wrap) local(1) {
+    param feed: f32 = 0.037 in 0.01 .. 0.09
+    param kill: f32 = 0.060 in 0.03 .. 0.07
+
+    let lap = laplacian(neighbors(1))
+    let react = cell.a * cell.b * cell.b
+    cell.a = cell.a + (0.16 * lap.a - react + feed * (1 - cell.a)) * dt
+    cell.b = cell.b + (0.08 * lap.b + react - (kill + feed) * cell.b) * dt
+}
+
+canvas rd_view(ctx: CanvasContext) -> color {
+    compose {
+        fill(#0a0e14)
+        layer colormap(gray_scott.b, ramp: [#0a0e14, #155e75, #5eead4, #fef3c7])
+    }
+}

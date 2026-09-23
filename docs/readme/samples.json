@@ -1,0 +1,105 @@
+{
+  "width": 320,
+  "height": 320,
+  "fps": 60,
+  "samples": [
+    {
+      "id": "badge",
+      "source": "examples/10) fundamentals/badge.fr",
+      "duration": 18,
+      "alt": "Rounded pink badge rotating with a shadow and white outline"
+    },
+    {
+      "id": "cutout",
+      "source": "examples/10) fundamentals/shape_boolean_cutout.fr",
+      "alt": "Blue rounded frame with a pink disc moving across it",
+      "duration": 4
+    },
+    {
+      "id": "orb",
+      "source": "examples/10) fundamentals/param_gradient_orb.fr",
+      "alt": "Warm radial gradient orb"
+    },
+    {
+      "id": "top_left",
+      "source": "examples/10) fundamentals/top_left_coordinates.fr",
+      "alt": "Yellow circle placed using top-left coordinates"
+    },
+    {
+      "id": "dial",
+      "source": "examples/10) fundamentals/polar_dial.fr",
+      "alt": "Straight progress bar bent into a blue dial"
+    },
+    {
+      "id": "perspective_flip_card",
+      "source": "examples/90) gallery/perspective_flip_card.fr",
+      "duration": 4,
+      "alt": "Perspective card rotating between a white decorated front and a teal striped back"
+    },
+    {
+      "id": "dots",
+      "source": "examples/10) fundamentals/repeat_grid_dots.fr",
+      "duration": 2.4,
+      "alt": "Repeating mint dots moving through one wave cycle"
+    },
+    {
+      "id": "bars",
+      "source": "examples/10) fundamentals/for_loop_bars.fr",
+      "alt": "Seven gradient bars pulsing with increasing heights",
+      "duration": 2.8
+    },
+    {
+      "id": "haze",
+      "source": "examples/10) fundamentals/blur_soften_haze.fr",
+      "alt": "Warm circle surrounded by analytic soft haze"
+    },
+    {
+      "id": "functions",
+      "source": "examples/10) fundamentals/02_callable_parameter_basics.fr",
+      "alt": "Blue shape evaluated using reusable functions"
+    },
+    {
+      "id": "textured",
+      "source": "examples/20) techniques/texture_outline.fr",
+      "textures": {
+        "image": "examples/assets/textures/brick_tex.png"
+      },
+      "alt": "Host-supplied brick texture beneath a white circle outline"
+    },
+    {
+      "id": "uv_material",
+      "source": "examples/40) surface shaders/uv_material.fr",
+      "alt": "UV-colored material on the engine mesh preview"
+    },
+    {
+      "id": "engine",
+      "source": "examples/10) fundamentals/engine_canvas.fr",
+      "alt": "Pink circle executed through the supplied engine bundle"
+    },
+    {
+      "id": "canvas_contract",
+      "source": "integrations/example-engine/engine/core/04_canvas_contract.fr",
+      "entrypoint": "examples/10) fundamentals/engine_canvas.fr",
+      "preview": false
+    },
+    {
+      "id": "toon",
+      "source": "examples/40) surface shaders/style_sample.fr",
+      "mesh": "sphere",
+      "alt": "Peach Toon material with banded lighting and a dark inverted-hull outline"
+    },
+    {
+      "id": "torch",
+      "source": "examples/50) particles/torch.fr",
+      "duration": 4,
+      "fps": 30,
+      "warmup": 3,
+      "textures": {
+        "flame_tex": "examples/assets/particles/torch_flame.png",
+        "smoke_tex": "examples/assets/particles/torch_smoke.png",
+        "ember_tex": "examples/assets/particles/torch_ember.png"
+      },
+      "alt": "Simulated torch with orange flame tongues, rising smoke, and glowing embers"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+== fresco --explain: canvas `badge` ==
+pass plan (phase-1 locality partitioner DAG):
+pass 0  stage=0  locality=point  layers 0..=5 (6 layer node(s))
+pass dag edges: none
+locality marks: point=6, local=0, global=0 (phase-1 persisted)
+  rewrite: shadow lowered analytically ×1 — soften(fill(translate(s))) (§10.2)
+  locality: all nodes point after rewrites ⇒ 1 fused fragment pass (§11 step 2)
+  sdf: 3 evaluation(s), 1 reuse(s) via shape CSE (§10.3)
+  dag: 3 shape node(s), 6 layer node(s)
+

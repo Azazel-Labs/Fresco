@@ -1,0 +1,24 @@
+// Advanced example: scatter trails with per-instance phase and lifetimes.
+// Shows `scatter`, a named instance binding, and additive layering.
+
+canvas scatter_comet_field(ctx: CanvasContext) -> color {
+    let sky = fill(gradient(
+        along: y,
+        stops: [
+            stop(at: 0.0, color: #04070f),
+            stop(at: 1.0, color: #101a2f),
+        ]
+    ))
+
+    let comets = scatter 28 within region((0.08, 0.10) .. (0.92, 0.82)) seed 23 strategy compact
+    lifetime comet: 1.2s respawn every rand(4s .. 8s) {
+        let drift = wave(period: 8s, shape: saw, phase: comet.index01, range: -0.10 .. 0.10)
+        let head = comet.pos + (drift, 0.03)
+        capsule(from: comet.pos, to: head, radius: 0.005) |> fill(#c4e7ff88)
+    }
+
+    compose {
+        sky
+        comets |> blend(add)
+    }
+}

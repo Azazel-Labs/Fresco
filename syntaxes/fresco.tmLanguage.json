@@ -1,0 +1,222 @@
+{
+  "name": "Fresco",
+  "scopeName": "source.fresco",
+  "fileTypes": [
+    "fr"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#colors"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#host-identifiers"
+    },
+    {
+      "include": "#calls"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.fresco",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "name": "comment.block.fresco",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.fresco",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.fresco"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.fresco"
+            }
+          }
+        },
+        {
+          "name": "string.quoted.double.fresco",
+          "begin": "\"",
+          "end": "\"",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.begin.fresco"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.string.end.fresco"
+            }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.fresco",
+              "match": "\\\\[nrt\"\\\\]"
+            },
+            {
+              "name": "invalid.illegal.escape.fresco",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.fresco",
+          "match": "#pragma\\b"
+        },
+        {
+          "name": "entity.other.attribute-name.fresco",
+          "match": "@[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "colors": {
+      "name": "constant.other.color.fresco",
+      "match": "#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![A-Za-z0-9_])"
+    },
+    "numbers": {
+      "match": "(?<![A-Za-z0-9_])([0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(px|uv|vw|vh|vmin|vmax|deg|turn|ms|s|u|i)?(?![A-Za-z0-9_])",
+      "name": "constant.numeric.fresco",
+      "captures": {
+        "2": {
+          "name": "storage.type.numeric-suffix.fresco"
+        }
+      }
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(fn|canvas|surface|effect|texture_type)(\\s+)([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "storage.type.fresco"
+            },
+            "3": {
+              "name": "entity.name.function.fresco"
+            }
+          }
+        },
+        {
+          "match": "\\b(struct|enum|interface|pass|pipeline|style)(\\s+)([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": {
+              "name": "storage.type.fresco"
+            },
+            "3": {
+              "name": "entity.name.type.fresco"
+            }
+          }
+        }
+      ]
+    },
+    "constants": {
+      "name": "constant.language.fresco",
+      "match": "\\b(?:true|false|center)\\b"
+    },
+    "keywords": {
+      "name": "keyword.control.fresco",
+      "match": "\\b(?:as|at|blend|break|canvas|canvas_space|case|compose|conform|const|default|disable|each|effect|else|enum|every|extern|field|fn|for|if|import|in|interface|internal|known|layer|let|lifetime|match|optional|param|pass|pipeline|require|required|respawn|return|rewrite|scatter|seed|select|space|strategy|struct|style|surface|tags|template|texture_type|through|uniform|unroll|var|vertex|when|within)\\b"
+    },
+    "types": {
+      "name": "support.type.fresco",
+      "match": "\\b(?:angle|array|bool|color|color_field|coord|coord_like|coverage|delta|f32|f64|gradient|half|i32|layer|length|mask|mat2|mat3|mat4|material|path|resolution|sampler|scalar|shape|signal|surf|texture|u32|vec2|vec3|vec4)\\b"
+    },
+    "host-identifiers": {
+      "name": "variable.other.host.fresco",
+      "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "calls": {
+      "name": "support.function.fresco",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
+    },
+    "labels": {
+      "name": "variable.parameter.fresco",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*:(?!:))"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.pipe.fresco",
+          "match": "\\|>"
+        },
+        {
+          "name": "keyword.operator.range.fresco",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.fresco",
+          "match": "->|=>|<=|>=|==|!=|&&|\\|\\||<<|>>|\\+\\+|--|[|&^+*/%=?<>-]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.block.fresco",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.section.group.fresco",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.section.brackets.fresco",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.separator.fresco",
+          "match": "[,:;.]"
+        }
+      ]
+    }
+  }
+}

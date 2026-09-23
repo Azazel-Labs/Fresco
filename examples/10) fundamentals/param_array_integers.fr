@@ -1,0 +1,16 @@
+// Example: Integer array parameters
+// Shows how to use array<i32, N> and array<u32, N> as params
+
+canvas demo(ctx: CanvasContext) -> color {
+    param radii: array<i32, 4> = [2, 3, 4, 5] in 1 .. 10
+
+    compose {
+        fill(#ffffff)
+
+        // Create concentric circles with integer-scaled radii
+        for radius in radii {
+            circle(at: (0.0, 0.0), radius: 0.05 * f32(radius))
+            |> stroke(width: 0.01, color: #3b82f6)
+        }
+    }
+}

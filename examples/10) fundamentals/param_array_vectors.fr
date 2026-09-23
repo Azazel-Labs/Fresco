@@ -1,0 +1,22 @@
+// Example: Vec2 array parameters
+// Shows how to use array<vec2, N> for position arrays
+
+canvas demo(ctx: CanvasContext) -> color {
+    param positions: array<vec2, 5> = [
+        (-0.3, -0.2),
+        (-0.15, 0.1),
+        (0.0, -0.1),
+        (0.15, 0.15),
+        (0.3, -0.05)
+    ]
+
+    compose {
+        fill(#faf5ff)
+
+        // Draw circles at each position
+        for pos in positions {
+            circle(at: pos, radius: 0.08)
+            |> fill(#8b5cf6)
+        }
+    }
+}

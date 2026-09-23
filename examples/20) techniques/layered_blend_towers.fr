@@ -1,0 +1,30 @@
+// Advanced example: multi-layer blend stack using over/add/screen/multiply.
+
+canvas layered_blend_towers(ctx: CanvasContext) -> color {
+    let drift = wave(period: 5s, shape: saw, range: -0.06 .. 0.06)
+
+    let tower_a = box(at: (0.30 + drift, 0.54), size: (0.18, 0.52)) |> round(0.03)
+    let tower_b = box(at: (0.52, 0.58), size: (0.20, 0.46)) |> round(0.03)
+    let tower_c = box(at: (0.74 - drift, 0.56), size: (0.16, 0.50)) |> round(0.03)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #080e1a),
+                stop(at: 1.0, color: #15243b),
+            ]
+        ))
+
+        tower_a |> fill(#6ba6ff)
+        tower_b |> fill(#8e7bff) |> blend(screen)
+        tower_c |> fill(#ff8fb8) |> blend(add)
+
+        tower_a |> glow(reach: 0.10, strength: 0.20, color: #6ba6ff) |> blend(add)
+        tower_b |> glow(reach: 0.10, strength: 0.24, color: #8e7bff) |> blend(add)
+        tower_c |> glow(reach: 0.10, strength: 0.20, color: #ff8fb8) |> blend(add)
+
+        box(at: (0.5, 0.86), size: (1.0, 0.30)) |> fill(#0c1530)
+        box(at: (0.5, 0.86), size: (1.0, 0.30)) |> fill(#4a7fff) |> blend(multiply)
+    }
+}

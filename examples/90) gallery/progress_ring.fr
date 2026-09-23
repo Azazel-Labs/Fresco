@@ -1,0 +1,80 @@
+// Showcase example — full design language; compiles in the v0 playground.
+// Note: `wave(...)` is currently lowered as range midpoint in v0.
+// Parameter plumbing in the playground provides a live `progress` control.
+//
+// A progress ring in which no ring is ever drawn.
+//
+// The entire design is a STRAIGHT progress bar — rounded rectangle, tip dot,
+// tick marks — laid out in x = "how far along", y = "radius". A polar space
+// bends it into a dial. This is §3's thesis made literal: you keep thinking
+// in straight lines; the space owns the geometry.
+
+canvas progress_ring(ctx: CanvasContext) -> color {
+    param progress: f32 = 0.72 in 0 .. 1   // exposed uniform → editor slider
+    space stage = centered(aspect: preserve)
+
+    // Inside `dial`: x = fraction of a full turn (0 at 12 o'clock, clockwise),
+    // y = distance from center.
+    space dial = polar(center: (0.5, 0.5), from: -90deg, direction: clockwise)
+
+    let r     = 0.32     // ring radius. Units inside a warp space are that
+    let thick = 0.045    // space's own — px would not survive the bend, and
+    // the compiler warns if you try (§10.3: nothing
+    // screen-local commutes with warp).
+
+    // A straight track and a straight bar. Rounding the bar's corners is the
+    // ordinary §10.1 rewrite — which here means rounded arc end caps for free.
+    let track = box(at: (0.5, r), size: (1.0, thick))
+    let bar   = box(at: (progress / 2, r), size: (progress, thick))
+    |> round(thick / 2)
+
+    // Mirror copy shifted by -1 turn so wrap-around stays continuous at x=0/1.
+    let bar_wrap = box(at: (progress / 2 - 1.0, r), size: (progress, thick))
+    |> round(thick / 2)
+
+    // The tip: a breathing glow riding the leading edge of progress.
+    let tip     = circle(at: (progress, r), radius: thick * 0.55)
+    let tip_wrap = circle(at: (progress - 1.0, r), radius: thick * 0.55)
+    let breathe = wave(period: 2s, shape: sine, range: 0.5 .. 1.0)
+
+    compose {
+        fill(#0d1117)
+
+        in space stage {
+            in space dial {
+                compose {
+                    track |> fill(#ffffff12)
+
+                    // One tick, stamped 12 times by a modulo space, bent into a
+                    // circle by the polar space. Three lines, zero trig.
+                    in space repeat_x(every: 1/12) {
+                        box(at: (0, r + thick * 0.9), size: (0.003, 0.018))
+                        |> fill(#ffffff30)
+                    }
+
+                    // A linear gradient along the bar becomes an angular sweep
+                    // around the ring — also for free.
+                    bar |> fill(gradient(
+                        along: x,
+                        stops: [
+                            stop(at: 0.0, color: #4facfe),
+                            stop(at: 1.0, color: #9d5cff),
+                        ]
+                    ))
+                    bar_wrap |> fill(gradient(
+                        along: x,
+                        stops: [
+                            stop(at: 0.0, color: #4facfe),
+                            stop(at: 1.0, color: #9d5cff),
+                        ]
+                    ))
+
+                    tip |> glow(reach: 0.03, strength: breathe)   |> blend(add)
+                    tip_wrap |> glow(reach: 0.03, strength: breathe)   |> blend(add)
+                    tip |> fill(#ffffff)
+                    tip_wrap |> fill(#ffffff)
+                }
+            }
+        }
+    }
+}

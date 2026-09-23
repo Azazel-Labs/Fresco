@@ -1,0 +1,80 @@
+// Showcase: Analytic pattern filtering prevents shimmer under minification.
+//
+// This example demonstrates the benefit of analytic prefiltering for procedural
+// patterns by showing a split-screen comparison:
+//
+// RED HALF (x < 0.5): filtering(off) — unfiltered point-sampling causes shimmer
+// GREEN HALF (x >= 0.5): filtering(on) — stable, alias-free rendering
+//
+// The horizon line (bottom of canvas) shows maximum aliasing in the unfiltered
+// version because patterns are heavily minified (many pattern cycles per pixel).
+//
+// ## How Analytic Filtering Works
+//
+// Unfiltered patterns evaluate at a single point per pixel, causing aliasing when
+// the pattern frequency exceeds the Nyquist limit (0.5 cycles per pixel).
+//
+// Analytic filtering uses the footprint Jacobian (from explicit space transforms) to
+// compute each pixel's coverage width in pattern space, then integrates the pattern
+// over that box using closed-form antiderivatives:
+//
+//   checker(x, y) = 0.5 * (1 - square_wave(x) * square_wave(y))
+//
+//   filtered_checker(x, y, wx, wy) = 0.5 * (1 - S̄(x, wx) * S̄(y, wy))
+//
+// where S̄ is the box-filtered square wave computed via triangle wave antiderivatives.
+//
+// For axis-aligned footprints, this is exact. For rotated/sheared footprints, we use
+// the axis-aligned bounding box (AABB) approximation with ε ≤ 0.02 error bound (§3.3).
+//
+// ## Split-Screen Setup
+//
+// Both halves use the same rotated horizon-style transform, so they
+// have matching perspective and minification all the way into the distance. The
+// rotation eases back and forth instead of spinning through a full turn, which
+// keeps the red unfiltered and green filtered halves visually stable.
+
+canvas filtered_checkerboard(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    // Swing the board back and forth while keeping a steeper, deeper horizon.
+    space board_warp = rotate(sin(time * 0.6) * 14deg) . scale(1.0 + uv.y * 3.0)
+
+    // Base checker pattern parameters
+    let pattern_scale = 0.12uv
+
+    // RED HALF: Unfiltered (shimmer under minification)
+    filtering(off);
+    let unfiltered_pattern = checker(scale: pattern_scale, at: (0.25, 0.5))
+
+    // GREEN HALF: Filtered (stable under minification)
+    filtering(on);
+    let filtered_pattern = checker(scale: pattern_scale, at: (0.75, 0.5))
+
+    // Color mapping: neutral board surround plus distinct checker colors per side.
+    let terrain_dark = #b89b76   // neutral board surround
+    let terrain_far = #e4d4bb    // far-board haze
+    let unfiltered_dark = #c94a4a
+    let filtered_dark = #2f9a5d
+    let checker_light = #fff7ea
+
+    compose {
+        // Background: keep any uncovered pixels in the same sand palette.
+        fill(mix(terrain_dark, terrain_far, 1.0 - uv.y))
+
+        in space board_warp {
+            compose {
+                // RED HALF: Unfiltered (shimmer under minification)
+                box(at: (0.25, 0.36), size: (0.49, 1.55))
+                |> fill(mix(unfiltered_dark, checker_light, unfiltered_pattern))
+
+                // GREEN HALF: Filtered (stable under minification)
+                box(at: (0.75, 0.36), size: (0.49, 1.55))
+                |> fill(mix(filtered_dark, checker_light, filtered_pattern))
+
+                // Vertical separator line at x=0.5
+                box(at: (0.5, 0.42), size: (0.003, 1.25)) |> fill(#ffffff55)
+            }
+        }
+    }
+}

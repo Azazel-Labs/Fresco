@@ -1,0 +1,23 @@
+// Fundamentals: interface + conform + bounded generic call.
+
+interface Scaleable {
+    fn keep(x: f32) -> f32
+}
+
+conform f32 : Scaleable {
+    fn keep(x: f32) -> f32 {
+        return x
+    }
+}
+
+fn retain<T: Scaleable>(x: T) -> T {
+    return x
+}
+
+canvas interface_bound_basics(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let r = retain(uv.x)
+    compose {
+        circle(at: center, radius: r) |> fill(#b5ff9b)
+    }
+}

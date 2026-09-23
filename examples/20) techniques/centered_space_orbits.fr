@@ -1,0 +1,43 @@
+// Advanced example: centered space composition and layered glows.
+// Uses `centered`, chained transforms, and additive blending.
+
+canvas centered_space_orbits(ctx: CanvasContext) -> color {
+    let spin_a = wave(period: 7s, shape: saw, range: 0deg .. 360deg)
+    let spin_b = -wave(period: 11s, shape: saw, range: 0deg .. 360deg)
+    space stage = centered(aspect: preserve)
+
+    let base = fill(gradient(
+        along: y,
+        stops: [
+            stop(at: 0.0, color: #070b15),
+            stop(at: 1.0, color: #141f33),
+        ]
+    ))
+    let ring = (
+        box(at: (0.5, 0.5), size: (0.40, 0.40)) |> round(0.20)) -
+    (box(at: (0.5, 0.5), size: (0.30, 0.30)) |> round(0.15)
+    )
+
+    compose {
+        base
+        in space stage {
+            ring |> fill(#203452)
+        } |> blend(screen)
+        in space stage . rotate(angle: spin_a, around: (0.5, 0.5)) {
+            capsule(from: (0.22, 0.50), to: (0.34, 0.50), radius: 0.03)
+            |> fill(#7dd3fc)
+        } |> blend(add)
+        in space stage . rotate(angle: spin_a, around: (0.5, 0.5)) {
+            capsule(from: (0.22, 0.50), to: (0.34, 0.50), radius: 0.03)
+            |> glow(reach: 0.09, strength: 0.55, color: #7dd3fc)
+        } |> blend(add)
+        in space stage . rotate(angle: spin_b, around: (0.5, 0.5)) {
+            capsule(from: (0.66, 0.50), to: (0.78, 0.50), radius: 0.025)
+            |> fill(#f9a8d4)
+        } |> blend(add)
+        in space stage . rotate(angle: spin_b, around: (0.5, 0.5)) {
+            capsule(from: (0.66, 0.50), to: (0.78, 0.50), radius: 0.025)
+            |> glow(reach: 0.08, strength: 0.45, color: #f472b6)
+        } |> blend(add)
+    }
+}

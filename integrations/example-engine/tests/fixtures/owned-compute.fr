@@ -1,0 +1,47 @@
+compute ProjectPoints(mesh: PreparedMesh, scene: PreviewScene, gain: f32) -> buffer<vec4, read> {
+    requires gain >= 0.0
+    output points: buffer<vec4, write>(mesh.vertex_count)
+    workgroup_size: (64, 1, 1)
+    dispatch threads(mesh.vertex_count, 1, 1)
+    @compute fn main(id: uvec3) {
+        points[id.x] = scene.view * vec4(mesh.vertices[id.x].world_position * gain, 1.0)
+    }
+    return points
+}
+compute CopyPoints(source: buffer<vec4, read>) -> buffer<vec4, read> {
+    output points: buffer<vec4, write>(source.count)
+    workgroup_size: (64, 1, 1)
+    dispatch threads(source.count, 1, 1)
+    @compute fn main(id: uvec3) { points[id.x] = source[id.x] }
+    return points
+}
+compute MakeField(size: u32) -> texture2d<rg32float, read> {
+    requires size <= 4096u
+    output field: texture2d<rg32float, write>(size, 2u)
+    workgroup_size: (8, 8, 1)
+    dispatch threads(size, 2u, 1u)
+    @compute fn main(id: uvec3) { field.store(id.xy, f32(id.x)) }
+    return field
+}
+compute FieldDimensions(source: texture2d<rg32float, read>) -> buffer<u32, read> {
+    output sizes: buffer<u32, write>(source.width)
+    workgroup_size: (64, 1, 1)
+    dispatch threads(source.width, 1u, 1u)
+    @compute fn main(id: uvec3) { sizes[id.x] = textureDimensions(source).x }
+    return sizes
+}
+style Processing for standard : StandardStyle {
+    param gain: f32 = 1.25
+    param size: u32 = 65u
+    requires PreparedGeometry
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    for self {
+        at after_opaque as target {
+        let points = ProjectPoints(mesh: mesh.prepared, scene: frame, gain: gain)
+        let copied = CopyPoints(source: points)
+        let field = MakeField(size: size)
+        let dimensions = FieldDimensions(source: field)
+        }
+    }
+}
+surface item(sp: surf) -> material(standard) { properties { style: Processing }; compose { base(albedo: #fff) } }

@@ -1,0 +1,15 @@
+// Demonstrates generic 2-D repeat syntax via `repeat(every: (x, y))`.
+// The parser desugars this onto the existing repeat-space lowering.
+
+canvas repeat_grid_dots(ctx: CanvasContext) -> color {
+    let bob = wave(period: 2.4s, shape: sine, range: -0.01 .. 0.01)
+
+    compose {
+        fill(#101827)
+
+        in space repeat(every: (0.16, 0.16)) {
+            circle(at: (0.08, 0.08 + bob), radius: 0.035)
+            |> fill(#5eead4)
+        }
+    }
+}

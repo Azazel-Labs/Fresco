@@ -1,0 +1,16 @@
+// Basic example: stroke as an outline shape.
+// Demonstrates `stroke(width)` followed by `fill`.
+
+canvas stroke_outline_panel(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let panel = box(at: (0.5, 0.5), size: (0.62, 0.36)) |> round(0.08)
+
+    compose {
+        fill(#0b1220)
+
+        in space stage {
+            panel |> fill(#1f3a5f)
+            panel |> stroke(width: 0.018) |> fill(#e2efff)
+        }
+    }
+}

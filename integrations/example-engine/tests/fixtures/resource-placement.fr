@@ -1,0 +1,49 @@
+compute Ink(value: color, scene: PreviewScene) -> buffer<vec4, read> {
+    output ink: buffer<vec4, write>(1u)
+    workgroup_size: (1, 1, 1)
+    dispatch threads(1u, 1u, 1u)
+    @compute fn main(id: uvec3) { ink[id.x] = mix(value, vec4(0.02, 0.9, 0.03, 1.0), clamp(scene.time, 0.0, 1.0)) }
+    return ink
+}
+
+draw Shell(geometry: PreparedMesh, view: PreviewScene, ink: buffer<vec4, read>, width: f32, layer: u32,
+           color: attachment<rgba16float, preserve_update>, depth: attachment<depth32float, test_only>) {
+    requires material.blend == SurfaceBlend.Opaque && material.two_sided == false
+    raster geometry
+    visibility: uncullable
+    cull: front
+    blend { all: replace }
+    depth { write: false; compare: less_equal }
+    attachments { color: load_store; depth: load_store }
+    @vertex fn project(index: u32) -> clip_position {
+        let point = geometry.vertices[index]
+        return view.proj * view.view * vec4(point.world_position + point.geometric_normal * width * f32(layer + 1u), 1.0)
+    }
+    @fragment fn fragment() -> vec4 { return ink[0u] }
+}
+
+style Outlined for standard : StandardStyle {
+    param ink_color: color = #e61938
+    param width: f32 = 0.045
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        return surface.albedo * max(dot(surface.normal, light.direction), 0.0) * light.radiance
+    }
+    for self {
+        let ink = Ink(value: ink_color, scene: frame)
+        at after_opaque as target {
+            static for layer in 0..2 {
+                Shell(geometry: mesh.prepared, view: frame, ink: ink, width: width, layer: layer,
+                      color: target.color, depth: target.depth)
+            }
+        } // placement
+    }
+}
+
+surface first(sp: surf) -> material(standard) {
+    properties { style: Outlined }
+    compose { base(albedo: #e8cd85) }
+}
+surface second(sp: surf) -> material(standard) {
+    properties { style: Outlined(ink_color: #1922dc) }
+    compose { base(albedo: #76cda5) }
+}

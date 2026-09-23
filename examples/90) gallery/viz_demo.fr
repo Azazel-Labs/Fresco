@@ -1,0 +1,73 @@
+// @viz Demo - Kill Math-style inline visualization
+// This example demonstrates the @viz annotation syntax for exploring
+// how math expressions evolve over time and space.
+
+canvas viz_demo(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    // Core controls
+    param threshold: f32 = 0.52 in 0 .. 1  // @viz(time)
+    param glow_strength: f32 = 0.65 in 0 .. 1  // @viz(time)
+
+    // Baseline sine
+    let speed = wave(period: 2s, shape: sine, range: 0.2 .. 0.8)  // @viz
+
+    // Extreme frequency for stress testing resolution and anti-aliasing
+    let speed_fast = wave(period: 120ms, shape: sine, range: 0.05 .. 0.95)  // @viz(time, window=480ms, title="speed_fast")
+
+    // Sharp-edged waveform to show non-sine behavior
+    let gate = wave(period: 700ms, shape: square, range: 0.0 .. 1.0)  // @viz(time, title="gate_square")
+
+    // Narrow pulse with explicit window
+    let pulse_gate = pulse(every: 300ms, width: 0.06)  // @viz(time, window=1.2s)
+
+    // Long ramp to show low-frequency trend shape
+    let ramp_long = ramp(from: 0s, over: 9s)  // @viz(time, window=9s)
+
+    // Spatial sweep preview (x domain)
+    let striped_x = wrap(x: uv.x * 16.0 + time * 0.35, range: 0.0 .. 1.0)  // @viz(x, title="striped_x")
+
+    // Color swatch over time
+    let tint = rgb(speed_fast, 0.18 + 0.82 * pulse_gate, 1.0 - speed)  // @viz(kind=swatch, domain=time, window=2s)
+
+    // Thumbnail of shape-valued expression
+    let orbit_shape = circle(at: (speed, 0.35 + 0.30 * speed), radius: 0.035 + 0.05 * pulse_gate)  // @viz(thumb, title="orbit_shape")
+
+    // Explicit chart kind alias
+    let modulated = wave(period: 1.4s, shape: triangle, range: 0.1 .. 0.9)  // @viz(kind=chart, domain=time)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #14263a),
+                stop(at: 1.0, color: #2d4a6f),
+            ]
+        ))
+
+        // Stripe layer driven by x-domain viz variable
+        circle(at: (striped_x, 0.86), radius: 0.020)
+        |> fill(rgb(striped_x, 0.25, 0.95 - striped_x))
+
+        // Main orbit marker
+        orbit_shape
+        |> fill(tint)
+
+        // Chart alias marker
+        circle(at: (modulated, 0.52), radius: 0.018 + 0.022 * glow_strength)
+        |> fill(#fef08a)
+
+        // Secondary marker driven by fast waveform
+        circle(at: (speed_fast, 0.68), radius: 0.022 + 0.028 * gate)
+        |> fill(#fca5a5)
+
+        // Threshold marker to compare with param visualizer
+        circle(at: (threshold, 0.15), radius: 0.024 + 0.030 * glow_strength)
+        |> fill(#93c5fd)
+
+        // Gentle pulse ring
+        circle(at: (0.5, 0.5), radius: 0.35 + 0.10 * ramp_long)
+        |> stroke(width: 0.010 + 0.010 * pulse_gate)
+        |> fill(rgba(0.06, 0.20, 0.30, 0.14))
+    }
+}

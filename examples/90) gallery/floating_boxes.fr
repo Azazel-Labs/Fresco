@@ -1,0 +1,57 @@
+// Showcase example: port of the original GLSL floating boxes look.
+
+canvas floating_boxes(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    // GLSL baseline tones.
+    param bg_color: color = #03296b
+    param rect_color: color = #044293
+
+    // Original constants mapped to Fresco-friendly values.
+    let total = 60
+    let min_size = 0.03
+    let max_span = 0.05
+    let y_distribution = 0.5
+
+    // Normalized to centered coordinates like the shader's -1..1 UV remap.
+    let uv2 = ((uv.x - 0.5) * 2.0, (uv.y - 0.5) * 2.0)
+    let velocity = time / 1.6
+    let intensity = wave(period: 5.2s, shape: sine, phase: uv2.x * 0.9, range: 0.4 .. 2.6)
+
+    let ripple = (fbm((uv2.x * 0.5 - velocity * 0.03, uv2.y), octaves: 5) - 0.5) * 0.2
+    let rz = field fbm((uv2.x * 0.54 + ripple + velocity * 0.35, uv2.y * 0.6 + ripple), octaves: 5)
+    let bp = (
+        uv2.x -
+        2.0, uv2.y
+    )
+    let falloff = bp.x * bp.x * intensity * intensity + bp.y * bp.y + 1.2
+    let haze = rz * falloff
+    let bg_mix = 0.22 + haze * 0.95
+    let vignette = 2.0 - abs(uv2.y * 2.0)
+    let bg_tint = bg_color * bg_mix * vignette
+
+    let specks = scatter total within screen seed 17 strategy compact
+    lifetime speck: 1.2s respawn every 9s {
+        let index = speck.index01
+        let rnd = noise2((index * 12.9898, index * 78.233))
+        let vel_x = -time / 8.0
+        let vel_y = time / 10.0
+
+        let px = wrap(x: vel_x * rnd + index, range: 0.0 .. 1.0) * 2.0 - 0.5
+        let py = (noise2((index * rnd * 1000.0 + vel_y, rnd * 31.0)) - 0.5) * y_distribution + 0.5
+
+        let size = min_size + max_span * rnd
+        let spin = index * 360deg + time * 28.6deg
+        let gain = size / max_span
+        let tile = box(at: (px, py), size: (size, size)) |> round(size * 0.09)
+
+        in space rotate(angle: spin, around: (px, py)) {
+            tile |> fill(rect_color * gain)
+        }
+    }
+
+    compose {
+        box(at: (0.5, 0.5), size: (1.5, 1.1)) |> fill(bg_tint)
+        specks |> blend(add)
+    }
+}

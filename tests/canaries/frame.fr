@@ -1,0 +1,6 @@
+struct FrameGlobals {
+    @semantic(time) time: f32
+    @semantic(delta_time) delta_time: f32
+    @semantic(resolution) resolution: vec2
+}
+param frame: FrameGlobals

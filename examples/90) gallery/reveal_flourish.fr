@@ -1,0 +1,102 @@
+// north-star: reveal-flourish - draw-on stroke with a hot tip and terminal bloom
+// status: aspirational
+// rung: 7 (path parametrization and path-local channels)
+// deltas:
+//   - `path { ... }` value with segment list lowering and total `.length`
+//   - path-sample channels as demand-driven projections: `.dist`, `.along`, `.tangent`
+//   - `path |> stroke(width:)` for stroke coverage from `.dist`
+//   - `path.point_at(s)` and `path.tangent_at(s)` evaluators with signal-rate hoisting
+//   - `--explain` path receipt: segments, demanded channels, and along-source (const vs hoisted)
+// done when:
+//   - this file compiles without lowering path channels that are not demanded by the DAG
+//   - masking by `curve.along` reveals stroke continuously (no reveal pops at segment boundaries)
+//   - `pen` rides at uniform arc-length speed when `head_s` is signal-driven
+//   - `--explain` prints path demand + lowering notes for this canvas
+
+canvas reveal_flourish(ctx: CanvasContext) -> color {
+    let time = context(time)
+    param accent: color = #7de0ff
+    param stroke_w: f32 = 18px
+
+    // Raw pasted path tag input is accepted directly and auto-normalized to UV.
+    let curve = path_svg(
+        "M 55 142&#10;C 145 34, 275 50, 358 112&#10;C 425 161, 512 152, 562 110&#10;C 588 88, 616 94, 618 114&#10;C 620 132, 600 138, 592 126&#10;C 588 119, 594 111, 601 114&#10;C 596 113, 593 118, 596 123&#10;C 601 131, 615 127, 613 115&#10;C 611 99, 588 95, 568 116&#10;C 520 162, 424 174, 350 122&#10;C 278 70, 152 48, 55 158",
+        preserve_cubics: 1,
+    )
+
+    // Loop draw-on timing from signal time so preview loop UI is unnecessary.
+    let loop_t = wrap(x: time * 0.32, range: 0 .. 1)
+    let draw = smoothstep(lo: 0.0, hi: 0.78, x: loop_t)
+    let head_s = draw * curve.length
+    let bloom = smoothstep(lo: 0.78, hi: 1.0, x: loop_t)
+    // Bring-up mode: derive stroke alpha directly from path distance.
+    let half_w = stroke_w * 0.5
+    let edge_aa = max(a: 1px, b: fwidth(curve.dist))
+    let stroke_cov = 1.0 - smoothstep(lo: half_w, hi: half_w + edge_aa, x: curve.dist)
+    let ink = fill(accent)
+    |> mask(stroke_cov)
+    |> glow(reach: 6px, strength: 0.25)
+
+    // New evaluator request: point_at/tangent_at over arc length s.
+    let pen = curve.point_at(head_s)
+    let tangent = curve.tangent_at(head_s)
+    let blur_velocity = tangent * 0.35
+    let tip = circle(at: pen, radius: stroke_w * 1.4)
+    |> fill(#ffffff)
+    |> tint(#ffffff)
+    |> glow(reach: 22px, strength: 1.2 * (1.0 - bloom))
+
+    let shed = scatter 40 within screen seed 7 strategy compact {
+        let age = wrap(x: time * 1.6 + instance.rand, range: 0 .. 1)
+        circle(
+            at: pen - tangent * age * 30px + instance.jitter * 8px,
+            radius: mix(a: 1.5px, b: 0px, t: age)
+        )
+        |> fill(#ffffff)
+        |> tint(accent)
+        |> opacity(1.0 - age)
+    } |> mask(draw < 1.0)
+
+    let end_p = curve.point_at(curve.length)
+    let burst = scatter 90 within screen seed 11 strategy compact {
+        let dir = angle(instance.rand * 1turn)
+        let r = bloom * mix(a: 20px, b: 70px, t: instance.rand2)
+        circle(
+            at: end_p + dir * r,
+            radius: mix(a: 2.5px, b: 0px, t: bloom)
+        )
+        |> fill(#ffffff)
+        |> tint(mix(a: #ffffff, b: accent, t: instance.rand2))
+        |> opacity(1.0 - bloom * bloom)
+    }
+
+    let flower = star(
+        at: end_p,
+        points: 6,
+        inner: bloom * 6px,
+        outer: bloom * 16px,
+        rotate: bloom * 40deg
+    )
+    |> fill(#ffffff)
+    |> tint(#ffffff)
+    |> glow(reach: 30px, strength: bloom * 1.5)
+
+    // Debug bring-up order (measured compile pressure):
+    // 1) ink
+    // 2) tip
+    // 3) shed   (first large jump)
+    // 4) burst  (largest jump)
+    // 5) flower
+    // 6) motion_blur
+    compose {
+        fill(#070b16)
+        ink
+        //tip
+
+        // Enable next, one line at a time, after each stage renders correctly.
+        // shed
+        // burst
+        // flower
+    }
+    // |> motion_blur(shutter: 8ms)
+}

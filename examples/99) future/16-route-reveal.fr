@@ -1,0 +1,34 @@
+// north-star: route-reveal — paths, arc length, draw-on animation
+// status: aspirational
+// rung: 7 (largest 2D primitive; prerequisite for text)
+// deltas:
+//   - `path(spline:, smooth:)` primitive with (u, v) local frame (ext §23.3)
+//   - `trim(from:, to:)`, `dash(pattern:, phase:)` in path coords, pixel-true
+//   - `anchor: path` gradients along u; `path.point_at(t)` host-side eval
+//   - arc-length LUT honesty: receipt prints segment count + max param error
+// done when: draw-on animates smoothly; dashes crawl; the head marker rides the
+//   tip with zero per-pixel cost; curvature-vs-stroke-width warning fires when
+//   width is cranked past the tightest bend.
+
+canvas route_reveal(ctx: CanvasContext) -> color {
+    let route = path(spline: [
+            (0.10, 0.22), (0.28, 0.30), (0.42, 0.62),
+            (0.60, 0.55), (0.78, 0.74), (0.90, 0.70),
+        ], smooth: 0.5)
+
+    let draw = ramp(from: 0.3s, over: 2.2s, ease: in_out_cubic)
+
+    compose {
+        fill(#0e1420)
+        route |> stroke(width: 3px) |> fill(#334155)
+        route |> trim(from: 0, to: draw)
+        |> stroke(width: 4px)
+        |> dash(pattern: (14px, 6px), phase: -30px/s)
+        |> fill(gradient(along: u, anchor: path, stops: [
+                stop(at: 0.0, color: #5eead4),
+                stop(at: 1.0, color: #f59e0b),
+        ]))
+        circle(at: route.point_at(draw), radius: 7px) |> fill(#fff)
+        circle(at: route.point_at(draw), radius: 7px) |> glow(reach: 16px, strength: 0.8)
+    }
+}

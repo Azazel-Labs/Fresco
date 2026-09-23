@@ -1,0 +1,10 @@
+== fresco --explain: canvas `sunset` ==
+pass plan (phase-1 locality partitioner DAG):
+pass 0  stage=0  locality=point  layers 0..=6 (7 layer node(s))
+pass dag edges: none
+locality marks: point=7, local=0, global=0 (phase-1 persisted)
+  rewrite: blur(r) ∘ fill(shape#0) ⇒ soften — Sdf-conforming shape, analytic (§10.2, §17.1)
+  rewrite: glow lowered analytically ×1 — exp falloff on the distance field (§10.2)
+  locality: all nodes point after rewrites ⇒ 1 fused fragment pass (§11 step 2)
+  sdf: 4 evaluation(s), 2 reuse(s) via shape CSE (§10.3)
+  dag: 5 shape node(s), 7 layer node(s)

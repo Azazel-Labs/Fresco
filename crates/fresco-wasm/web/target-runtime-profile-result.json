@@ -1,0 +1,14 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "file": "engine/pipelines/10_forward.fr",
+      "severity": "error",
+      "message": "unexpected newline",
+      "label": "unexpected token",
+      "help": "expected '`(`', '`pass`', '`pipeline`', something else",
+      "span_start": 12,
+      "span_end": 13
+    }
+  ]
+}

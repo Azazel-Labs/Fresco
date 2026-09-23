@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "diagnostics": [
+    {
+      "file": "main.fr",
+      "severity": "error",
+      "message": "generated naga IR failed validation",
+      "span_start": 0,
+      "span_end": 0
+    },
+    {
+      "file": "main.fr",
+      "severity": "info",
+      "message": "This is a Fresco compiler bug (the user program was accepted).",
+      "help": "validator details: WithSpan {\n    inner: Function {\n        handle: [1],\n        name: \"fresco_surface_response_demo\",\n        source: Expression {\n            handle: [32],\n            source: Compose(\n                ComponentType {\n                    index: 5,\n                },\n            ),\n        },\n    },\n    spans: [],\n}\nRe-run with `--emit ir` to inspect the module, then report the issue.",
+      "span_start": 0,
+      "span_end": 0
+    }
+  ]
+}

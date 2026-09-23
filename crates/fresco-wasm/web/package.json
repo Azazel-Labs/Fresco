@@ -1,0 +1,44 @@
+{
+  "name": "fresco-wasm-playground",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "sync:examples": "node ./scripts/sync-examples.mjs",
+    "readme:render": "node ./scripts/render-readme.mjs",
+    "docs:sync": "node ./scripts/sync-language-docs.mjs --skip-generate",
+    "docs:refresh": "node ./scripts/sync-language-docs.mjs",
+    "clean:vite-cache": "node -e \"const fs=require('fs'); for (const p of ['node_modules/.vite','node_modules/.vite-temp']) fs.rmSync(p,{recursive:true,force:true}); console.log('Cleared Vite cache directories.');\"",
+    "types:contracts": "cargo test -p fresco-wasm export_wasm_contract_types",
+    "types:contracts:check": "npm run types:contracts && git diff --exit-code -- src/generated/wasm-contracts",
+    "wasm:build": "node ./scripts/build-wasm.mjs",
+    "perf:compile:iq": "node --cpu-prof --cpu-prof-dir ../../../target/tmp --cpu-prof-name wasm-iq-distance.cpuprofile ./scripts/perf-compile-wasm.mjs",
+    "perf:compile:iq:fast": "node --cpu-prof --cpu-prof-dir ../../../target/tmp --cpu-prof-name wasm-iq-distance.cpuprofile ./scripts/perf-compile-wasm.mjs --skip-build",
+    "dev": "node ./scripts/dev-auto.mjs",
+    "dev:vite": "vite",
+    "dev:vite:clean": "npm run clean:vite-cache && vite --force",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "build": "npm run wasm:build && npm run build:site",
+    "build:site": "npm run sync:examples && npm run docs:refresh && vite build",
+    "preview": "vite preview",
+    "test:unit": "npm run sync:examples && vitest run src/tests",
+    "test:gpu": "npm run sync:examples && npm run wasm:build && playwright test --config playwright.gpu.config.mjs",
+    "test:canaries": "cargo test -p fresco-cli --test canaries && npm run sync:examples && npm run wasm:build && playwright test --config playwright.canaries.config.mjs",
+    "test:integration": "npm run sync:examples && npm run wasm:build && vitest run src/tests/bootstrap-watchdog.integration.test.js src/tests/compile_warnings.integration.test.js src/tests/completion-provider.integration.test.js src/tests/visualizer_metadata.integration.test.js"
+  },
+  "dependencies": {
+    "marked": "^14.1.4",
+    "monaco-editor": "^0.56.0",
+    "preact": "^10.29.7"
+  },
+  "overrides": {
+    "dompurify": "^3.4.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "sass": "^1.102.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.11"
+  }
+}

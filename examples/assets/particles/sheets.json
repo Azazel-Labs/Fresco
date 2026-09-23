@@ -1,0 +1,16 @@
+{
+  "sheet_size": [1024, 1024],
+  "grid": [4, 4],
+  "frame_size": [256, 256],
+  "frame_count": 16,
+  "frame_order": "row-major-top-left",
+  "pivot": [0.5, 0.5],
+  "padding_pixels": 20,
+  "alpha": "straight",
+  "loop": false,
+  "sheets": [
+    { "file": "smoke_puff.png", "suggested_fps": 12, "suggested_blend": "alpha-over" },
+    { "file": "flame_burst.png", "suggested_fps": 24, "suggested_blend": "alpha-weighted-additive" },
+    { "file": "spark_burst.png", "suggested_fps": 30, "suggested_blend": "alpha-weighted-additive" }
+  ]
+}

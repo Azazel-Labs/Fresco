@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_BUILD_JOBS: 2
+      # Keep the many native test binaries small on hosted runners.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust compiler outputs
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-native-no-debug
+          cache-workspace-crates: true
+          cache-on-failure: true
+
+      - name: Report runner resources before native CI
+        run: |
+          df -h .
+          free -h
+          du -sh target 2>/dev/null || true
+
+      - name: Run workspace CI task
+        run: cargo run --locked -p xtask -- ci-strict
+
+      - name: Report runner resources after native CI
+        if: always()
+        run: |
+          df -h .
+          free -h
+          du -sh target 2>/dev/null || true
+
+  web-playground:
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust compiler outputs
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-web
+          cache-workspace-crates: true
+          cache-on-failure: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crates/fresco-wasm/web/package-lock.json
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@wasm-pack
+
+      - name: Check release version consistency
+        run: node --test scripts/version.test.mjs
+
+      - name: Install web dependencies
+        working-directory: crates/fresco-wasm/web
+        run: npm ci
+
+      - name: Check generated wasm contracts drift
+        working-directory: crates/fresco-wasm/web
+        run: npm run types:contracts:check
+
+      - name: Check WASM-specific Rust code
+        run: cargo clippy -p fresco-wasm --target wasm32-unknown-unknown --locked -- -D warnings
+
+      - name: Check browser renderer Rust code
+        run: cargo clippy -p fresco-example-engine-host --target wasm32-unknown-unknown --no-default-features --features browser --locked -- -D warnings
+
+      - name: Build release compiler and example renderer WASM bundles
+        working-directory: crates/fresco-wasm/web
+        run: npm run wasm:build
+
+      - name: Build deployable web bundle using the existing WASM
+        working-directory: crates/fresco-wasm/web
+        run: npm run build:site
+
+      - name: Run web typecheck
+        working-directory: crates/fresco-wasm/web
+        run: npm run typecheck
+
+      - name: Run web unit tests
+        working-directory: crates/fresco-wasm/web
+        run: npm run test:unit
+
+      - name: Check sample path comparison boundaries (CPU only)
+        run: node --test integrations/example-engine-host/scripts/path-pixels.test.mjs
+
+      - name: Upload tested site for Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: fresco-pages-${{ github.sha }}
+          path: crates/fresco-wasm/web/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  dependency-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-dependency-policy
+          cache-targets: false
+          cache-on-failure: true
+
+      - name: Run cargo-deny checks
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  unused-dependencies:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust (nightly for udeps)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache nightly cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-nightly-udeps
+          cache-workspace-crates: true
+          cache-on-failure: true
+
+      - name: Install cargo-udeps
+        uses: taiki-e/install-action@cargo-udeps
+
+      - name: Run cargo-udeps
+        run: cargo +nightly udeps --workspace --all-targets

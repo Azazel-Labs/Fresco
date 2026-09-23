@@ -1,0 +1,56 @@
+// Perspective card flip: one turn and two pulses every four seconds.
+
+canvas perspective_flip_card(ctx: CanvasContext) -> color {
+    let time = context(time)
+    let flip = time * 90deg
+    let pulse = wave(period: 2s, shape: sine, range: 0.35 .. 0.85)
+    space stage = centered(aspect: preserve)
+
+    let front_base = box(at: center, size: (0.42, 0.58)) |> round(0.035)
+    let front_face = front_base
+
+    let back_base = box(at: center, size: (0.42, 0.58)) |> round(0.035)
+    let stripe_a = box(at: (0.5, 0.38), size: (0.30, 0.04)) |> round(0.01)
+    let stripe_b = box(at: (0.5, 0.46), size: (0.30, 0.04)) |> round(0.01)
+    let stripe_c = box(at: (0.5, 0.54), size: (0.30, 0.04)) |> round(0.01)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #101827),
+                stop(at: 1.0, color: #1f2f46),
+            ]
+        ))
+
+        // Hard side switch (no cross-fade): dynamic branch selects one face path.
+        if cos(flip) >= 0.0 {
+            // Front face in its own rotating space.
+            in space stage
+                .perspective(fov: 58deg, near: 0.02, far: 12.0, origin: center)
+                .rotate_x(angle: -8deg, around: center)
+                .rotate_y(angle: flip, around: center)
+                .translate3(x: 0.0, y: 0.0, z: 0.03) {
+                compose {
+                    front_face |> fill(#f8fafc)
+                    circle(at: (0.5, 0.36), radius: 0.055 * pulse) |> fill(#5eead4)
+                    star(at: (0.5, 0.62), outer: 0.06, inner: 0.028, points: 5) |> fill(#f59e0b)
+                }
+            }
+        } else {
+            // Back face rendered as a separate plane rotated 180deg from the front.
+            in space stage
+                .perspective(fov: 58deg, near: 0.02, far: 12.0, origin: center)
+                .rotate_x(angle: -8deg, around: center)
+                .rotate_y(angle: flip + 180deg, around: center)
+                .translate3(x: 0.0, y: 0.0, z: 0.03) {
+                compose {
+                    back_base |> fill(#0f766e)
+                    stripe_a |> fill(#99f6e4)
+                    stripe_b |> fill(#99f6e4)
+                    stripe_c |> fill(#99f6e4)
+                }
+            }
+        }
+    }
+}

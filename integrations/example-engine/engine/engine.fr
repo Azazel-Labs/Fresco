@@ -1,0 +1,28 @@
+// Explicit engine rendering policy; these are choices, not compiler defaults.
+#pragma check.shape_aa_min_px = 1.5
+#pragma check.shape_aa_max_px = 3.0
+#pragma check.shape_aa_style = gradient
+#pragma check.projective_footprint_max_px = 64.0
+
+import "core/00_prelude.fr"
+import "core/01_core.fr"
+import "core/02_functions.fr"
+import "core/03_payload.fr"
+import "core/04_canvas_contract.fr"
+import "core/05_mesh_contract.fr"
+import "core/06_particle_contract.fr"
+import "core/07_surface_properties.fr"
+import "core/08_lighting.fr"
+import "particles/01_motion.fr"
+import "particles/02_camera_billboard.fr"
+import "pipelines/10_forward.fr"
+import "pipelines/20_forward_plus.fr"
+import "pipelines/30_deferred.fr"
+import "pipelines/40_gpu_programs.fr"
+import "pipelines/50_buffer_views.fr"
+import "pipelines/60_scene_background.fr"
+
+budget {
+    warn_above: 256
+    fail_above: 2048
+}

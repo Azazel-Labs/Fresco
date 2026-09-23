@@ -1,0 +1,36 @@
+// north-star: relief-wall — parallax occlusion + drifting cloud shadows
+// (community ask: "normal mapped with parallax, with an animated cloud layer")
+// status: aspirational
+// rung: 8+
+// deltas:
+//   - `parallax(height:, depth:, view:, steps:, refine:)` — a SAMPLEMAP SPACE whose
+//     map iterates; cost = declared steps, like lit_by (ext §23.5 category + §26.3
+//     along-ray locality arriving in surfaces)
+//   - `relief_shadow(height, light:, steps:)` — self-shadow march in the heightfield
+//   - clouds drift in UNSHIFTED uv while bricks parallax beneath => compose
+//     expressing depth across two coordinate spaces
+// done when: --explain prints `parallax: 16 linear + 4 binary steps along view;
+//   relief_shadow: 8 steps; worst case 28 height evals/pixel`; silhouette edges
+//   documented as the known POM limitation.
+
+surface relief_wall(sp: surf, time: signal) -> material {
+    param relief: f32 = 0.05 in 0 .. 0.12
+
+    let height = field brick_profile(sp.uv * (6, 3)) + fbm(sp.uv * 30) * 0.15
+
+    space deep = parallax(height: height, depth: relief,
+        view: sp.view, steps: 16, refine: binary(4))
+
+    let clouds = field fbm(sp.uv * 2.2 + time * (0.015, 0.004))
+    |> remap(0.45 .. 0.75, 0 .. 1)
+
+    compose {
+        in space deep {
+            base(albedo: image(brick_tex, at: coord),
+                roughness: 0.85,
+                normal: normal_from(height, strength: 0.9))
+            darken(by: relief_shadow(height, light: sun_dir, steps: 8) * 0.5)
+        }
+        darken(by: clouds * 0.35)
+    }
+}

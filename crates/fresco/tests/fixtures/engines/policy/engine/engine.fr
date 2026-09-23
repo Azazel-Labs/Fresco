@@ -1,0 +1,31 @@
+tags pipeline { lighting }
+// Explicit policy for compiler regression fixtures.
+#pragma check.shape_aa_min_px = 1.5
+#pragma check.shape_aa_max_px = 3.0
+#pragma check.shape_aa_style = gradient
+#pragma check.projective_footprint_max_px = 64.0
+
+// Explicit material contracts for compiler fixtures using the default profile.
+@context(surf, sp)
+@composition(base, material, weight)
+@default_material
+material_properties fixture_surface {
+    channel @compose(mix) albedo: color = rgba(0.0, 0.0, 0.0, 1.0)
+    channel @compose(mix) roughness: f32 = 1.0
+    channel @compose(mix) metallic: f32 = 0.0
+    channel @compose(mix) normal: vec3 = sp.normal
+    channel @compose(mix) emissive: vec3 = vec3(0.0)
+    channel @compose(mix) opacity: f32 = 1.0
+}
+material_properties unlit extends fixture_surface {}
+
+
+// Surface inputs are an engine record; field names carry no compiler semantics.
+struct surf {
+    @semantic(coord) uv: vec2
+    uv2: vec2
+    @semantic(time) time: f32
+    @semantic(resolution) resolution: vec2
+    position: vec3
+    normal: vec3
+}

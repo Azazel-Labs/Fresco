@@ -1,0 +1,36 @@
+// Lighting comes only from the contributed draw; the base surface is transparent.
+style LitShell for standard : StandardStyle {
+    requires ForwardLighting
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    for self {
+        at transparent as target {
+            LitOverlay(geometry: self, scene: frame, lighting: lights, color: target.color, depth: target.depth)
+        }
+    }
+}
+struct LitPosition { @semantic(position) clip: vec4; world_position: vec3; normal: vec3 }
+@factory(preview_static) draw LitOverlay(geometry: DrawRange, scene: PreviewScene, lighting: LightingService,
+    color: attachment<rgba16float, preserve_update>, depth: attachment<depth32float, test_only>) {
+    raster geometry
+    visibility: uncullable
+    cull: back
+    blend { all: premultiplied }
+    depth { write: false; compare: less_equal }
+    attachments { color: load_store; depth: load_store }
+    @vertex fn vertex(v: PreviewShaded) -> LitPosition {
+        let world = factory.transform(v) * vec4(v.position, 1.0)
+        return LitPosition(scene.proj * scene.view * world, world.xyz, normalize((factory.transform(v) * vec4(v.normal, 0.0)).xyz))
+    }
+    @fragment fn fragment(input: LitPosition) -> vec4 {
+        let normal = normalize(input.normal)
+        var rgb = lighting.indirect(input.world_position, normal).irradiance
+        for light in lighting.direct_samples(input.world_position, normal) {
+            rgb += light.radiance * light.attenuation * light.visibility * max(dot(normal, light.direction), 0.0)
+        }
+        return vec4(rgb * 0.25, 1.0)
+    }
+}
+surface shell(sp: surf) -> material(standard) {
+    properties { style: LitShell; blend: SurfaceBlend.Translucent }
+    compose { base(albedo: rgba(0.0, 0.0, 0.0, 0.0)) }
+}

@@ -1,0 +1,65 @@
+// north-star: signal-workbench — the plot stdlib: graphs as Fresco programs
+// status: aspirational
+// rung: 5.5 (after fn->layer + each; before paths; digits() as pre-text stopgap)
+// deltas:
+//   - TEMPORAL `at`: `s at t` evaluates a signal at arbitrary time.
+//     closed-form signals (§10.3 folding) => free per-pixel eval;
+//     stateful signals => `remember` history ring, receipt says so
+//   - `viewport((a,b) .. (c,d))` space sugar (translate+scale to a sub-rect)
+//   - `last 8s` playhead-anchored time-range syntax
+//   - `digits(n, at:, size:)` SDF numeral builtin (0-9 . - : %) until paths->text
+//   - `plot` stdlib module, written IN Fresco: signal/signals/field/distance/
+//     space/vectors/timeline
+//   - `mix(space, space, t)` for plot.space's morph slider (affine lerp;
+//     displacement blend for warps)
+// done when: this file renders a live 2x2 diagnostic dashboard in ONE fused pass
+//   (all signals closed-form); --explain prints `s at t: closed-form, inlined`
+//   for every trace and would print `signal history: ring 256 x r16f` if any
+//   trace were stateful; workbook rung 1 (§21.8) re-implemented as calls into
+//   this module — hover thumbnails ARE plot.* programs.
+
+use plot
+
+canvas signal_workbench(ctx: CanvasContext) -> color {
+    let time = context(time)
+    param b_period: f32 = 0.9 in 0.4 .. 3.5
+    param envelope: bool = false
+
+    let a = wave(period: 4s, shape: sine)
+    let b_raw = wave(period: b_period * 1s, shape: sine)
+    let b = if envelope { 0.5 + 0.5 * b_raw } else { b_raw }
+
+    let sum = a + b
+    let prod = a * b
+
+    compose {
+        fill(#0e1420)
+
+        // top: superposition — components faint, result bold
+        in space viewport((0.05, 0.55) .. (0.95, 0.95)) {
+            plot.signals([
+                    trace(a,   color: #898781, width: 1px),
+                    trace(b,   color: #898781, width: 1px, dash: (4px, 3px)),
+                    trace(sum, color: #2a78d6, width: 2px),
+                ], window: last 8s, range: -2.1 .. 2.1, playhead: true)
+        }
+
+        // bottom-left: modulation — beats or tremolo depending on `envelope`
+        in space viewport((0.05, 0.08) .. (0.62, 0.48)) {
+            plot.signal(prod, color: #eb6834, window: last 8s, range: -1.05 .. 1.05)
+        }
+
+        // bottom-right: the same product as a 2D field driven by phase offsets —
+        // space + time diagnostics side by side, same stdlib
+        in space viewport((0.66, 0.08) .. (0.95, 0.48)) {
+            plot.field(
+                field (a at time + coord.x * 4s) * (b at time + coord.y * 4s),
+                range: -1 .. 1, map: diverging(#2a78d6, #eb6834), isolines: 0.5)
+        }
+
+        // timecode ruler across the bottom with the playhead
+        in space viewport((0.05, 0.01) .. (0.95, 0.06)) {
+            plot.timeline([a, b], window: last 8s, playhead: time)
+        }
+    }
+}

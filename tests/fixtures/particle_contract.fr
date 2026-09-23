@@ -1,0 +1,112 @@
+// GPU particle storage and executable spawn/update/draw contracts.
+import "05_mesh_contract.fr"
+import "../particles/01_motion.fr"
+
+// The same material instance can be rendered as a GPU-simulated particle set.
+// The engine authors pure behavior and explicit GPU invocation/storage operations.
+struct PreviewParticle {
+	position: vec4
+	velocity: vec4
+}
+
+struct PreviewParticleConfig {
+	delta_time: f32
+	particle_count: u32
+	padding: vec2
+}
+
+struct PreviewParticleVarying {
+	@semantic(position) clip_pos: vec4
+	@location(0) uv: vec2
+	@location(1) world_pos: vec3 in world
+	@location(2) world_normal: vec3 in world
+}
+
+@meta(capacity, 64)
+@shader pass preview_particle_sim {
+	stage: compute
+
+	binding {
+		@group(draw) @binding(1) @access(read_write) particles: buffer<PreviewParticle>
+		@group(draw) @binding(2) particle_config: uniform<PreviewParticleConfig>
+	}
+
+	// Initialization runs once on the GPU, and again only after an explicit reset.
+	@pure fn spawn(id: f32, count: f32) -> PreviewParticle {
+		let angle = id / count * 6.28318530718
+		let radius = 0.25 + 0.55 * ((id % 8.0) / 7.0)
+		return PreviewParticle(
+			position: vec4(cos(angle) * radius, sin(angle) * radius, ((id % 5.0) - 2.0) * 0.06, 1.0),
+			velocity: vec4(-sin(angle) * 0.12, cos(angle) * 0.12, 0.0, 0.0))
+	}
+
+	@pure fn main(p: PreviewParticle, dt: f32) -> PreviewParticle {
+		return particle_integrate(p, dt)
+	}
+
+    @compute @workgroup_size(64)
+    fn initialize(@builtin(global_invocation_id) id: uvec3) {
+        if id.x >= particle_config.particle_count { return }
+        particles[id.x] = spawn(f32(id.x), f32(particle_config.particle_count))
+    }
+    @compute @workgroup_size(64)
+    fn simulate(@builtin(global_invocation_id) id: uvec3) {
+        if id.x >= particle_config.particle_count { return }
+        particles[id.x] = main(particles[id.x], particle_config.delta_time)
+    }
+}
+
+@shader pass preview_particle_draw for base {
+    binding {
+        @group(draw) @binding(0) scene: uniform<PreviewScene>
+        @group(draw) @binding(3) particle_render: buffer<PreviewParticle>
+    }
+	stage: raster
+	draw: fullscreen
+	blend: opaque
+    cull: back
+    depth { write: true; compare: less }
+    blend { all: replace }
+
+	@vertex fn vertex(@builtin(vertex_index) vertex_id: u32, @builtin(instance_index) instance_id: u32) -> PreviewParticleVarying {
+		let p = particle_render[instance_id]
+		let corner = particle_billboard_corner(vertex_id)
+		let world_pos = p.position.xyz + vec3(corner * 0.12, 0.0)
+		return PreviewParticleVarying(
+			scene.proj * scene.view * vec4(world_pos, 1.0),
+			corner + vec2(0.5),
+			world_pos,
+			vec3(0.0, 0.0, 1.0))
+	}
+
+	fn material_context(sp: PreviewParticleVarying) -> surf {
+		return surf(sp.uv, sp.uv, scene.time, scene.res, sp.world_pos, sp.world_normal, 0.0, 1.0, 0.0, vec3(0.0))
+	}
+
+	fn shade(sp: PreviewParticleVarying, m: base) -> color {
+		return m.albedo
+	}
+
+    fn particle_billboard_corner(vertex_id: u32) -> vec2 {
+        let corners = [vec2(-0.5, -0.5), vec2(0.5, -0.5), vec2(-0.5, 0.5),
+                       vec2(-0.5, 0.5), vec2(0.5, -0.5), vec2(0.5, 0.5)]
+        return corners[vertex_id]
+    }
+    @evaluate(surface) fn evaluate(context: surf) -> base {}
+    @fragment fn fragment(sp: PreviewParticleVarying) -> color {
+        return shade(sp, evaluate(material_context(sp)))
+    }
+}
+
+@technique @meta(engine, "particle")
+@external(state, particle_state) @external(config, particle_config) @external(scene, scene)
+@image(output, float_color) @provider(output, presentation)
+@image(depth, depth32float) @provider(depth, depth)
+pipeline(compute) preview_particles for base {
+    @node(spawn) @enabled(spawn) @dispatch(initialize, capacity)
+    @bind(particles, state) @bind(particle_config, config) preview_particle_sim
+    @node(update) @enabled(update) @after(spawn) @dispatch(simulate, capacity)
+    @bind(particles, state) @bind(particle_config, config) preview_particle_sim
+    @node(draw) @after(update) @draw(vertex, fragment, fullscreen, 6) @instances(capacity)
+    @bind(scene, scene) @bind(particle_render, state) @color(0, output) @depth(depth) preview_particle_draw
+}

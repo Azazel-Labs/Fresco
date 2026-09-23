@@ -1,0 +1,6 @@
+surface uv_material(sp: surf) -> material(unlit) {
+    let uv = sp.uv
+    compose {
+        base(albedo: rgba(uv.x, uv.y, 1.0 - uv.x, 1.0))
+    }
+}

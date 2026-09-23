@@ -1,0 +1,17 @@
+// Fundamentals: callable parameter (`fn(T)->R`) and function reference passing.
+
+fn double(x: f32) -> f32 {
+    return x * 2.0
+}
+
+fn apply(f: fn(f32)->f32, x: f32) -> f32 {
+    return f(x)
+}
+
+canvas callable_parameter_basics(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let r = apply(double, uv.x) * 0.25
+    compose {
+        circle(at: center, radius: r) |> fill(#7fd1ff)
+    }
+}

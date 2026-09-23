@@ -1,0 +1,386 @@
+// Executable mesh-preview contract. The compiler selects the named factory,
+// lowers these hooks per surface instance, and publishes the exact entries and
+// vertex/resource layout to the host.
+
+vertex_interface PreviewShaded {
+	position: vec3 in object
+	normal: vec3 in object
+	tangent: vec3 in object
+	uv: vec2
+	uv2: vec2
+}
+
+vertex_format PreviewMesh {
+	required {
+		position: vec3 in object
+		normal: vec3 in object
+		tangent: vec3 in object
+		uv: vec2
+		uv2: vec2
+	}
+}
+
+struct PreviewLighting { settings: vec4, sky: vec4, ground: vec4, direction: vec4, radiance: vec4 }
+struct PreviewShadow { world_to_shadow: mat4 }
+
+struct PreviewScene {
+	model: mat4 from object to world
+	view: mat4 from world to view
+	proj: mat4 from view to clip
+	camera_pos: vec3 in world
+	time: f32
+	res: vec2
+	padding: vec2
+	displacement: vec4
+}
+
+struct PreviewVarying {
+	@semantic(position) clip_pos: vec4
+	world_pos: vec3 in world
+	world_normal: vec3 in world
+	world_tangent: vec3 in world
+	uv: vec2
+	uv2: vec2
+}
+
+// World-space geometry produced after authored deformation and object transforms.
+struct PreparedVertex {
+    world_position: vec3
+    geometric_normal: vec3
+    world_tangent: vec3
+    uv: vec2
+    uv2: vec2
+}
+struct WorldBounds { minimum: vec3; maximum: vec3; valid: bool }
+@geometry(vertices, indices, vertex_count, index_count, bounds)
+resource PreparedMesh {
+    vertices: buffer<PreparedVertex, read>
+    indices: buffer<u32, read>
+    vertex_count: u32
+    index_count: u32
+    bounds: WorldBounds
+}
+
+// Explicit MRT locations; formats are validated by the shared renderer.
+struct PreviewGBuffer {
+    @location(0) albedo: vec4
+    @location(1) normal_material: vec4
+    @location(2) emissive_occlusion: vec4
+    @location(3) identity: uvec2
+    @location(4) surface_uv: vec2
+}
+
+@table(surfaces, ascending, 1)
+struct DrawRecord {
+    @table_index material_id: u32
+    @schema_value(base, 0, standard, 1, unlit, 2) shading_model: u32
+    @implementation_value(style) style_id: u32
+    @implementation_settings_value(style) style_settings_offset: u32
+}
+
+// Shared geometry preparation for the main draw and implementation contributions.
+fn preview_prepare_position(position: vec3, normal: vec3, tangent: vec3, uv: vec2, uv2: vec2, model: mat4, scene: PreviewScene) -> PreparedVertex {
+    let displacement_phase = (uv.x + uv.y) * scene.displacement.z + scene.time * scene.displacement.w
+    let displacement_offset = sin(displacement_phase) * scene.displacement.y * scene.displacement.x
+    let local_position = position + normalize(normal) * displacement_offset
+    let world_pos = model * vec4(local_position, 1.0)
+    return PreparedVertex(
+        world_pos.xyz,
+            normalize((cross(model[1].xyz, model[2].xyz) * normal.x + cross(model[2].xyz, model[0].xyz) * normal.y + cross(model[0].xyz, model[1].xyz) * normal.z) * sign(dot(model[0].xyz, cross(model[1].xyz, model[2].xyz)))),
+        normalize((model * vec4(tangent, 0.0)).xyz),
+        uv,
+        uv2)
+}
+
+fn preview_project_prepared(v: PreparedVertex, scene: PreviewScene) -> PreviewVarying {
+    return PreviewVarying(scene.proj * scene.view * vec4(v.world_position, 1.0), v.world_position, v.geometric_normal, v.world_tangent, v.uv, v.uv2)
+}
+fn preview_project_position(position: vec3, normal: vec3, tangent: vec3, uv: vec2, uv2: vec2, model: mat4, scene: PreviewScene) -> PreviewVarying {
+    return preview_project_prepared(preview_prepare_position(position, normal, tangent, uv, uv2, model, scene), scene)
+}
+
+vertex_factory preview_static for PreviewMesh {
+	binding {
+		@group(draw) scene: uniform<PreviewScene>
+        @group(draw) environment: uniform<PreviewLighting>
+        @group(draw) shadow_camera: uniform<PreviewShadow>
+        @group(draw) shadow_map: texture_depth_2d
+        @group(draw) point_lights: buffer<vec4>
+        @group(draw) light_tiles: buffer<u32>
+        @group(draw) style_settings: buffer<vec4>
+        @group(draw) @source(DrawRecord) draw_record: uniform<DrawRecord>
+        @group(draw) @draw_data(instance_id) shading_instance_id: uniform<u32>
+	}
+
+	fn transform(v: PreviewMesh) -> mat4 from object to world {
+		return scene.model
+	}
+}
+
+struct PreviewDirectSample { active: bool; light: DirectLight }
+@service(LightingService)
+@factory(preview_static) pass preview_mesh for base {
+	stage: raster
+	draw: per_object
+	cull: choose_state(back, none, two_sided)
+    depth { write: blend != SurfaceBlend.Translucent; compare: less }
+    blend { all: choose_state(replace, premultiplied, blend == SurfaceBlend.Translucent) }
+
+
+    fn preview_visibility(position: vec3, n: vec3) -> f32 {
+        let projected = shadow_camera.world_to_shadow * vec4(position, 1.0)
+        let uv = vec2(projected.x * 0.5 + 0.5, 0.5 - projected.y * 0.5)
+        if uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0 || projected.z <= 0.0 || projected.z >= 1.0 { return 1.0 }
+        let size = ivec2(textureDimensions(shadow_map))
+        let texel = uv * vec2(size) - vec2(0.5)
+        let pixel = ivec2(floor(texel))
+        let fraction = fract(texel)
+        let facing = max(dot(n, preview_safe_normalize(environment.direction.xyz)), 0.0)
+        let bias = 0.0015 + 3.0 / f32(min(size.x, size.y)) * sqrt(max(1.0 - facing * facing, 0.0)) / max(facing, 0.1)
+        var visibility = 0.0
+        // Bilinear interpolation of a 3x3 comparison filter avoids texel jumps.
+        for y in 0 .. 4 {
+            for x in 0 .. 4 {
+                let sample_pixel = clamp(pixel + ivec2(i32(x) - i32(1), i32(y) - i32(1)), ivec2(0), size - ivec2(1))
+                let z = textureLoad(shadow_map, sample_pixel, i32(0))
+                let wx = select(select(1.0, fraction.x, x == u32(3)), 1.0 - fraction.x, x == u32(0))
+                let wy = select(select(1.0, fraction.y, y == u32(3)), 1.0 - fraction.y, y == u32(0))
+                visibility += select(0.0, 1.0, projected.z - bias <= z) * wx * wy
+            }
+        }
+        return visibility / 9.0
+    }
+    // Out-of-table IDs produce no response; valid selections are compiler generated.
+    @dispatch(StandardStyle, direct, style_settings, draw)
+    fn style_direct(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    @dispatch(StandardStyle, indirect, style_settings, draw)
+    fn style_indirect(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 { return vec3(0.0) }
+    @dispatch(StandardStyle, finish, style_settings, draw)
+    fn style_finish(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, lighting: LightingResult) -> vec3 { return vec3(0.0) }
+
+    fn preview_point_sample(position: vec3, light: vec4, energy: vec4) -> PreviewDirectSample {
+        let sample = preview_point_light_sample(position, light)
+        // Empty slots and samples outside the finite light volume are not lights.
+        let active = sample.w > 0.0 && energy.w > 0.0 && max(max(energy.x, energy.y), energy.z) > 0.0
+        return PreviewDirectSample(active, DirectLight(sample.xyz, energy.rgb * energy.w, sample.w, 1.0))
+    }
+
+    fn preview_sun_sample(position: vec3, normal: vec3) -> PreviewDirectSample {
+        let active = max(max(environment.radiance.x, environment.radiance.y), environment.radiance.z) > 0.0
+        var visibility = 1.0
+        if active && environment.direction.w > 0.0 { visibility = preview_visibility(position, normal) }
+        return PreviewDirectSample(active, DirectLight(preview_safe_normalize(environment.direction.xyz), environment.radiance.rgb, 1.0, visibility))
+    }
+
+    fn direct_samples(position: vec3, normal: vec3) -> iterator<DirectLight> {
+        for i in 0 .. 64 {
+            let sample = preview_point_sample(position, point_lights[i * u32(2)], point_lights[i * u32(2) + u32(1)])
+            if sample.active { yield(sample.light) }
+        }
+        let sun = preview_sun_sample(position, normal)
+        if sun.active { yield(sun.light) }
+    }
+
+    fn indirect(position: vec3, normal: vec3) -> IndirectLight {
+        let hemisphere = mix(environment.ground.rgb, environment.sky.rgb, normal.y * 0.5 + 0.5)
+        return IndirectLight(hemisphere, environment.settings.y)
+    }
+
+    fn preview_point_light(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext, light: vec4, energy: vec4) -> vec3 {
+        let sample = preview_point_sample(context.world_position, light, energy)
+        if sample.active { return style_direct(response, settings_offset, surface, context, sample.light) }
+        return vec3(0.0)
+    }
+
+    fn scene_environment(response: u32, settings_offset: u32, surface: StandardSurface, context: ShadingContext) -> LightingResult {
+        let fill = style_indirect(response, settings_offset, surface, context, indirect(context.world_position, surface.normal))
+        var sun = vec3(0.0)
+        let sample = preview_sun_sample(context.world_position, surface.normal)
+        if sample.active {
+            sun = style_direct(response, settings_offset, surface, context, sample.light)
+        }
+        return LightingResult(sun, fill)
+    }
+
+    // Interpolated tangents avoid triangle seams; UV derivatives determine handedness.
+    fn shading_normal(sp: PreviewVarying, m: standard) -> vec3 {
+        let n = normalize(m.normal)
+        let px = dpdx(sp.world_pos)
+        let py = dpdy(sp.world_pos)
+        let ux = dpdx(sp.uv)
+        let uy = dpdy(sp.uv)
+        let determinant = ux.x * uy.y - ux.y * uy.x
+        if abs(determinant) < 0.00000001 { return n }
+        let tangent = (px * uy.y - py * ux.y) / determinant
+        var t0 = tangent - n * dot(n, tangent)
+        let smooth_tangent = sp.world_tangent - n * dot(n, sp.world_tangent)
+        if dot(smooth_tangent, smooth_tangent) > 0.00000001 {
+            t0 = smooth_tangent * select(-1.0, 1.0, dot(smooth_tangent, tangent) >= 0.0)
+        }
+        if dot(t0, t0) < 0.00000001 { return n }
+        let t = normalize(t0)
+        let bitangent = (py * ux.x - px * uy.x) / determinant
+        let b = cross(n, t) * select(-1.0, 1.0, dot(cross(n, t), bitangent) >= 0.0)
+        return normalize(t * m.normal_map.x + b * m.normal_map.y + n * m.normal_map.z)
+    }
+
+    fn prepare_material(sp: PreviewVarying, m: standard) -> standard {
+        var result = m
+        result.normal = shading_normal(sp, m)
+        return result
+    }
+    fn prepare_material(sp: PreviewVarying, m: unlit) -> unlit { return m }
+    fn prepare_material(sp: PreviewVarying, m: base) -> base { return m }
+
+    @evaluate(surface) fn evaluate_surface(context: surf) -> base {}
+    @evaluate(vertex) fn evaluate_vertex(context: surf) -> surf {}
+
+    @fragment fn raster(input: PreviewVarying, @builtin(front_facing) front: bool) -> color {
+        let prepared = prepare_fragment(input, front)
+        let material = prepare_material(prepared, evaluate_surface(material_context(prepared)))
+        return finish_fragment(shade(prepared, material))
+    }
+    @fragment fn geometry(input: PreviewVarying, @builtin(front_facing) front: bool) -> PreviewGBuffer {
+        let prepared = prepare_fragment(input, front)
+        let material = prepare_material(prepared, evaluate_surface(material_context(prepared)))
+        return pack_pixels(prepared, material)
+    }
+
+    fn vertex_context(v: PreviewShaded) -> surf {
+        return surf(v.uv, v.uv2, scene.time, scene.res, v.position, v.normal, 0.0, 1.0, 0.0, vec3(0.0))
+    }
+    fn apply_vertex(v: PreviewShaded, updated: surf) -> PreviewShaded {
+        var result = v
+        result.position = updated.position
+        result.normal = updated.normal
+        return result
+    }
+
+	@vertex fn vertex(v: PreparedVertex) -> PreviewVarying { return preview_project_prepared(v, scene) }
+    @vertex fn shadow_vertex(v: PreparedVertex) -> PreviewVarying {
+        var result = preview_project_prepared(v, scene)
+        result.clip_pos = shadow_camera.world_to_shadow * vec4(result.world_pos, 1.0)
+        return result
+    }
+    // Depth-only shadow caster shares deformation and masked material coverage.
+    @fragment fn shadow_fragment(input: PreviewVarying) {
+        // Translucent pass state disables depth writes; it cannot cast opaque shadows.
+        if blend == SurfaceBlend.Masked {
+            let m = evaluate_surface(material_context(input))
+            if m.albedo.a * m.opacity < mask_cutoff { discard_fragment() }
+        }
+    }
+    @prepare(PreparedMesh) fn prepare(raw: PreviewShaded) -> PreparedVertex {
+		let v = apply_vertex(raw, evaluate_vertex(vertex_context(raw)))
+		let model = factory.transform(v)
+        return preview_prepare_position(v.position, v.normal, v.tangent, v.uv, v.uv2, model, scene)
+	}
+
+    fn material_context(sp: PreviewVarying) -> surf {
+        return surf(sp.uv, sp.uv2, scene.time, scene.res, sp.world_pos, sp.world_normal, 0.0, 1.0, 0.0, vec3(0.0))
+    }
+
+    // Renderer policy is authored here, including normal orientation and coverage.
+    fn prepare_fragment(sp: PreviewVarying, front_face: bool) -> PreviewVarying {
+        if two_sided {
+            if front_face == false { return PreviewVarying(sp.clip_pos, sp.world_pos, -sp.world_normal, sp.world_tangent, sp.uv, sp.uv2) }
+        }
+        return sp
+    }
+
+    fn finish_fragment(result: color) -> color {
+        if blend == SurfaceBlend.Masked {
+            if result.a < mask_cutoff { discard_fragment() }
+        }
+        if blend == SurfaceBlend.Translucent { return vec4(result.rgb * result.a, result.a) }
+        return vec4(result.rgb, 1.0)
+    }
+
+    fn pack_pixels(sp: PreviewVarying, m: standard) -> PreviewGBuffer {
+        let normal = normalize(m.normal)
+        if blend == SurfaceBlend.Masked {
+            if m.albedo.a * m.opacity < mask_cutoff { discard_fragment() }
+        }
+        let n = normal / max(abs(normal.x) + abs(normal.y) + abs(normal.z), 0.0001)
+        var oct = n.xy
+        if n.z < 0.0 {
+            oct = (vec2(1.0) - abs(oct.yx)) * vec2(select(1.0, -1.0, oct.x < 0.0), select(1.0, -1.0, oct.y < 0.0))
+        }
+        return PreviewGBuffer(vec4(m.albedo.rgb, 1.0), vec4(oct, clamp(m.roughness, 0.045, 1.0), clamp(m.metallic, 0.0, 1.0)), vec4(m.emissive, clamp(m.occlusion, 0.0, 1.0)), uvec2(draw_record.material_id, shading_instance_id), sp.uv)
+    }
+
+    fn pack_pixels(sp: PreviewVarying, m: unlit) -> PreviewGBuffer {
+        if blend == SurfaceBlend.Masked {
+            if m.albedo.a * m.opacity < mask_cutoff { discard_fragment() }
+        }
+        let normal = normalize(sp.world_normal)
+        let n = normal / max(abs(normal.x) + abs(normal.y) + abs(normal.z), 0.0001)
+        var oct = n.xy
+        if n.z < 0.0 {
+            oct = (vec2(1.0) - abs(oct.yx)) * vec2(select(1.0, -1.0, oct.x < 0.0), select(1.0, -1.0, oct.y < 0.0))
+        }
+        return PreviewGBuffer(vec4(m.albedo.rgb, 1.0), vec4(oct, clamp(1.0, 0.045, 1.0), clamp(0.0, 0.0, 1.0)), vec4(m.emissive, clamp(1.0, 0.0, 1.0)), uvec2(draw_record.material_id, shading_instance_id), sp.uv)
+    }
+
+    // Custom base-derived schemas own their response. Preserve its HDR color in
+    // the emissive attachment so deferred resolve does not apply standard PBR.
+    fn pack_pixels(sp: PreviewVarying, m: base) -> PreviewGBuffer {
+        let result = finish_fragment(shade(sp, m))
+        return PreviewGBuffer(vec4(0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(result.rgb, 1.0), uvec2(draw_record.material_id, shading_instance_id), sp.uv)
+    }
+
+	fn shade(sp: PreviewVarying, m: standard) -> color {
+        let n = normalize(m.normal)
+        if environment.settings.x == 0.0 { return rgba(m.albedo.rgb + m.emissive, m.albedo.a * m.opacity) }
+            // 16px tiles, two 32-bit masks: every one of the 64 lights can overlap.
+            let columns = u32(ceil(scene.res.x / 16.0))
+            let tile = u32(sp.clip_pos.y / 16.0) * columns + u32(sp.clip_pos.x / 16.0)
+            let v = preview_safe_normalize(scene.camera_pos - sp.world_pos)
+            let roughness = clamp(m.roughness, 0.045, 1.0)
+            let metallic = clamp(m.metallic, 0.0, 1.0)
+            let surface = StandardSurface(m.albedo.rgb, roughness, metallic, clamp(m.occlusion, 0.0, 1.0), m.emissive, n, sp.uv)
+            let context = ShadingContext(sp.world_pos, v)
+            var lighting = scene_environment(style, draw_record.style_settings_offset, surface, context)
+            for i in 0 .. 64 {
+                var visible = true
+                if forward_plus {
+                    let mask = light_tiles[tile * u32(2) + i / u32(32)]
+                    visible = (mask & (u32(1) << (i % u32(32)))) != u32(0)
+                }
+                if visible {
+                    let light = point_lights[i * u32(2)]
+                    let radiance = point_lights[i * u32(2) + u32(1)]
+                    lighting.direct += preview_point_light(style, draw_record.style_settings_offset, surface, context, light, radiance)
+                }
+            }
+            return rgba(style_finish(style, draw_record.style_settings_offset, surface, context, lighting), m.albedo.a * m.opacity)
+	}
+    fn shade(sp: PreviewVarying, m: base) -> color {
+        return evaluate_schema(surf(sp.uv, sp.uv2, scene.time, scene.res, sp.world_pos, sp.world_normal, 0.0, 1.0, 0.0, vec3(0.0)), m)
+    }
+
+}
+
+pipeline(postprocess) preview_mesh_pipeline for base {
+	preview_mesh
+}
+
+// Preview lighting is engine-authored and shared by meshes and particles.
+// Production renderers can replace this response and supply their own lighting
+// contract inputs through evaluate_schema in their raster hooks.
+schema_program preview_lit for standard {
+    fn response() -> vec4 {
+        let n = normalize(self.normal)
+        let light = normalize(vec3(0.4, 0.8, 0.6))
+        let diffuse = 0.15 + 0.85 * max(dot(n, light), 0.0)
+        return vec4(self.albedo.rgb * diffuse + self.emissive, self.albedo.a * self.opacity)
+    }
+    output: response()
+}
+
+schema_program preview_unlit for unlit {
+    fn response() -> vec4 {
+        return vec4(self.albedo.rgb + self.emissive, self.albedo.a * self.opacity)
+    }
+    output: response()
+}

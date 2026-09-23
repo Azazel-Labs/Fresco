@@ -1,0 +1,11 @@
+// Source for the visual guide's shader walkthrough.
+canvas nested_circle(ctx: CanvasContext) -> color {
+    compose {
+        fill(#101827)
+        in space translate((0.12, 0.0)) {
+            in space scale(0.6, around: center) {
+                circle(at: (0.65, 0.5), radius: 0.12) |> fill(#ff4b91)
+            }
+        }
+    }
+}

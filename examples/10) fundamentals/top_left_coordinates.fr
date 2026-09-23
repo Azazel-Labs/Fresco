@@ -1,0 +1,9 @@
+canvas top_left(ctx: CanvasContext) -> color {
+    space screen = orientation(y: down)
+    compose {
+        fill(#111827)
+        in space screen {
+            circle(at: (0.2, 0.2), radius: 0.08) |> fill(#ffd27a)
+        }
+    }
+}

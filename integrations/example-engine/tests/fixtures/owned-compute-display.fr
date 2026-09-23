@@ -1,0 +1,14 @@
+struct ComputedVertex { @semantic(position) position: vec4 }
+@factory(preview_static) draw Show(geometry: DrawRange, scene: PreviewScene,
+    values: buffer<vec4, read>, field: texture2d<rg32float, read>,
+    target: attachment<rgba16float, preserve_update>) {
+    raster geometry
+    attachments { target: load_store }
+    @vertex fn project(v: PreviewShaded) -> ComputedVertex {
+        return ComputedVertex(scene.proj * scene.view * factory.transform(v) * vec4(v.position, 1.0))
+    }
+    @fragment fn paint(v: ComputedVertex) -> vec4 {
+        if (values).count == 0u || (field).width == 0u { return vec4(0.0) }
+        return vec4(abs(values[0u].xyz) * 0.2 + textureLoad(field, ivec2(1, 0), 0).xyz * 0.05, 1.0)
+    }
+}

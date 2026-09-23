@@ -1,0 +1,20 @@
+// north-star: smear — pointer paint with advected history
+// status: aspirational
+// rung: 4
+// deltas:
+//   - host-updated params per frame (pointer, pressed) — no new machinery, a contract test
+//   - sampling previous_frame THROUGH a space (analytic translate — simplest `through`, ext §23.6)
+// done when: painting works; the smear drifts upward; --explain prints
+//   `through translate: inlined (analytic)`.
+
+canvas smear(ctx: CanvasContext) -> color {
+    param pointer: coord = (0.5, 0.5)
+    param pressed: bool = false
+
+    let brush = circle(at: pointer, radius: 0.03) |> soften(0.02)
+    compose {
+        previous_frame through space translate(0, -0.0012)
+        |> fade(toward: #0a0c12, amount: 0.008)
+        if pressed { brush |> fill(#ffb347) |> blend(add) }
+    }
+}

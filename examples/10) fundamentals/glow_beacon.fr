@@ -1,0 +1,16 @@
+// Basic example: glow layering for a beacon-like pulse.
+
+canvas glow_beacon(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let pulse = wave(period: 2.8s, shape: sine, range: 0.5 .. 1.0)
+    let core = circle(at: (0.5, 0.5), radius: 0.10)
+
+    compose {
+        fill(#060b14)
+
+        in space stage {
+            core |> glow(reach: 0.26, strength: 0.45 * pulse, color: #61d7ff) |> blend(add)
+            core |> fill(#bdefff)
+        }
+    }
+}

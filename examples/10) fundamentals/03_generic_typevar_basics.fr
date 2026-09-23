@@ -1,0 +1,13 @@
+// Fundamentals: generic type variable flow (`<T>`) through a function.
+
+fn id<T>(x: T) -> T {
+    return x
+}
+
+canvas generic_typevar_basics(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let r = id(uv.x)
+    compose {
+        circle(at: center, radius: r) |> fill(#ffd67f)
+    }
+}

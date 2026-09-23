@@ -1,0 +1,20 @@
+// Library: reusable shape-coloring helpers.
+//
+// Import this module and call `outline_rings(s)` to render any shape with
+// an iso-band field pattern and a white zero-contour stroke.
+
+fn ring_field(d: f32, iso: f32) -> f32 {
+    let fade  = 1.0 - exp(-6.0 * abs(d) / iso)
+    let rings = 0.8 + 0.2 * cos(d / iso * 6.28318)
+    return fade * rings
+}
+
+fn outline_color(d: f32) -> color {
+    let t = saturate(d * 12.0 + 0.5)
+    return rgba(
+        r: lerp(0.65, 0.9, t),
+        g: lerp(0.85, 0.6, t),
+        b: lerp(1.0, 0.3, t),
+        a: 1.0,
+    )
+}

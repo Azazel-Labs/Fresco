@@ -1,0 +1,7 @@
+// Shared native/browser example: GPU-cull up to 64 point lights into 16px tiles.
+// Choose Forward+ in the browser renderer selector.
+// The sample engine supplies three colored point lights. Hosts can replace them.
+surface tiled_lights(sp: surf) -> material(standard) {
+    param tint: color = rgba(0.8, 0.8, 0.8, 1.0)
+    compose { base(albedo: tint) }
+}

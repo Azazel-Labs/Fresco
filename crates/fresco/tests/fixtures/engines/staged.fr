@@ -1,0 +1,24 @@
+// Parsing fixture: specialization branches, nested blocks, and loops.
+pass probe_base for ProbeMaterial {
+    stage: raster
+    draw: per_object
+    permutations { @known(compile) lighting: "off"|"on" }
+    fn shade(value: f32) -> color {
+        var amount = select lighting { off: 0.0; on: value }
+        select lighting {
+            off: {}
+            on: { if amount > 0.5 { amount = 0.5 } }
+        }
+        return rgba(amount, amount, amount, 1.0)
+    }
+}
+pass probe_add for ProbeMaterial {
+    stage: raster
+    draw: per_binding(light)
+    blend: additive
+    fn shade(value: f32) -> color {
+        var amount = value
+        unroll for light in lights { amount += light.energy }
+        return rgba(amount, 0.0, 0.0, 1.0)
+    }
+}

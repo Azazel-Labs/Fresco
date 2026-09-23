@@ -1,0 +1,29 @@
+// Demonstrates compile-time array comprehensions and `for`-loop unrolling.
+// The loop iterates over a compile-time array of bar steps rather than a runtime collection.
+
+canvas for_loop_bars(ctx: CanvasContext) -> color {
+    let steps = [for i in 0 .. 7 => i]
+    let pulse = wave(period: 2.8s, shape: sine, range: 0.92 .. 1.08)
+
+    compose {
+        fill(#0e1420)
+
+        for step in steps {
+            let p = step / 6.0
+            let x = 0.14 + p * 0.72
+            let h = (0.16 + p * 0.40) * pulse
+            let bar = box(at: (x, 0.12 + h / 2), size: (0.07, h)) |> round(0.012)
+
+            bar |> fill(gradient(
+                along: y,
+                anchor: shape,
+                stops: [
+                    stop(at: 0.0, color: #17345c),
+                    stop(at: 1.0, color: #5eead4),
+                ]
+            ))
+        }
+
+        box(at: (0.5, 0.11), size: (0.82, 0.002)) |> fill(#334155)
+    }
+}

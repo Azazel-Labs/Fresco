@@ -1,0 +1,102 @@
+struct ParticleSlot { birth_id: u32; spawn: u32; enabled: u32; dt: f32 }
+// Shared particle resource ABI. Effects author their own simulation and draw passes.
+struct PreviewParticleConfig {
+    delta_time: f32
+    particle_count: u32
+    padding: vec2
+}
+
+// The engine owns the persistent layout and authored vocabulary. Integrations
+// may extend this record and rename the entry/blocks without compiler changes.
+struct Particle {
+    position: vec4
+    velocity: vec4
+    age: f32
+    lifespan: f32
+    id: f32
+}
+
+enum ParticleAllocationMode: u32 { Fixed, Estimated, Automatic }
+
+@entry(emitter, update)
+@surface_defaults(blend: SurfaceBlend.Translucent)
+interface ParticleEmitter {
+    param @config(editor) allocation: ParticleAllocationMode = ParticleAllocationMode.Fixed
+    param @config(editor) spawn_rate: f32 = 60.0
+    param @config(editor) burst_count: u32 = 8
+    param @config(editor) max_lifespan: f32 = 2.0
+    param @config(editor) allocation_hint: u32 = 32
+    param @config(editor) max_particles: u32 = 4096
+    param @config(editor) @permutation simulate_motion: bool = true
+    @bind(initialize_particle) @compose(p)
+    fn spawn(p: Particle, id: f32, count: f32) -> Particle
+
+    @bind(advance_particle) @compose(p)
+    fn update(p: Particle, dt: f32) -> Particle
+}
+
+// Explicit resource contract. Expressions bind to this entry's configuration.
+@meta(allocation_mode, allocation)
+@meta(capacity, allocation == ParticleAllocationMode.Fixed ? max(1, u32(ceil(spawn_rate * max_lifespan)) + burst_count) : allocation_hint)
+@meta(max_capacity, max_particles)
+@meta(growth_factor, 2.0)
+@meta(spawn_rate, spawn_rate)
+@meta(spawn_burst, burst_count)
+@meta(max_lifespan, max_lifespan)
+@meta(max_spawn_per_step, 4096)
+@meta(overflow, "drop_new")
+@shader pass particle_simulation for ParticleEmitter {
+    stage: compute
+    binding {
+        @group(draw) @binding(1) @access(read_write) particles: buffer<Particle>
+        @group(draw) @binding(2) particle_config: uniform<PreviewParticleConfig>
+        @group(draw) @binding(4) particle_slots: buffer<ParticleSlot>
+    }
+
+    @pure fn spawn(id: f32, count: f32) -> Particle {
+        let initial = Particle(position: vec4(0.0), velocity: vec4(0.0),
+            age: 0.0, lifespan: max_lifespan, id: id)
+        var next = initialize_particle(initial, id, count)
+        next.lifespan = clamp(next.lifespan, 0.0, max_lifespan)
+        return next
+    }
+    @pure fn main(p: Particle, dt: f32, count: f32) -> Particle {
+        var next = p
+        next.age = p.age + dt
+        if next.age >= p.lifespan {
+            next.position = vec4(next.position.xyz, 0.0)
+            return next
+        }
+        if simulate_motion {
+            next = advance_particle(next, dt)
+        }
+        return next
+    }
+
+    @compute @workgroup_size(64)
+    fn initialize(@builtin(global_invocation_id) id: uvec3) {
+        if id.x >= particle_config.particle_count { return }
+        if particle_slots[id.x].spawn == u32(0) { return }
+        particles[id.x] = spawn(f32(particle_slots[id.x].birth_id), f32(particle_config.particle_count))
+    }
+    @compute @workgroup_size(64)
+    fn simulate(@builtin(global_invocation_id) id: uvec3) {
+        if id.x >= particle_config.particle_count { return }
+        if particle_slots[id.x].enabled == u32(0) { return }
+        particles[id.x] = main(particles[id.x], particle_slots[id.x].dt, f32(particle_config.particle_count))
+    }
+}
+@technique @meta(engine, "particle")
+@external(state, particle_state) @external(config, particle_config)
+@external(slots, particle_slots) @external(scene, scene)
+@image(output, float_color) @provider(output, presentation)
+@image(depth, depth32float) @provider(depth, depth)
+pipeline(compute) particle_system for ParticleEmitter {
+    @node(spawn) @enabled(spawn) @dispatch(initialize, capacity)
+    @bind(particles, state) @bind(particle_config, config) @bind(particle_slots, slots) particle_simulation
+    @node(update) @enabled(update) @after(spawn) @dispatch(simulate, capacity)
+    @bind(particles, state) @bind(particle_config, config) @bind(particle_slots, slots) particle_simulation
+    @node(draw) @after(update) @draw(vertex, fragment, fullscreen, 6) @instances(capacity)
+    @bind(scene, scene) @bind(particle_render, state) @bind(particle_slots, slots)
+    @color(0, output) @depth(depth) camera_billboard
+}

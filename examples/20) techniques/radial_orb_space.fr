@@ -1,0 +1,39 @@
+// Radial-gradient orb in a local top-left-authored space using orientation.
+// This uses explicit in-space transforms plus radial stop control in a basic scene.
+
+canvas radial_orb_space(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+
+    let wobble = wave(period: 4s, shape: sine, range: -0.04 .. 0.04)
+    let orb = circle(at: (0.5 + wobble, 0.42), radius: 0.23)
+
+    compose {
+        in space orientation(y: down) {
+            compose {
+                fill(gradient(
+                    along: (0.25, 1.0),
+                    stops: [
+                        stop(at: 0.0, color: #0a1324),
+                        stop(at: 1.0, color: #1f3d63),
+                    ]
+                ))
+
+                in space stage {
+                    orb |> fill(gradient(
+                        kind: radial,
+                        center: (0.5 + wobble, 0.42),
+                        radius: 0.23,
+                        stops: [
+                            stop(at: 0.0, color: #fff4bf),
+                            stop(at: 0.40, color: #ffb86a),
+                            stop(at: 0.72, color: #ff7a45),
+                            stop(at: 1.0, color: #742b22),
+                        ]
+                    ))
+
+                    orb |> glow(reach: 38px, strength: 0.45, color: #ff9a55) |> blend(screen)
+                }
+            }
+        }
+    }
+}

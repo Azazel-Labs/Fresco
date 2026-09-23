@@ -1,0 +1,103 @@
+// north-star: reveal-flourish - draw-on stroke with a hot tip and terminal bloom
+// status: aspirational
+// rung: 7 (path parametrization and path-local channels)
+// deltas:
+//   - `path { ... }` value with segment list lowering and total `.length`
+//   - path-sample channels as demand-driven projections: `.dist`, `.along`, `.tangent`
+//   - `path |> stroke(width:)` for stroke coverage from `.dist`
+//   - `path.point_at(s)` and `path.tangent_at(s)` evaluators with signal-rate hoisting
+//   - `--explain` path receipt: segments, demanded channels, and along-source (const vs hoisted)
+// done when:
+//   - this file compiles without lowering path channels that are not demanded by the DAG
+//   - masking by `curve.along` reveals stroke continuously (no reveal pops at segment boundaries)
+//   - `pen` rides at uniform arc-length speed when `head_s` is signal-driven
+//   - `--explain` prints path demand + lowering notes for this canvas
+
+canvas reveal_flourish(ctx: CanvasContext) -> color {
+    let time = context(time)
+    param accent: color = #7de0ff
+    param stroke_w: f32 = 18px
+
+    // New primitive request: a path value whose sample carries dist/along/tangent.
+    let curve = path {
+        move (0.081, 0.714)
+        line (0.248, 0.345)
+        line (0.424, 0.390)
+        line (0.571, 0.680)
+        line (0.794, 0.648)
+        line (0.892, 0.548)
+    }
+
+    let draw = ramp(from: 0s, over: 2.2s, ease: in_out)
+    let head_s = draw * curve.length
+    let bloom = ramp(from: 2.2s, over: 0.6s, ease: out_back)
+    let along01 = clamp(x: curve.along / curve.length, lo: 0.0, hi: 1.0)
+    let body_t = smoothstep(lo: 0.0, hi: 0.62, x: along01)
+    let tail_t = smoothstep(lo: 0.76, hi: 1.0, x: along01)
+    let body_w = mix(a: stroke_w, b: stroke_w * 0.42, t: body_t)
+    let brush_w = mix(a: body_w, b: 1.0px, t: tail_t)
+
+    let ink = curve |> stroke(width: brush_w)
+    |> mask(smoothstep(lo: head_s - 14px, hi: head_s, x: curve.along))
+    |> tint(accent)
+    |> glow(reach: 10px, strength: 0.6)
+
+    // New evaluator request: point_at/tangent_at over arc length s.
+    let pen = curve.point_at(head_s)
+    let tangent = curve.tangent_at(head_s)
+    let blur_velocity = tangent * 0.35
+    let tip = circle(at: pen, radius: stroke_w * 1.4)
+    |> fill(#ffffff)
+    |> tint(#ffffff)
+    |> glow(reach: 22px, strength: 1.2 * (1.0 - bloom))
+
+    let shed = scatter 40 within screen seed 7 strategy compact {
+        let age = wrap(x: time * 1.6 + instance.rand, range: 0 .. 1)
+        circle(
+            at: pen - tangent * age * 30px + instance.jitter * 8px,
+            radius: mix(a: 1.5px, b: 0px, t: age)
+        )
+        |> fill(#ffffff)
+        |> tint(accent)
+        |> opacity(1.0 - age)
+    } |> mask(draw < 1.0)
+
+    let end_p = curve.point_at(curve.length)
+    let burst = scatter 90 within screen seed 11 strategy compact {
+        let dir = angle(instance.rand * 1turn)
+        let r = bloom * mix(a: 20px, b: 70px, t: instance.rand2)
+        circle(
+            at: end_p + dir * r,
+            radius: mix(a: 2.5px, b: 0px, t: bloom)
+        )
+        |> fill(#ffffff)
+        |> tint(mix(a: #ffffff, b: accent, t: instance.rand2))
+        |> opacity(1.0 - bloom * bloom)
+    }
+
+    let flower = star(
+        at: end_p,
+        points: 6,
+        inner: bloom * 6px,
+        outer: bloom * 16px,
+        rotate: bloom * 40deg
+    )
+    |> fill(#ffffff)
+    |> tint(#ffffff)
+    |> glow(reach: 30px, strength: bloom * 1.5)
+
+    // Debug bring-up order (measured compile pressure):
+    // 1) ink
+    // 2) tip
+    // 3) shed   (first large jump)
+    // 4) burst  (largest jump)
+    // 5) flower
+    // 6) motion_blur
+    compose {
+        fill(#070b16)
+        ink
+        tip
+        shed
+        burst
+    }
+}

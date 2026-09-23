@@ -1,0 +1,76 @@
+// An externally authored style for existing standard materials. Change
+// properties.style to StandardGGX to use the engine default response instead.
+// The selected implementation also contributes an inverted-hull mesh draw.
+// The renderer supplies separate light inputs; the style chooses their weighting.
+style Toon for standard : StandardStyle {
+    param outline_width: f32 in [0.0, 10.0] = 2.5
+    param outline_color: color = #2e1938
+    static param outline_enabled: bool = true
+    for self {
+        static if outline_enabled {
+            InvertedHull(geometry: mesh.prepared, view: frame, width: outline_width, ink: outline_color,
+                         color: opaque.color, depth: opaque.depth)
+        }
+    }
+    param band_threshold: f32 in [0.05, 0.55] = 0.25
+    param highlight_strength: f32 in [0.0, 2.0] = 1.0
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        let albedo = surface.albedo
+        let roughness = surface.roughness
+        let metallic = surface.metallic
+        let n = surface.normal
+        let v = context.view_direction
+        let l = light.direction
+        let nl = dot(n, l)
+        // Diffuse bands depend on light direction, including at grazing view angles.
+        if nl <= 0.0 { return vec3(0.0) }
+        let bands = smoothstep(0.0, 0.04, nl) * (0.15 + 0.35 * smoothstep(band_threshold - 0.02, band_threshold + 0.02, nl) + 0.5 * smoothstep(0.63, 0.67, nl))
+        let h = (v + l) * inverse_sqrt(max(dot(v + l, v + l), 0.00000001))
+        let highlight = smoothstep(0.55, 0.65, pow(max(dot(n, h), 0.0), mix(96.0, 4.0, roughness)))
+        return (albedo * (1.0 - metallic) * bands / 3.14159265 + mix(vec3(0.04), albedo, metallic) * highlight * highlight_strength)
+             * light.radiance * light.attenuation * light.visibility
+    }
+    fn indirect(surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 {
+        return (surface.albedo * (1.0 - surface.metallic)
+             + mix(vec3(0.04), surface.albedo, surface.metallic) * light.specular_fill)
+             * light.irradiance * surface.occlusion
+    }
+}
+
+// Reusable operation: defining it alone schedules no work.
+draw InvertedHull(geometry: PreparedMesh, view: PreviewScene, width: f32, ink: color,
+                  color: attachment<rgba16float, preserve_update>, depth: attachment<depth32float, test_only>) {
+    requires material.blend == SurfaceBlend.Opaque && material.two_sided == false
+    raster geometry
+    visibility: uncullable
+    cull: front
+    blend { all: replace }
+    depth { write: false; compare: less_equal }
+    attachments { color: load_store; depth: load_store }
+    @vertex fn shell(index: u32) -> clip_position {
+        let v = geometry.vertices[index]
+        var projected = view.proj * view.view * vec4(v.world_position, 1.0)
+        let view_normal = (view.view * vec4(v.geometric_normal, 0.0)).xyz
+        let direction = (view.proj * vec4(view_normal, 0.0)).xy * view.res
+        let length_squared = dot(direction, direction)
+        if length_squared > 0.000001 && projected.w > 0.0 {
+            let offset = direction * inverse_sqrt(length_squared) * 2.0 * width / view.res
+            projected.x += offset.x * projected.w
+            projected.y += offset.y * projected.w
+        }
+        return projected
+    }
+    @fragment fn fragment() -> vec4 { return ink }
+}
+
+surface style_sample(sp: surf) -> material(standard) {
+    properties { style: Toon }
+    param tint: color = #f5ad69
+    param roughness_level: f32 = 0.45
+    param metallic_level: f32 = 0.0
+    param glow: f32 = 0.0
+    compose {
+        base(albedo: tint, roughness: clamp(roughness_level, 0.045, 1.0),
+             metallic: clamp(metallic_level, 0.0, 1.0), emissive: tint.rgb * max(glow, 0.0))
+    }
+}

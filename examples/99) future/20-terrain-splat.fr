@@ -1,0 +1,23 @@
+// north-star: terrain-splat — height/slope-driven material blending; world units
+// status: aspirational
+// rung: 8
+// deltas:
+//   - world unit `m`, resolved via host world-scale in the bind manifest (ext §25.3)
+//   - `sp.position` / `sp.normal` driving masks (world-space fields on a surface)
+//   - `cavity(sp)` attribute-or-derivative stdlib, manifest-declared like curvature
+// done when: snow stays off steep slopes; rock fades in on cliffs; changing the
+//   host world scale rescales the height thresholds correctly (unit test for `m`).
+
+surface terrain(sp: surf, time: signal) -> material {
+    let h = sp.position.y
+    let slope = 1 - dot(sp.normal, up)
+
+    compose {
+        base(albedo: image(grass_tex, at: sp.uv * 24), roughness: 0.9)
+        layer material(albedo: image(rock_tex, at: sp.uv * 16), roughness: 0.8)
+        mask: field smoothstep(0.35, 0.55, slope)
+        layer material(albedo: image(snow_tex, at: sp.uv * 20), roughness: 0.4)
+        mask: field smoothstep(1400m, 1650m, h) * smoothstep(0.5, 0.3, slope)
+        darken(by: field cavity(sp) * 0.3)
+    }
+}

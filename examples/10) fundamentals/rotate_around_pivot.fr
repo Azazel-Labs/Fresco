@@ -1,0 +1,20 @@
+// Basic example: rotate around explicit pivot.
+
+canvas rotate_around_pivot(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let spin = wave(period: 4s, shape: saw, range: 0deg .. 360deg)
+
+    compose {
+        fill(#0a1220)
+
+        in space stage {
+            compose {
+                in space rotate(angle: spin, around: (0.5, 0.5)) {
+                    capsule(from: (0.50, 0.00), to: (0.82, 0.00), radius: 0.045) |> fill(#9ccfff)
+                }
+
+                circle(at: (0.5, 0.5), radius: 0.03) |> fill(#ffd28f)
+            }
+        }
+    }
+}

@@ -1,0 +1,23 @@
+[
+{"args":{"name":"fresco-compile"},"name":"thread_name","ph":"M","pid":1,"tid":0},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":187,"args":{"filename":"target/tmp/map_repro.fr","include_stdlib":"true","message":"compile started"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:187","ph":"i","pid":1,"s":"t","tid":0,"ts":668.7},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":188,"args":{"filename":"target/tmp/map_repro.fr","include_stdlib":"true"},"cat":"fresco::driver::pipeline","name":"compile_with_options","ph":"B","pid":1,"tid":0,"ts":993.6},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":196,"cat":"fresco::driver::pipeline","name":"lex","ph":"B","pid":1,"tid":0,"ts":1014.3},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":197,"args":{"message":"phase start: lex"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:197","ph":"i","pid":1,"s":"t","tid":0,"ts":1016.9},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":203,"args":{"message":"phase done: lex","ms":"3.4556999999999998","tokens":"4700"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:203","ph":"i","pid":1,"s":"t","tid":0,"ts":4489.6},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":196,"cat":"fresco::driver::pipeline","name":"lex","ph":"E","pid":1,"tid":0,"ts":4556.1},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":206,"cat":"fresco::driver::pipeline","name":"parse","ph":"B","pid":1,"tid":0,"ts":4600.6},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":207,"args":{"message":"phase start: parse"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:207","ph":"i","pid":1,"s":"t","tid":0,"ts":4604.0},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":212,"args":{"canvases":"1","functions":"28","message":"phase done: parse","ms":"63.148700000000005"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:212","ph":"i","pid":1,"s":"t","tid":0,"ts":67772.5},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":206,"cat":"fresco::driver::pipeline","name":"parse","ph":"E","pid":1,"tid":0,"ts":67820.5},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":223,"cat":"fresco::driver::pipeline","name":"resolve_imports","ph":"B","pid":1,"tid":0,"ts":67869.6},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":224,"args":{"message":"phase start: resolve_imports"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:224","ph":"i","pid":1,"s":"t","tid":0,"ts":67874.0},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":228,"args":{"message":"phase done: resolve_imports","ms":"11.918700000000001","sources":"3"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:228","ph":"i","pid":1,"s":"t","tid":0,"ts":79829.4},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":223,"cat":"fresco::driver::pipeline","name":"resolve_imports","ph":"E","pid":1,"tid":0,"ts":79878.0},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":235,"cat":"fresco::driver::pipeline","name":"check_and_rewrite","ph":"B","pid":1,"tid":0,"ts":79918.5},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":236,"args":{"message":"phase start: check_and_rewrite"},"cat":"fresco::driver::pipeline","name":"event crates\\fresco\\src\\driver\\pipeline.rs:236","ph":"i","pid":1,"s":"t","tid":0,"ts":79920.9},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":1433,"args":{"canvas":"map_repro"},"cat":"fresco::driver::pipeline","name":"check_rewrite_canvas","ph":"B","pid":1,"tid":0,"ts":80680.7},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":1433,"args":{"canvas":"map_repro"},"cat":"fresco::driver::pipeline","name":"check_rewrite_canvas","ph":"E","pid":1,"tid":0,"ts":28457155.2},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":235,"cat":"fresco::driver::pipeline","name":"check_and_rewrite","ph":"E","pid":1,"tid":0,"ts":28457981.1},
+{".file":"crates\\fresco\\src\\driver\\pipeline.rs",".line":188,"args":{"filename":"target/tmp/map_repro.fr","include_stdlib":"true"},"cat":"fresco::driver::pipeline","name":"compile_with_options","ph":"E","pid":1,"tid":0,"ts":28459224.9}
+]

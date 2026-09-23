@@ -1,0 +1,31 @@
+style PaintedShell for standard : StandardStyle {
+    param ink: color = rgba(1.0, 0.0, 0.0, 0.5)
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    for self {
+        at transparent as target {
+            PaintShell(geometry: self, scene: frame, ink: ink, color: target.color, depth: target.depth)
+        }
+    }
+}
+struct ShellPosition { @semantic(position) clip: vec4 }
+@factory(preview_static) draw PaintShell(geometry: DrawRange, scene: PreviewScene, ink: color,
+    color: attachment<rgba16float, preserve_update>, depth: attachment<depth32float, test_only>) {
+    raster geometry
+    visibility: uncullable
+    cull: back
+    blend { all: premultiplied }
+    depth { write: false; compare: less_equal }
+    attachments { color: load_store; depth: load_store }
+    @vertex fn vertex(v: PreviewShaded) -> ShellPosition {
+        return ShellPosition(scene.proj * scene.view * factory.transform(v) * vec4(v.position, 1.0))
+    }
+    @fragment fn fragment() -> vec4 { return vec4(ink.rgb * ink.a, ink.a) }
+}
+surface shell(sp: surf) -> material(standard) {
+    properties { style: PaintedShell; blend: SurfaceBlend.Translucent }
+    compose { base(albedo: rgba(0.0, 0.0, 0.0, 0.0)) }
+}
+surface glass(sp: surf) -> material(unlit) {
+    properties { blend: SurfaceBlend.Translucent }
+    compose { base(albedo: rgba(0.0, 1.0, 0.0, 0.5)) }
+}

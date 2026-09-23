@@ -1,0 +1,16 @@
+canvas t(ctx: CanvasContext) -> color {
+    let ring = circle(at: center, radius: 0.16) |> stroke(1px)
+    let soft_spot = circle(at: (0.32, 0.5), radius: 0.035)
+    let shadow_card = box(at: (0.7, 0.5), size: (0.16, 0.22))
+
+    compose {
+        fill(#101820)
+        in space centered(aspect: preserve)
+            .perspective(fov: 58deg, near: 0.02, far: 12.0, origin: center)
+            .rotate_y(angle: 72deg, around: center) {
+            ring |> fill(#ffffff)
+            soft_spot |> soften(radius: 1px, color: #93c5fdff)
+            shadow_card |> shadow(offset: (1px, 1px), soften: 1px, color: #00000088)
+        }
+    }
+}

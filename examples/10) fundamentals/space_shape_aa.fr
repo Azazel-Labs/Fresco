@@ -1,0 +1,56 @@
+// Test: explicit in-space Jacobian computation for ordinary shape antialiasing.
+//
+// This example proves the footprint Jacobian is not limited to procedural
+// patterns. Everything is drawn inside explicit `in space` blocks.
+//
+// In lowering, shape coverage uses:
+//   aa_adaptive = ||grad(d) · J||
+// where grad(d) comes from dpdx/dpdy of the shape distance field and J is the
+// composed footprint Jacobian. Distant transformed edges should therefore
+// stay smooth even when the apparent shape thickness changes across the frame.
+
+canvas space_shape_aa(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    // Rotate and deepen the authored space so the same shape edges span
+    // noticeably different apparent thicknesses across the screen.
+    space warped = rotate(12deg) . scale(1.0 + uv.y * 2.4)
+
+    // Explicit authored-space block so it's obvious geometry is drawn in-space.
+    space authored = centered(aspect: preserve)
+
+    let board = box(at: (0.50, 0.58), size: (0.92, 0.84)) |> round(0.06)
+    let board_frame = board |> stroke(2px)
+
+    // Authored-space guides: these make the transformed space visibly obvious.
+    let rail_top = capsule(from: (0.12, 0.74), to: (0.88, 0.68), radius: 0.008)
+    let rail_mid = capsule(from: (0.12, 0.56), to: (0.88, 0.50), radius: 0.008)
+    let rail_low = capsule(from: (0.12, 0.38), to: (0.88, 0.32), radius: 0.008)
+
+    // Thin-detail shapes that demonstrate Jacobian-driven adaptive AA.
+    let ring = circle(at: (0.24, 0.70), radius: 0.09) |> stroke(2px)
+    let frame = box(at: (0.68, 0.58), size: (0.24, 0.18)) |> round(0.04) |> stroke(2px)
+    let rail = capsule(from: (0.12, 0.24), to: (0.88, 0.16), radius: 0.014)
+    let bead = circle(at: (0.74, 0.20), radius: 0.022)
+
+    compose {
+        fill(#101820)
+
+        in space warped {
+            in space authored {
+                compose {
+                    board |> fill(#172432)
+                    board_frame |> fill(#3f5d79)
+                    rail_top |> fill(#2a3f56)
+                    rail_mid |> fill(#2a3f56)
+                    rail_low |> fill(#2a3f56)
+
+                    // Thin edges on each primitive should stay clean under the transformed footprint.
+                    ring |> fill(#ffcc66)
+                    frame |> fill(#8fd3ff)
+                    rail |> fill(#9ef0b8)
+                    bead |> fill(#ffe7f1)
+                }
+            }
+        }
+    }
+}

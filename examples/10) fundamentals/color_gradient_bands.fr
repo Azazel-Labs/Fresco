@@ -1,0 +1,18 @@
+// Basic example: horizontal bands over a vertical gradient.
+// Shows `gradient`, scalar math, and basic shape fills.
+
+canvas color_gradient_bands(ctx: CanvasContext) -> color {
+    let stripe = wave(period: 6s, shape: saw, range: 0.15 .. 0.85)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1324),
+                stop(at: 1.0, color: #1d2f4f),
+            ]
+        ))
+        box(at: (0.5, stripe), size: (0.9, 0.08)) |> round(0.02) |> fill(#9ae6b4)
+        box(at: (0.5, 1 - stripe), size: (0.9, 0.08)) |> round(0.02) |> fill(#fbd38d)
+    }
+}

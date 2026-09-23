@@ -1,0 +1,39 @@
+// A custom material and response, independent of the engine's standard PBR model.
+// The light and band controls belong to this authored toon style.
+material_properties toon extends base {
+    channel @compose(mix) normal: vec3 in world = sp.normal
+    channel @compose(mix) shadow_tint: color = #343c72
+    channel @compose(mix) midtone: f32 = 0.55
+    channel @compose(mix) shadow_edge: f32 = 0.2
+    channel @compose(mix) highlight_edge: f32 = 0.7
+}
+
+schema_program toon_response for toon {
+    fn response() -> color {
+        let n = normalize(self.normal)
+        let light = normalize(vec3(0.4, 0.8, 0.6))
+        let diffuse = max(dot(n, light), 0.0)
+        var pigment = self.albedo.rgb
+        if diffuse < self.shadow_edge {
+            pigment = self.albedo.rgb * self.shadow_tint.rgb
+        } else if diffuse < self.highlight_edge {
+            pigment = self.albedo.rgb * self.midtone
+        }
+        return vec4(pigment + self.emissive, self.albedo.a * self.opacity)
+    }
+    output: response()
+}
+
+surface style_sample(sp: surf) -> material(toon) {
+    param tint: color = #f5ad69
+    param shadow_color: color = #343c72
+    param midtone_level: f32 = 0.55
+    param shadow_threshold: f32 = 0.2
+    param highlight_threshold: f32 = 0.7
+
+    compose {
+        base(albedo: tint, shadow_tint: shadow_color,
+             midtone: clamp(midtone_level, 0.0, 1.0), shadow_edge: clamp(shadow_threshold, 0.0, 1.0),
+             highlight_edge: clamp(max(shadow_threshold, highlight_threshold), 0.0, 1.0))
+    }
+}

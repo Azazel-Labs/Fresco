@@ -1,0 +1,52 @@
+#pragma check.shape_aa_min_px = 1.5
+#pragma check.shape_aa_max_px = 3.0
+#pragma check.shape_aa_style = gradient
+#pragma check.projective_footprint_max_px = 64.0
+// A minimal independent contract exercising implementation-owned extra work.
+struct SamplePoint {
+ @semantic(coord) uv: vec2
+ @semantic(time) clock: f32
+ @semantic(resolution) size: vec2
+}
+@context(SamplePoint, sp) @composition(Value, material, weight)
+material_properties Value { channel @compose(mix) tint: color }
+contract Action for Value { point finish: Target { scope: view; accepts: raster_draws; composition: ordered_draws(engine.stable_draw_order); after: complete; before: presentation };  fn value(x: f32) -> f32 }
+style Plain for Value : Action { fn value(x: f32) -> f32 { return x } }
+style Extra for Value : Action { for self { at finish as target { Paint(geometry: self, target: target.target) } };  fn value(x: f32) -> f32 { return x * 2.0 } }
+@surface_properties(properties) interface Controls { param action: implementation<Action> = Plain }
+vertex_interface Corner { point: vec3 }
+vertex_format Triangle { required { point: vec3 } }
+struct Projected { @semantic(position) position: vec4 }
+vertex_factory plain for Triangle {
+ fn transform(v: Triangle) -> mat4 { return mat4(vec4(1.0,0.0,0.0,0.0),vec4(0.0,1.0,0.0,0.0),vec4(0.0,0.0,1.0,0.0),vec4(0.0,0.0,0.0,1.0)) }
+}
+@factory(plain) pass first for Value {
+ stage: raster
+ draw: per_object
+ cull: none
+ @vertex fn project(v: Corner) -> Projected { return Projected(vec4(v.point, 1.0)) }
+ @fragment fn paint(v: Projected) -> vec4 { return vec4(1.0, 0.0, 0.0, 1.0) }
+}
+@factory(plain) pass second for Value {
+ stage: raster
+ draw: per_object
+ cull: none
+ @vertex fn project(v: Corner) -> Projected { return Projected(vec4(v.point.xy * 0.5, v.point.z, 1.0)) }
+ @fragment fn paint(v: Projected) -> vec4 { return vec4(0.0, 1.0, 0.0, 1.0) }
+}
+@renderer("test", "Test") @default @image(result, rgba16float)
+pipeline(postprocess) main_plan {
+ @draw(project, paint, mesh) @color(0, result) first
+ @node(display) @after(first) @draw(project, paint, mesh) @color(0, result) @attachment(result, load, store) first
+}
+
+struct Target { target: attachment<rgba16float, preserve_update> }
+provide Action for main_plan { finish { complete: all(first); presentation: all(display); target: result; order: stable_draw_order } }
+@factory(plain) draw Paint(geometry: DrawRange, target: attachment<rgba16float, preserve_update>) {
+ raster geometry
+ visibility: uncullable
+ cull: none
+ attachments { target: load_store }
+ @vertex fn project(v: Corner) -> Projected { return Projected(vec4(v.point.xy * 0.5, v.point.z, 1.0)) }
+ @fragment fn paint(v: Projected) -> vec4 { return vec4(0.0, 1.0, 0.0, 1.0) }
+}

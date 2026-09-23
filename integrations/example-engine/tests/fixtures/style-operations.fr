@@ -1,0 +1,20 @@
+struct OperationVertex { @semantic(position) position: vec4 }
+@factory(preview_static) draw Paint(geometry: DrawRange, scene: PreviewScene, scale: f32, tint: color,
+    target: attachment<rgba16float, preserve_update>) {
+    raster geometry
+    cull: none
+    attachments { target: load_store }
+    @vertex fn project(v: PreviewShaded) -> OperationVertex {
+        return OperationVertex(scene.proj * scene.view * factory.transform(v) * vec4(v.position * scale, 1.0))
+    }
+    @fragment fn paint(v: OperationVertex) -> vec4 { return tint }
+}
+style Overlay for standard : StandardStyle {
+    param ink: color = #ff0000
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 { return vec3(0.0) }
+    for self { at after_opaque as target {
+        Paint(geometry: self, scene: frame, scale: 1.0, tint: ink, target: target.color)
+        Paint(geometry: self, scene: frame, scale: 0.25, tint: #00ff00, target: target.color)
+    } }
+}
+surface item(sp: surf) -> material(standard) { properties { style: Overlay }; compose { base(albedo: #fff) } }

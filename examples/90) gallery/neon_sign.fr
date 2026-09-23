@@ -1,0 +1,61 @@
+// Showcase example — full design language; compiles in the v0 playground.
+// A neon sign in rain, using only features currently lowered in v0.
+//
+// The sign itself is built from analytic capsules/circles (no text mesh),
+// then styled with layered glow passes. Rain is forward-authored via scatter
+// and lowered to bounded gather evaluation.
+
+canvas neon_sign(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let tube = 0.014
+
+    // --- "N" ---
+    let n_l = capsule(from: (0.18, 0.34), to: (0.18, 0.70), radius: tube)
+    let n_r = capsule(from: (0.30, 0.34), to: (0.30, 0.70), radius: tube)
+    let n_d = capsule(from: (0.18, 0.70), to: (0.30, 0.34), radius: tube)
+    let n = n_l | n_r | n_d
+
+    // --- "E" ---
+    let e_l = capsule(from: (0.38, 0.34), to: (0.38, 0.70), radius: tube)
+    let e_t = capsule(from: (0.38, 0.70), to: (0.52, 0.70), radius: tube)
+    let e_m = capsule(from: (0.38, 0.52), to: (0.50, 0.52), radius: tube)
+    let e_b = capsule(from: (0.38, 0.34), to: (0.52, 0.34), radius: tube)
+    let e = e_l | e_t | e_m | e_b
+
+    // --- "O" ring (matched cap-height) ---
+    let o_outer = box(at: (0.66, 0.52), size: (0.18, 0.38)) |> round(0.09)
+    let o_inner = box(at: (0.66, 0.52), size: (0.126, 0.326)) |> round(0.063)
+    let o = o_outer - o_inner
+
+    // --- "N" ---
+    let n2_l = capsule(from: (0.79, 0.34), to: (0.79, 0.70), radius: tube)
+    let n2_r = capsule(from: (0.91, 0.34), to: (0.91, 0.70), radius: tube)
+    let n2_d = capsule(from: (0.79, 0.70), to: (0.91, 0.34), radius: tube)
+    let n2 = n2_l | n2_r | n2_d
+
+    let letters = n | e | o | n2
+
+    let sputter_fast = wave(period: 0.11s, shape: square, range: 0.58 .. 1.0)
+    let sputter_mid = wave(period: 0.17s, shape: square, phase: 0.37, range: 0.72 .. 1.0)
+    let sputter_slow = wave(period: 0.29s, shape: saw, phase: 0.13, range: 0.84 .. 1.0)
+    let breathe = wave(period: 2.6s, shape: sine, phase: 0.19, range: 0.86 .. 1.02)
+    let flicker = sputter_fast * sputter_mid * sputter_slow * breathe
+
+    let wall = fill(gradient(
+        along: y,
+        stops: [
+            stop(at: 0.0, color: #10131b),
+            stop(at: 1.0, color: #223447),
+        ]
+    ))
+
+    compose {
+        wall
+
+        in space stage {
+            letters |> stroke(width: tube * 0.75) |> fill(#ffe2ef) |> blend(screen)
+            letters |> glow(reach: 5.5vmin, strength: 1.45 * flicker, color: #ff5ca8) |> blend(add)
+            letters |> glow(reach: 5.5vmin, strength: 0.52 * flicker, color: #ff2d78) |> blend(add)
+        }
+    }
+}

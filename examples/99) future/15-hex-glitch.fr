@@ -1,0 +1,32 @@
+// north-star: hex-glitch — per-cell corruption in a hex repeat space
+// (community ask: shadertoy.com/view/lfscD7, "Hex Glitch" by igneus)
+// status: aspirational
+// rung: 2 + 3 + 6 combined (stress test disguised as eye candy)
+// deltas:
+//   - `hex_repeat(size:, id: cell)` space with hexagonal cell context (ext §23.1)
+//   - CELL-RATE dynamic branching: the corruption decision is per-cell, not per-pixel
+//   - `through` sampling inside a repeat cell (composition of §23.1 x §23.6)
+// done when: one fused pass; --explain shows `hash(cell.id,...): hoisted to cell
+//   rate` and per-cell branch; hex seams invisible; scene reference shared (CSE'd)
+//   between plain and corrupted entries.
+
+canvas hex_glitch(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    let time = context(time)
+    let scene = my_scene(uv, time)
+    let g = pulse(every: 2.5s, width: 300ms)
+
+    compose {
+        scene
+        in space hex_repeat(size: 36px, id: cell) {
+            let roll = hash(cell.id, frame_bucket(time, 120ms))
+            if roll < 0.06 * g {
+                (scene through space translate(hash_signed(cell.id) * 30px, 0))
+                |> chromatic_split(spread: 2px)
+                mask: hexagon(at: cell.center, size: 36px)
+            }
+            hexagon(at: cell.center, size: 36px)
+            |> stroke(1px) |> fill(#5eead4) |> opacity(0.15 * g)
+        }
+    }
+}

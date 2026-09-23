@@ -1,0 +1,26 @@
+import "../config/renderer.fr"
+
+// Static material asset properties: names and visible choices belong to the engine.
+enum SurfaceProfile: u32 { Inherit, Lit, Unlit }
+enum SurfaceBlend: u32 { Opaque, Masked, Translucent }
+
+@surface_properties(properties)
+interface SurfaceOptions {
+    param @config(engine) @permutation deferred: bool = preview_deferred
+    // Basic tiled point lighting; mesh-only, without shadows or a depth prepass.
+    param @config(engine) @permutation forward_plus: bool = preview_forward_plus
+    param @config(editor) @profiles(inherit, standard, unlit) profile: SurfaceProfile = SurfaceProfile.Inherit
+    param @config(editor) @schema(standard) style: implementation<StandardStyle> = StandardGGX
+    param @config(editor) blend: SurfaceBlend = SurfaceBlend.Opaque
+    param @config(editor) two_sided: bool = false
+    param @config(editor) @range(0, 1) mask_cutoff: f32 = 0.5
+    param @config(editor) @usage(preview_static) used_with_static_mesh: bool = true
+    // Choosing this requires an executable skinning factory supplied by the integration.
+    param @config(editor) @usage(preview_skinned) used_with_skinning: bool = false
+}
+
+// Ordinary compile-time function used by GPU state declarations.
+fn choose_state<T>(first: T, second: T, condition: bool) -> T {
+    if condition { return second }
+    return first
+}

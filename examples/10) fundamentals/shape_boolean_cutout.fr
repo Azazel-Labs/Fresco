@@ -1,0 +1,22 @@
+// Basic example: shape boolean operations.
+// Shows union (`|`) and subtraction (`-`) with direct fills.
+
+canvas shape_boolean_cutout(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+
+    let frame_outer = box(at: (0.5, 0.5), size: (0.64, 0.42)) |> round(0.08)
+    let frame_inner = box(at: (0.5, 0.5), size: (0.52, 0.30)) |> round(0.06)
+    let frame = frame_outer - frame_inner
+
+    let orbit_x = wave(period: 4s, shape: sine, range: 0.28 .. 0.72)
+    let orb = circle(at: (orbit_x, 0.5), radius: 0.06)
+
+    compose {
+        fill(#0d1424)
+
+        in space stage {
+            frame |> fill(#60a5fa)
+            (orb & frame_outer) |> fill(#f472b6)
+        }
+    }
+}

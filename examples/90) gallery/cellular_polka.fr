@@ -1,0 +1,63 @@
+// Polka dots on three cell layouts, from left to right: square, hex, Voronoi.
+// Each cell gets a stable color, radius, and animation phase, like repeat_cell_polka.
+// The subtle background tiles reveal ownership, especially the irregular Voronoi edges.
+// Try layout: brick on the left, or layout: jittered on the right to compare
+// displaced sites with square ownership against true nearest-site ownership.
+
+canvas cellular_polka(ctx: CanvasContext) -> color {
+    let uv = context(coord)
+    space stage = centered(aspect: preserve)
+
+    compose {
+        fill(#101827)
+
+        if uv.x < 0.333 {
+            in space stage.cells(layout: square, every: 0.11,
+                                 seed: 37, sampling: grid4x4, cell: tile) {
+                let r = 0.018 + 0.02 * hash(tile)
+                let bob = wave(period: 2.4s, shape: sine,
+                    phase: hash(tile, salt: 1), range: -0.006 .. 0.006)
+
+                compose {
+                    fill(mix(#101827, #263c50, tile.rand))
+                    circle(at: tile.center + (0, bob), radius: r)
+                        |> fill(mix(#5eead4, #f59e0b, hash(tile, salt: 2)))
+                }
+            }
+        }
+
+        if (uv.x >= 0.333) && (uv.x < 0.667) {
+            in space stage.cells(layout: hex, every: 0.11,
+                                 seed: 37, sampling: grid4x4, cell: tile) {
+                let r = 0.018 + 0.02 * hash(tile)
+                let bob = wave(period: 2.4s, shape: sine,
+                    phase: hash(tile, salt: 1), range: -0.006 .. 0.006)
+
+                compose {
+                    fill(mix(#101827, #263c50, tile.rand))
+                    circle(at: tile.center + (0, bob), radius: r)
+                        |> fill(mix(#5eead4, #f59e0b, hash(tile, salt: 2)))
+                }
+            }
+        }
+
+        if uv.x >= 0.667 {
+            in space stage.cells(layout: voronoi, every: 0.11, jitter: 1.0,
+                                 seed: 37, sampling: grid4x4, cell: tile) {
+                let r = 0.018 + 0.02 * hash(tile)
+                let bob = wave(period: 2.4s, shape: sine,
+                    phase: hash(tile, salt: 1), range: -0.006 .. 0.006)
+
+                compose {
+                    fill(mix(#101827, #263c50, tile.rand))
+                    circle(at: tile.center + (0, bob), radius: r)
+                        |> fill(mix(#5eead4, #f59e0b, hash(tile, salt: 2)))
+                }
+            }
+        }
+
+        // Quiet dividers keep the layout comparison readable at any viewport size.
+        box(at: (0.333, 0.5), size: (2px, 1.0)) |> fill(#101827)
+        box(at: (0.667, 0.5), size: (2px, 1.0)) |> fill(#101827)
+    }
+}

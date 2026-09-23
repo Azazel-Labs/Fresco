@@ -1,0 +1,19 @@
+canvas dial(ctx: CanvasContext) -> color {
+    param progress: f32 = 0.72 in 0 .. 1
+    space stage = centered(aspect: preserve)
+    space dial_space = polar(center: center, from: -90deg, direction: clockwise)
+    let track = box(at: (0.5, 0.32), size: (1.0, 0.045))
+    let bar = box(at: (progress / 2, 0.32), size: (progress, 0.045))
+
+    compose {
+        fill(#0d1117)
+        in space stage {
+            in space dial_space {
+                compose {
+                    track |> fill(#ffffff20)
+                    bar |> fill(#4facfe)
+                }
+            }
+        }
+    }
+}

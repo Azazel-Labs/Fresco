@@ -1,0 +1,23 @@
+// The emitter authors behavior; the engine supplies storage, lifecycle and drawing.
+emitter drifting_sparks_system {
+    spawn_rate: 60.0
+    max_lifespan: 2.0
+    spawn {
+        particle_fountain(vec3(0.0, -0.65, 0.0), 0.35, 1.0, id)
+    }
+    update {
+        particle_gravity(vec3(0.0, -1.4, 0.0), dt)
+        particle_drag(0.2, dt)
+        particle_integrate(dt)
+        particle_fade_size(0.055)
+    }
+}
+
+// Appearance of each sprite; camera_billboard is selected by the engine pipeline.
+surface drifting_sparks(sp: surf) -> material(unlit) {
+    let radius = length(sp.uv - vec2(0.5))
+    let core = 1.0 - smoothstep(0.0, 0.65, radius)
+    compose {
+        base(albedo: rgba(1.0, 0.15 + 0.75 * core, 0.03 + 0.35 * core, 1.0))
+    }
+}

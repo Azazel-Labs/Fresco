@@ -1,0 +1,26 @@
+// Basic example: scatter instance phase offsets.
+// Demonstrates `phase: worm.index01` inside a scatter body.
+
+canvas scatter_index_phase(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let streaks = scatter 12 within region((0.08, 0.2) .. (0.92, 0.8)) seed 11 strategy compact
+    lifetime worm: 3.5s respawn every rand(3s .. 5s) {
+        let drift = wave(period: 6s, shape: saw, phase: worm.index01, range: -0.06 .. 0.06)
+        let tip = worm.pos + (drift, 0)
+        capsule(from: worm.pos, to: tip, radius: 0.008) |> fill(#ffffff)
+    }
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0a0f1d),
+                stop(at: 1.0, color: #151d2f),
+            ]
+        ))
+
+        in space stage {
+            streaks |> blend(add)
+        }
+    }
+}

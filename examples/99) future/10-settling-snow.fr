@@ -1,0 +1,33 @@
+// north-star: settling-snow — scatter COMPOSED WITH feedback
+// status: aspirational
+// rung: 4+ (composition test: §13 x §11-step-4, never combined)
+// deltas:
+//   - `remember`-qualified named layer (accumulation buffer with declared format)
+//   - scatter instances writing into a remembered layer on a condition (landing)
+// done when: flakes fall (lifecycle scatter), landed snow accumulates on the
+//   ground line and slowly melts; --explain shows scatter tables AND the
+//   remember ping-pong as separate, correctly ordered receipt entries.
+
+canvas settling_snow(ctx: CanvasContext) -> color {
+    remember drifts: layer(format: r16f)          // accumulated ground snow
+
+    let flakes = scatter 300 within region((0, 0.55) .. (1, 1.1)) seed 12
+    strategy compact lifetime flake: 6s respawn every rand(4s .. 8s) {
+        let sway = wave(period: 2.8s, shape: sine, phase: flake.index01,
+            range: -0.01 .. 0.01)
+        let p = flake.pos + (sway, -0.9 * flake.age_norm)
+        circle(at: p, radius: 0.003 + 0.002 * hash(flake.index01)) |> fill(#f0f6ffcc)
+    }
+
+    let ground = 0.12 + 0.02 * fbm(coord.x * 6)   // snow line height field
+
+    compose {
+        fill(gradient(along: y, stops: [
+                stop(at: 0.0, color: #1b2333), stop(at: 1.0, color: #0a0e17)]))
+        // accumulate: landed flakes deposit into the remembered layer
+        drifts <- drifts |> fade(amount: 0.0006)               // slow melt
+        + deposit(flakes, where: coord.y < ground)    // landing test
+        layer snow_shade(drifts)
+        flakes |> blend(screen)
+    }
+}

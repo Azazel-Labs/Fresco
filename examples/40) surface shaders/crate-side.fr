@@ -1,0 +1,79 @@
+// crate-side surface sample: layered material with explicit texture sampling and a normal map.
+
+// The texture_types are the kinda thing you'd define at the engine level, and have a corresponding
+// shader chunk ud put in your library that provided shapes for interfacing wiht whatever those texures.
+// Then you've got a throughline where your engine can document the actual data textures or special orm
+// textures as what they really are rather than pretending it's all color.
+
+texture_type AlbedoRGB -> color {
+    r: red
+    g: green
+    b: blue
+
+    return rgb(r, g, b)
+}
+
+texture_type RoughnessR {
+    r: roughness
+}
+
+texture_type NormalGL -> vec3 in tangent {
+    r: nx = raw * 2.0 - 1.0
+    g: ny = raw * 2.0 - 1.0
+    b: nz = raw * 2.0 - 1.0
+
+    return normalize(vec3(nx, ny, nz))
+}
+
+surface crate_side(sp: surf) -> material {
+    param wear: f32 = 0.5 in 0 .. 1
+    param hazard_hue: color = #f5b400
+    param wood_albedo: texture<AlbedoRGB> = "assets/textures/wood_floor/albedo.jpg"
+    param wood_roughness: texture<RoughnessR> = "assets/textures/wood_floor/roughness.jpg"
+    param wood_normal: texture<NormalGL> = "assets/textures/wood_floor/normal_tangent_y_plus.jpg"
+
+    let scratch_scale = 14
+    let grime_scale = 4.0
+    let stripe_scale = 13
+    let wear_fade = 0.85
+    let grime_offset = (0.13, 0.37, 0.61)
+    let grime_color = #3a2d23
+
+    let scratches = mask(0.55, 1.0, worley2(sp.uv * scratch_scale))
+    let edge_wear = mask(0.3, 0.9, curvature(sp.normal))
+    let grime_position = (sp.position.x, sp.position.y, sp.position.z)
+    let grime_noise = (noise3(grime_position * grime_scale + grime_offset) + 1.0) * 0.5
+    let grime = mask(0.22, 0.78, grime_noise) * grounded(height: sp.position.y, falloff: 0.9)
+    let wear_amount = mask(0.0, 1.0, wear)
+
+    let band_mask = band(0.08, 0.26, feather: 0.09, x: sp.uv.y)
+    let stripe_grid = checker(scale: stripe_scale, at: sp.uv)
+    let stripes = stripe_grid * band_mask
+
+    let albedo_sample = wood_albedo.at(sp.uv)
+    let roughness_sample = wood_roughness.at(sp.uv)
+    let normal_sample = wood_normal.at(sp.uv)
+
+    let wood_roughness_value = 0.06 + 0.22 * roughness_sample.roughness
+    let surviving_paint = 1 - wear_amount * wear_fade
+    let edge_damage = scratches * edge_wear
+    let paint_mask = erode(stripes * surviving_paint, by: edge_damage, strength: 0.25 + 0.75 * wear_amount)
+    let grime_mask = coverage(grime, gain: 0.55, bias: 0.03, extra: 0.35 * wear_amount)
+
+    compose {
+        base(
+            albedo: albedo_sample,
+            roughness: wood_roughness_value,
+            normal_map: normal_sample)
+        // Decal-like hazard paint over the wood base.
+        layer material(
+            albedo: hazard_hue,
+            roughness: 0.35,
+            weight: paint_mask)
+        // Faint grime sitting on top of the wood.
+        layer material(
+            albedo: grime_color,
+            roughness: 0.95,
+            weight: grime_mask)
+    }
+}

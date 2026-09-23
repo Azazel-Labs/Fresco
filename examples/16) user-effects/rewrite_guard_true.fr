@@ -1,0 +1,18 @@
+// §16.1 User-Defined Effects — Guarded rewrite that fires
+//
+// Demonstrates:
+//   - `when` guard on a user-defined compose rewrite
+//   - explain receipt note when guard resolves true at compile time
+
+effect grain(amount: f32) point {
+    fill(rgba(r: amount, g: amount, b: amount, a: 1.0))
+
+    rewrite grain(a) compose grain(b) => grain(a) when a > b
+}
+
+canvas rewrite_guard_true_demo(ctx: CanvasContext) -> color {
+    compose {
+        fill(#101218)
+        fill(#000000) |> grain(0.2) |> grain(0.8)
+    }
+}

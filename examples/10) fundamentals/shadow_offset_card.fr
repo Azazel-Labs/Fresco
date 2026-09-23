@@ -1,0 +1,21 @@
+// Basic example: analytic shadow with offset and soften.
+
+canvas shadow_offset_card(ctx: CanvasContext) -> color {
+    space stage = centered(aspect: preserve)
+    let card = box(at: (0.5, 0.5), size: (0.56, 0.32)) |> round(0.06)
+
+    compose {
+        fill(gradient(
+            along: y,
+            stops: [
+                stop(at: 0.0, color: #0b1422),
+                stop(at: 1.0, color: #1a2840),
+            ]
+        ))
+
+        in space stage {
+            card |> shadow(offset: (0.03, 0.04), soften: 0.06, color: #00000088)
+            card |> fill(#f8fbff)
+        }
+    }
+}

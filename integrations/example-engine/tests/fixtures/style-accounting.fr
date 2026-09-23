@@ -1,0 +1,28 @@
+// Deliberately independent of light weighting: the engine must not reweight direct.
+fn accounting_direct() -> vec3 { return vec3(0.125, 0.0, 0.0) }
+fn accounting_indirect(surface: StandardSurface, light: IndirectLight) -> vec3 {
+    return vec3(0.0, light.irradiance.y * surface.occlusion, 0.0)
+}
+style Accounting for standard : StandardStyle {
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        return accounting_direct()
+    }
+    fn indirect(surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 {
+        return accounting_indirect(surface, light)
+    }
+}
+style FinishAccounting for standard : StandardStyle {
+    fn direct(surface: StandardSurface, context: ShadingContext, light: DirectLight) -> vec3 {
+        return accounting_direct()
+    }
+    fn indirect(surface: StandardSurface, context: ShadingContext, light: IndirectLight) -> vec3 {
+        return accounting_indirect(surface, light)
+    }
+    fn finish(surface: StandardSurface, context: ShadingContext, lighting: LightingResult) -> vec3 {
+        return (lighting.direct + lighting.indirect + surface.emissive) * 0.5
+    }
+}
+surface accounting_probe(sp: surf) -> material(standard) {
+    properties { style: Accounting }
+    compose { base(albedo: rgba(0.8, 0.6, 0.4, 1.0), occlusion: 0.5, emissive: vec3(0.0, 0.0, 0.125)) }
+}
