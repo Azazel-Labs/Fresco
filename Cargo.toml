@@ -4,7 +4,7 @@ default-members = ["crates/fresco-cli"]
 resolver = "3"
 
 [workspace.package]
-repository = "https://github.com/nickdarnell/fresco"
+repository = "https://github.com/azazel-labs/fresco"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.98.1"
