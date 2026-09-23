@@ -12,9 +12,7 @@
 > output formats, and runtime APIs are also in flux. Expect breaking changes as the
 > design evolves; completed implementation milestones are not stability guarantees.
 
-![Abstract shapes flowing into sculpted materials, glowing particles, and translucent smoke](docs/readme/fresco-hero.png)
-
-*Concept artwork illustrating Fresco's ambition; rendered examples appear below.*
+![Geometry, surface color, and light composing through layered planes into a final pixel image](docs/readme/fresco-hero.png)
 
 **Write procedural pictures, materials, and particle systems. Compile them into GPU shaders.**
 
