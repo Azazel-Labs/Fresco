@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml)
 [![Rust coverage](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
-[![Previews](https://github.com/Azazel-Labs/Fresco/actions/workflows/readme-previews.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/readme-previews.yml)
 [![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://azazel-labs.github.io/Fresco/)
 
 > [!CAUTION]
@@ -1231,7 +1230,8 @@ The command compiles the samples, including an engine-bundle harness, and fixes
 stale README blocks automatically. Both `cargo xtask ci` and `cargo xtask ci-strict`
 run this update too. Missing sources, malformed markers, unmanaged Fresco blocks,
 and compilation errors still fail. An optional `--check` mode provides a read-only
-drift check when explicitly requested. CI updates its checkout; it does not commit
+drift check when explicitly requested. The native CI job runs this read-only check
+before `ci-strict`, so stale README snippets fail CI. CI updates its checkout; it does not commit
 changes back to the repository. This checks compilation, not rendered appearance;
 hardware GPU tests cover execution separately.
 
@@ -1266,6 +1266,13 @@ compiler and example renderer WASM bundles, builds the playground, and runs web
 checks and tests. Successful pushes to `main` then deploy that tested playground
 artifact to GitHub Pages. Pull requests run the same checks without deploying;
 manually running CI on `main` runs the full pipeline, including deployment.
+Native CI uses all available CPUs for test workers. Native, web, and coverage
+builds cap compiler jobs at the available CPU count and available RAM, reserving
+2 GiB and budgeting 3 GiB per build job (with a minimum of two jobs). These are
+conservative starting budgets, not measured peak-memory guarantees. The resource
+script targets GitHub-hosted Ubuntu VMs and reads their available RAM.
+Local `xtask` commands default to half the available CPUs; set
+`RUST_TEST_THREADS` to override test concurrency.
 The [Rust coverage workflow](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
 runs workspace tests with LLVM instrumentation and uploads HTML and LCOV reports.
 Its badge reports workflow status, not a coverage percentage; coverage scope is

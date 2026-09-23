@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      CARGO_BUILD_JOBS: 2
       # Keep instrumented test binaries small enough for hosted runner disks.
       # Coverage mapping is emitted by instrument-coverage without debug info.
       CARGO_PROFILE_DEV_DEBUG: "0"
@@ -22,6 +21,8 @@ jobs:
       CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@v5
+      - name: Configure coverage build concurrency
+        run: python3 scripts/ci-resources.py
       - uses: dtolnay/rust-toolchain@1.98.1
         with:
           components: llvm-tools-preview

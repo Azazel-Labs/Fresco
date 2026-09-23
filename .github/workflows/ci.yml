@@ -13,7 +13,6 @@ jobs:
   ci:
     runs-on: ubuntu-24.04
     env:
-      CARGO_BUILD_JOBS: 2
       # Keep the many native test binaries small on hosted runners.
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
@@ -45,6 +44,15 @@ jobs:
           free -h
           du -sh target 2>/dev/null || true
 
+      - name: Configure native build and test concurrency
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_ci_resources.py'
+          python3 scripts/ci-resources.py --test-threads
+
+      # Check before ci-strict synchronizes README snippets in the checkout.
+      - name: Check README snippets and compile sample programs
+        run: cargo run --locked -p xtask -- readme-sync --check
+
       - name: Run workspace CI task
         run: cargo run --locked -p xtask -- ci-strict
 
@@ -64,6 +72,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Configure web build concurrency
+        run: python3 scripts/ci-resources.py
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.98.1
