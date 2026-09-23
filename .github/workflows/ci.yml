@@ -17,6 +17,7 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_INCREMENTAL: "0"
+      CARGO_LLVM_COV_TARGET_DIR: ${{ github.workspace }}/target
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
     steps:
@@ -26,7 +27,10 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.98.1
         with:
-          components: rustfmt, clippy
+          components: rustfmt, clippy, llvm-tools-preview
+
+      - name: Install coverage tooling
+        uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Cache Rust compiler outputs
         uses: mozilla-actions/sccache-action@v0.0.11
@@ -34,7 +38,7 @@ jobs:
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: rust-native-no-debug
+          shared-key: rust-native-coverage-no-debug
           cache-workspace-crates: true
           cache-on-failure: true
 
@@ -49,12 +53,30 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_ci_resources.py'
           python3 scripts/ci-resources.py --test-threads
 
-      # Check before ci-strict synchronizes README snippets in the checkout.
-      - name: Check README snippets and compile sample programs
-        run: cargo run --locked -p xtask -- readme-sync --check
+      - name: Check README and run workspace CI with coverage
+        shell: bash
+        run: |
+          # Instrument the existing gate; its workspace tests run only once.
+          # Keep normal cfg behavior so coverage cannot disable tests or code.
+          coverage_env="$(cargo llvm-cov show-env --sh --no-cfg-coverage)"
+          eval "$coverage_env"
+          cargo llvm-cov clean --workspace
 
-      - name: Run workspace CI task
-        run: cargo run --locked -p xtask -- ci-strict
+          # Check before ci-strict synchronizes README snippets in the checkout.
+          cargo run --locked -p xtask -- readme-sync --check
+          cargo run --locked -p xtask -- ci-strict
+
+          # Report commands reuse the collected profiles without rerunning tests.
+          mkdir -p target/coverage
+          cargo llvm-cov report --lcov --output-path target/coverage/lcov.info
+          cargo llvm-cov report --html --output-dir target/coverage
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: rust-coverage
+          path: target/coverage/
+          if-no-files-found: error
 
       - name: Report runner resources after native CI
         if: always()

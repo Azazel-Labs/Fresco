@@ -1,7 +1,6 @@
 # Fresco
 
 [![CI](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml)
-[![Rust coverage](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
 [![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://azazel-labs.github.io/Fresco/)
 
 > [!CAUTION]
@@ -1264,17 +1263,19 @@ compiler and example renderer WASM bundles, builds the playground, and runs web
 checks and tests. Successful pushes to `main` then deploy that tested playground
 artifact to GitHub Pages. Pull requests run the same checks without deploying;
 manually running CI on `main` runs the full pipeline, including deployment.
-Native CI uses all available CPUs for test workers. Native, web, and coverage
+Native CI uses all available CPUs for test workers. Native and web
 builds cap compiler jobs at the available CPU count and available RAM, reserving
 2 GiB and budgeting 3 GiB per build job (with a minimum of two jobs). These are
 conservative starting budgets, not measured peak-memory guarantees. The resource
 script targets GitHub-hosted Ubuntu VMs and reads their available RAM.
 Local `xtask` commands default to half the available CPUs; set
 `RUST_TEST_THREADS` to override test concurrency.
-The [Rust coverage workflow](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
-runs workspace tests with LLVM instrumentation and uploads HTML and LCOV reports.
-Its badge reports workflow status, not a coverage percentage; coverage scope is
-native Rust tests, separate from browser and hardware GPU execution checks.
+The native CI job runs `ci-strict` with LLVM instrumentation, collecting coverage
+from its existing workspace test run. It uploads HTML and LCOV reports as the
+`rust-coverage` artifact on the CI run; no separate coverage test run is needed.
+The CI badge reports workflow status, not a coverage percentage. Coverage covers
+native Rust execution, separate from browser and hardware GPU execution checks;
+doctests still run, but their coverage is not collected on the stable toolchain.
 Hardware execution checks have their own [setup guide](crates/fresco-wasm/web/tests/gpu/README.md).
 Read [AGENTS.md](AGENTS.md) and the [maintainer guardrails](docs/maintainer-guardrails.md)
 for ownership and regression-test expectations.
