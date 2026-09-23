@@ -1,10 +1,9 @@
 # Fresco
 
-[![CI](https://github.com/nickdarnell/fresco/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nickdarnell/fresco/actions/workflows/ci.yml)
-[![Rust coverage](https://github.com/nickdarnell/fresco/actions/workflows/coverage.yml/badge.svg?branch=main)](https://github.com/nickdarnell/fresco/actions/workflows/coverage.yml)
-[![Previews](https://github.com/nickdarnell/fresco/actions/workflows/readme-previews.yml/badge.svg?branch=main)](https://github.com/nickdarnell/fresco/actions/workflows/readme-previews.yml)
-[![GitHub stars](https://img.shields.io/github/stars/nickdarnell/fresco?style=flat&logo=github)](https://github.com/nickdarnell/fresco/stargazers)
-[![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://nickdarnell.github.io/fresco/)
+[![CI](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/ci.yml)
+[![Rust coverage](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
+[![Previews](https://github.com/Azazel-Labs/Fresco/actions/workflows/readme-previews.yml/badge.svg?branch=main)](https://github.com/Azazel-Labs/Fresco/actions/workflows/readme-previews.yml)
+[![Playground](https://img.shields.io/badge/playground-try_Fresco-ff2d78)](https://azazel-labs.github.io/Fresco/)
 
 > [!CAUTION]
 > **Work in progress: the language is not stable.**
@@ -133,7 +132,7 @@ between content and engine instead of an exercise in uncovering hidden assumptio
 The bundled engine demonstrates that approach today; other engines need adapters
 that fulfill their chosen contracts.
 
-[Try the playground](https://nickdarnell.github.io/fresco/) ·
+[Try the playground](https://azazel-labs.github.io/Fresco/) ·
 [Language tour](#language-tour) · [How compilation works](#how-compilation-works) ·
 [Run locally](#run-locally) · [Documentation](docs/README.md)
 
@@ -1261,7 +1260,7 @@ cargo xtask repo-guard  # LF and module-file hygiene
 ```
 
 Browser unit tests run with `npm run test:unit` in `crates/fresco-wasm/web`.
-The [Rust coverage workflow](https://github.com/nickdarnell/fresco/actions/workflows/coverage.yml)
+The [Rust coverage workflow](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
 runs workspace tests with LLVM instrumentation and uploads HTML and LCOV reports.
 Its badge reports workflow status, not a coverage percentage; coverage scope is
 native Rust tests, separate from browser and hardware GPU execution checks.

@@ -73,6 +73,8 @@ jobs:
       - name: Build web bundle
         if: github.event_name == 'workflow_dispatch'
         working-directory: crates/fresco-wasm/web
+        env:
+          FRESCO_BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 
       - name: Download site from the successful CI run

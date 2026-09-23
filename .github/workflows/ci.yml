@@ -112,6 +112,8 @@ jobs:
 
       - name: Build deployable web bundle using the existing WASM
         working-directory: crates/fresco-wasm/web
+        env:
+          FRESCO_BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build:site
 
       - name: Run web typecheck

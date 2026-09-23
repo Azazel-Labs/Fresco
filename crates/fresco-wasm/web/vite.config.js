@@ -17,7 +17,7 @@ export default defineConfig({
     },
   }],
   // GitHub Pages project sites are served under /<repo>/.
-  base: process.env.GITHUB_ACTIONS ? "/fresco/" : "/",
+  base: process.env.FRESCO_BASE_PATH ?? "/",
   build: {
     // Monaco is intentionally split into its own chunk and remains large.
     // Vite's warning threshold is global, so set it above the expected Monaco size.

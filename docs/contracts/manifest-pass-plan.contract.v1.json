@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://nickdarnell.github.io/fresco/contracts/manifest-pass-plan.contract.v1.json",
+  "$id": "https://azazel-labs.github.io/Fresco/contracts/manifest-pass-plan.contract.v1.json",
   "title": "Fresco manifest pass-plan contract",
   "type": "object",
   "required": [
