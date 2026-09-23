@@ -1260,6 +1260,12 @@ cargo xtask repo-guard  # LF and module-file hygiene
 ```
 
 Browser unit tests run with `npm run test:unit` in `crates/fresco-wasm/web`.
+The CI workflow first checks and tests the native Rust workspace, including the
+example engine. After native CI and dependency policy checks pass, it builds the
+compiler and example renderer WASM bundles, builds the playground, and runs web
+checks and tests. Successful pushes to `main` then deploy that tested playground
+artifact to GitHub Pages. Pull requests run the same checks without deploying;
+manually running CI on `main` runs the full pipeline, including deployment.
 The [Rust coverage workflow](https://github.com/Azazel-Labs/Fresco/actions/workflows/coverage.yml)
 runs workspace tests with LLVM instrumentation and uploads HTML and LCOV reports.
 Its badge reports workflow status, not a coverage percentage; coverage scope is

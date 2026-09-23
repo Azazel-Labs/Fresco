@@ -4,13 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CARGO_BUILD_JOBS: 2
       # Keep the many native test binaries small on hosted runners.
@@ -55,7 +56,8 @@ jobs:
           du -sh target 2>/dev/null || true
 
   web-playground:
-    runs-on: ubuntu-latest
+    needs: [ci, dependency-policy]
+    runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: sccache
@@ -128,16 +130,35 @@ jobs:
         run: node --test integrations/example-engine-host/scripts/path-pixels.test.mjs
 
       - name: Upload tested site for Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v7
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
         with:
-          name: fresco-pages-${{ github.sha }}
           path: crates/fresco-wasm/web/dist
-          if-no-files-found: error
-          retention-days: 7
+
+  deploy-pages:
+    needs: web-playground
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Deploy tested playground to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
 
   dependency-policy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -160,7 +181,7 @@ jobs:
           command: check
 
   unused-dependencies:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     steps:
       - name: Checkout
