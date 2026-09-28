@@ -15,7 +15,7 @@ inventory = "0.3"
 logos = "0.16.1"
 chumsky = "0.13.0"
 ariadne = "0.6.0"
-naga = { version = "30.0.0", features = ["wgsl-in", "wgsl-out"] }
+naga = { workspace = true, features = ["wgsl-in", "wgsl-out"] }
 web-time = "1.1.0"
 smol_str = "0.3.6"
 serde = { version = "1.0", features = ["derive"] }

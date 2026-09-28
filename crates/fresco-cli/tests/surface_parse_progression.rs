@@ -2925,7 +2925,7 @@ surface probe(sp: surf) -> material(signal_data) { compose { base() } }
     );
     assert!(!success, "{result}");
     assert!(
-        result.contains("does not match the declared return type"),
+        result.contains("expected `vec4<f32>`, found `vec2<f32>`"),
         "{result}"
     );
 }

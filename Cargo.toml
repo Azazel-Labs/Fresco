@@ -14,6 +14,16 @@ fresco-example-engine = { version = "=0.2.0", path = "integrations/example-engin
 fresco-artifact = { version = "=0.2.0", path = "crates/fresco-artifact" }
 fresco = { version = "=0.2.0", path = "crates/fresco" }
 fresco-macros = { version = "=0.2.0", path = "crates/fresco-macros" }
+naga = { version = "30.0.0", git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers", default-features = false }
+wgpu = { version = "30.0.0", git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers", default-features = false }
+wgpu-naga-bridge = { version = "30.0.0", git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers" }
+
+# Keep Fresco and wgpu on the same Naga types while using our native-pointer fork.
+[patch.crates-io]
+naga = { git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers" }
+naga-types = { git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers" }
+wgpu = { git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers" }
+wgpu-naga-bridge = { git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers" }
 
 [workspace.lints.rust]
 future_incompatible = { level = "warn", priority = -1 }

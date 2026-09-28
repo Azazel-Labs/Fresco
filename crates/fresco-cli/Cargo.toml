@@ -21,7 +21,7 @@ fresco.workspace = true
 fresco-artifact.workspace = true
 fresco-example-engine.workspace = true
 libtest-mimic = "0.8.2"
-naga = { version = "30.0.0", features = ["wgsl-in"] }
+naga = { workspace = true, features = ["wgsl-in", "spv-out"] }
 serde_json = "1.0"
 
 [[test]]
@@ -32,6 +32,11 @@ harness = false
 [[test]]
 name = "examples_wgsl_valid"
 path = "tests/examples_wgsl_valid.rs"
+harness = false
+
+[[test]]
+name = "examples_spirv_valid"
+path = "tests/examples_spirv_valid.rs"
 harness = false
 
 [lints]

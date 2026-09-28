@@ -1262,6 +1262,22 @@ details and host obligations.
 
 ## Run locally
 
+This workspace uses `naga`, `naga-types`, `wgpu`, and `wgpu-naga-bridge` from the
+[`naga/physical-storage-pointers` branch of our wgpu fork](https://github.com/nickdarnell/wgpu/tree/naga/physical-storage-pointers).
+The root `Cargo.toml` selects the Git source for direct workspace dependencies
+and patches transitive dependencies so Fresco and wgpu share compatible
+types and backends. Trunk Naga is not API-compatible with the crates.io wgpu release.
+`Cargo.lock` records the selected commit. After pushing changes to that branch,
+run `cargo update -p naga -p naga-types -p wgpu -p wgpu-naga-bridge`, validate the workspace, and commit the
+updated lockfile. Normal builds keep using the locked commit.
+
+Direct Git dependencies also apply when consuming Fresco from another workspace.
+Cargo patches only apply at the consuming workspace root: applications that also
+use registry wgpu/Naga dependencies must copy these patches into their root
+manifest to unify them with the fork. Crates.io publishing uses the declared
+registry versions instead of Git, so fork-specific features need a registry
+release before that distribution path can support them.
+
 ### Compile a program
 
 Use Rust through rustup; [rust-toolchain.toml](rust-toolchain.toml) pins the

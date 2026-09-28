@@ -68,7 +68,7 @@ fn particle_settings_and_initialization_fail_closed() {
         (
             "delta_time: f32",
             "delta_time: vec2",
-            "invalid function call",
+            "expected `f32`, found `vec2<f32>`",
         ),
         (
             "@dispatch(simulate, capacity)",

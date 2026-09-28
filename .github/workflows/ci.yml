@@ -32,6 +32,9 @@ jobs:
       - name: Install coverage tooling
         uses: taiki-e/install-action@cargo-llvm-cov
 
+      - name: Install SPIR-V validator
+        run: sudo apt-get update && sudo apt-get install -y spirv-tools
+
       - name: Cache Rust compiler outputs
         uses: mozilla-actions/sccache-action@v0.0.11
 

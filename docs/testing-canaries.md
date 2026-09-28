@@ -10,8 +10,29 @@ Existing focused non-snapshot tests remain useful and are not removed.
 `cargo xtask test`, `cargo xtask ci`, and `cargo xtask ci-strict` default to
 half the available logical CPUs (rounded up, minimum one) for build jobs and test workers.
 Set `CARGO_BUILD_JOBS` and `RUST_TEST_THREADS` to override them independently.
-The example compilation and WGSL validation suites run one test per example,
+The example compilation, WGSL validation, and SPIR-V validation suites run one test per example,
 so examples can run concurrently and failures remain individually named.
+
+Compile every supported example through Naga's SPIR-V backend and validate every
+generated entry point with SPIRV-Tools (SPIR-V 1.3, Vulkan 1.1):
+
+```sh
+cargo test -p fresco-cli --test examples_spirv_valid
+```
+
+Install `spirv-val` from SPIRV-Tools or the Vulkan SDK and put it on `PATH`, or set
+`SPIRV_VAL` to its executable path. CI installs the Ubuntu `spirv-tools` package.
+A missing validator fails the tests; validation never silently skips. No GPU or
+Vulkan driver is needed. Failed binaries remain in the reported temporary
+directory for inspection. Existing `example-test-policy.txt` files govern the
+suite, so intentionally unsupported future examples remain compile-failure tests
+in `examples_compile_all` rather than SPIR-V candidates.
+
+This is a backend portability regression gate. Currently it parses the complete
+assembled WGSL into Naga IR before SPIR-V emission, because some engine stages
+are still built as WGSL text. It does not prove direct IR lowering or rendered
+equivalence. When the compiler exposes complete IR, switch this test to that API
+and retain the per-entry-point SPIR-V validation.
 
 Native canaries (also run by workspace tests and CI):
 
