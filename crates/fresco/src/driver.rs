@@ -412,7 +412,7 @@ fn render_compiled_source(
             &compiled.stats,
             Some(explain::EmitForStats {
                 text: &emitted,
-                format_label: emit_target.as_str(),
+                target: emit_target,
             }),
         )
     });
@@ -504,7 +504,7 @@ fn render_compiled_bundle(
             &compiled.stats,
             Some(explain::EmitForStats {
                 text: &wgsl,
-                format_label: "wgsl",
+                target: EmitTarget::Wgsl,
             }),
         )
     });
@@ -3077,7 +3077,7 @@ pub fn run(options: Options) -> ExitCode {
             &compiled.stats,
             Some(explain::EmitForStats {
                 text: &out,
-                format_label: options.emit.as_str(),
+                target: options.emit,
             }),
         );
     }
