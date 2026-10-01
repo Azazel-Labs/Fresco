@@ -13,7 +13,7 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 format!("duplicate axis `{}`", axis.name),
             ));
         }
-        if !matches!(axis.known_mode.as_str(), "compile" | "pipeline" | "draw") {
+        if !KNOWN_BINDING_MODES.contains(&axis.known_mode.as_str()) {
             diags.push(Diag::error(
                 axis.known_mode_span.clone(),
                 "axis binding time must be compile, pipeline, or draw",

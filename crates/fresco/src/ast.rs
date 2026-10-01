@@ -1500,6 +1500,14 @@ impl PassRequirementClause {
             Self::Implication { constraint, .. } | Self::Plain { constraint } => constraint,
         }
     }
+
+    /// Whether the constraint is a `disable(...)` clause with at least one axis argument.
+    pub fn is_disable(&self) -> bool {
+        matches!(
+            &self.constraint_expr().node,
+            Expr::Call { name, args, .. } if name == "disable" && !args.is_empty()
+        )
+    }
 }
 
 /// A staged `require { ... }` pass invariant clause.

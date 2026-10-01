@@ -517,13 +517,13 @@ fn expand_pass_variants(pass_decl: &PassDecl) -> Vec<HashMap<String, String>> {
     out
 }
 
+/// Binding-time modes accepted by `@known(...)` and axis declarations.
+const KNOWN_BINDING_MODES: [&str; 3] = ["compile", "pipeline", "draw"];
+
 pub(crate) fn active_pass_variants(pass_decl: &PassDecl) -> Vec<HashMap<String, String>> {
     let mut variants = expand_pass_variants(pass_decl);
     for requirement in &pass_decl.requirements {
-        let is_disable_clause = matches!(
-            &requirement.clause.constraint_expr().node,
-            Expr::Call { name, args, .. } if name == "disable" && !args.is_empty()
-        );
+        let is_disable_clause = requirement.clause.is_disable();
         variants.retain(|variant| {
             let guard_matches = requirement
                 .clause
@@ -558,12 +558,11 @@ fn validate_pass_requirements(pass_decl: &PassDecl, diags: &mut Vec<Diag>) {
     let active_variants = active_pass_variants(pass_decl);
 
     if active_variants.is_empty() {
-        let prune_kind = if pass_decl.requirements.iter().any(|requirement| {
-            matches!(
-                &requirement.clause.constraint_expr().node,
-                Expr::Call { name, args, .. } if name == "disable" && !args.is_empty()
-            )
-        }) {
+        let prune_kind = if pass_decl
+            .requirements
+            .iter()
+            .any(|requirement| requirement.clause.is_disable())
+        {
             "`disable(...)` clause"
         } else {
             "`require` clause"
@@ -1164,7 +1163,10 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
                     )
                     .with_help("spell the mode explicitly as `@known(compile)`, `@known(pipeline)`, or `@known(draw)`"),
                 );
-            } else if !matches!(known_mode.as_deref(), Some("compile" | "pipeline" | "draw")) {
+            } else if !known_mode
+                .as_deref()
+                .is_some_and(|mode| KNOWN_BINDING_MODES.contains(&mode))
+            {
                 diags.push(
                     pass_error(
                         pass_decl,
