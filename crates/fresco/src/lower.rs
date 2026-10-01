@@ -250,10 +250,8 @@ struct IrBuilder {
     /// These are computed from the canvas_space chain and represent the derivative
     /// of the sample mapping. The parallelogram spanned by the columns `[j11, j21]`
     /// and `[j12, j22]` is the footprint — the region of local space one output pixel covers.
-    jacobian_j11: Option<Handle<Ex>>,
-    jacobian_j12: Option<Handle<Ex>>,
-    jacobian_j21: Option<Handle<Ex>>,
-    jacobian_j22: Option<Handle<Ex>>,
+    /// Stored row-major as `[j11, j12, j21, j22]`.
+    jacobian: Option<[Handle<Ex>; 4]>,
     param_scalars: HashMap<String, Handle<Ex>>,
     param_scalar_ptrs: HashSet<Handle<Ex>>,
     tex_globals: HashMap<String, Handle<naga::GlobalVariable>>,

@@ -1424,12 +1424,7 @@ impl<'h> FnCtx<'h> {
                     self.discontinuity_space_depth += 1;
                 }
 
-                let prev_j = (
-                    self.ir.jacobian_j11,
-                    self.ir.jacobian_j12,
-                    self.ir.jacobian_j21,
-                    self.ir.jacobian_j22,
-                );
+                let prev_j = self.ir.jacobian;
 
                 // Compose local-space Jacobian into the active footprint so AA/filtering
                 // inside this block tracks explicit `in space` transforms.
@@ -1438,42 +1433,28 @@ impl<'h> FnCtx<'h> {
                 let l12 = self.sx_at(&l12_sx, p);
                 let l21 = self.sx_at(&l21_sx, p);
                 let l22 = self.sx_at(&l22_sx, p);
+                let local = [l11, l12, l21, l22];
 
-                let (n11, n12, n21, n22) =
-                    if let (Some(p11), Some(p12), Some(p21), Some(p22)) = prev_j {
-                        let n11_l = self.ir.mul(l11, p11);
-                        let n11_r = self.ir.mul(l12, p21);
-                        let n11 = self.ir.addx(n11_l, n11_r);
-
-                        let n12_l = self.ir.mul(l11, p12);
-                        let n12_r = self.ir.mul(l12, p22);
-                        let n12 = self.ir.addx(n12_l, n12_r);
-
-                        let n21_l = self.ir.mul(l21, p11);
-                        let n21_r = self.ir.mul(l22, p21);
-                        let n21 = self.ir.addx(n21_l, n21_r);
-
-                        let n22_l = self.ir.mul(l21, p12);
-                        let n22_r = self.ir.mul(l22, p22);
-                        let n22 = self.ir.addx(n22_l, n22_r);
-
-                        (n11, n12, n21, n22)
-                    } else {
-                        (l11, l12, l21, l22)
-                    };
-
-                self.ir.jacobian_j11 = Some(n11);
-                self.ir.jacobian_j12 = Some(n12);
-                self.ir.jacobian_j21 = Some(n21);
-                self.ir.jacobian_j22 = Some(n22);
+                // Row-major 2x2 product `local * prev`.
+                self.ir.jacobian = Some(match prev_j {
+                    Some(prev) => {
+                        let mut composed = local;
+                        // (row start in `local`, column in `prev`) for each output.
+                        let cells = [(0, 0), (0, 1), (2, 0), (2, 1)];
+                        for (slot, (row, col)) in composed.iter_mut().zip(cells) {
+                            let lhs = self.ir.mul(local[row], prev[col]);
+                            let rhs = self.ir.mul(local[row + 1], prev[col + 2]);
+                            *slot = self.ir.addx(lhs, rhs);
+                        }
+                        composed
+                    }
+                    None => local,
+                });
 
                 let p2 = self.enter_space(p, &xforms);
                 let out = self.layer_color(inner, p2);
 
-                self.ir.jacobian_j11 = prev_j.0;
-                self.ir.jacobian_j12 = prev_j.1;
-                self.ir.jacobian_j21 = prev_j.2;
-                self.ir.jacobian_j22 = prev_j.3;
+                self.ir.jacobian = prev_j;
 
                 self.repeat_cell_ctx.truncate(repeat_depth);
                 self.discontinuity_space_depth = prev_discontinuity_space_depth;

@@ -119,6 +119,19 @@ impl<'h> FnCtx<'h> {
         }
     }
 
+    /// One element of the footprint Jacobian (§3.8, §24.1), indexed row-major.
+    /// Contexts without canvas transforms (user helpers, scatter bodies) fall
+    /// back to the identity element.
+    fn footprint_element(&mut self, index: usize, identity: f32) -> Handle<Ex> {
+        let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
+        let out = match self.ir.jacobian {
+            Some(jacobian) => jacobian[index],
+            None => self.ir.lit(identity),
+        };
+        self.ir.restore_feature_tag(prev_feature_tag);
+        out
+    }
+
     fn sx_lit_value(sx: &Sx) -> Option<f32> {
         match sx {
             Sx::Lit(value) => Some(*value),
@@ -442,33 +455,11 @@ impl<'h> FnCtx<'h> {
             }
             Sx::CoordX => self.ir.x_of(p),
             Sx::CoordY => self.ir.y_of(p),
-            // Footprint matrix elements (§3.8, §24.1). Use computed Jacobian from canvas_space
-            // when available, falling back to identity for contexts without canvas transforms
-            // (e.g., user helper functions, scatter bodies).
-            Sx::FootprintJ11 => {
-                let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
-                let out = self.ir.jacobian_j11.unwrap_or_else(|| self.ir.lit(1.0));
-                self.ir.restore_feature_tag(prev_feature_tag);
-                out
-            }
-            Sx::FootprintJ12 => {
-                let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
-                let out = self.ir.jacobian_j12.unwrap_or_else(|| self.ir.lit(0.0));
-                self.ir.restore_feature_tag(prev_feature_tag);
-                out
-            }
-            Sx::FootprintJ21 => {
-                let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
-                let out = self.ir.jacobian_j21.unwrap_or_else(|| self.ir.lit(0.0));
-                self.ir.restore_feature_tag(prev_feature_tag);
-                out
-            }
-            Sx::FootprintJ22 => {
-                let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
-                let out = self.ir.jacobian_j22.unwrap_or_else(|| self.ir.lit(1.0));
-                self.ir.restore_feature_tag(prev_feature_tag);
-                out
-            }
+            // Footprint matrix elements, from the canvas_space Jacobian when available.
+            Sx::FootprintJ11 => self.footprint_element(0, 1.0),
+            Sx::FootprintJ12 => self.footprint_element(1, 0.0),
+            Sx::FootprintJ21 => self.footprint_element(2, 0.0),
+            Sx::FootprintJ22 => self.footprint_element(3, 1.0),
             Sx::PostColorR => self
                 .source_color_ctx
                 .last()

@@ -1747,10 +1747,7 @@ fn lower_scene_fn_with_root(
         cx.ir.name(j12_h, "jacobian_j12");
         cx.ir.name(j21_h, "jacobian_j21");
         cx.ir.name(j22_h, "jacobian_j22");
-        cx.ir.jacobian_j11 = Some(j11_h);
-        cx.ir.jacobian_j12 = Some(j12_h);
-        cx.ir.jacobian_j21 = Some(j21_h);
-        cx.ir.jacobian_j22 = Some(j22_h);
+        cx.ir.jacobian = Some([j11_h, j12_h, j21_h, j22_h]);
     }
 
     // Fold the whole layer DAG down to a vec3 color at the root coordinate.
