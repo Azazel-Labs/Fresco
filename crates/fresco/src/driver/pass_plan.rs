@@ -1,13 +1,6 @@
 use crate::hir::{EffectDef, Hir, Layer, Locality, Sx};
 use std::collections::{BTreeMap, BTreeSet};
 
-fn effective_render_root(hir: &Hir) -> usize {
-    match &hir.layers[hir.root] {
-        Layer::MotionBlur { inner, .. } => *inner,
-        _ => hir.root,
-    }
-}
-
 fn is_synthetic_root_motion_blur(hir: &Hir, layer_id: usize) -> bool {
     layer_id == hir.root && matches!(hir.layers[hir.root], Layer::MotionBlur { .. })
 }
@@ -161,7 +154,7 @@ pub fn build_for_hir(hir: &Hir) -> PassBuild {
             continue;
         }
         let mut stage = 0usize;
-        for dep in layer_inputs(layer) {
+        for dep in layer.inputs() {
             if !reachable[dep] {
                 continue;
             }
@@ -222,7 +215,7 @@ pub fn build_for_hir(hir: &Hir) -> PassBuild {
         if pass_id == usize::MAX {
             continue;
         }
-        for dep in layer_inputs(layer) {
+        for dep in layer.inputs() {
             if !reachable[dep] {
                 continue;
             }
@@ -315,7 +308,7 @@ pub fn build_for_hir(hir: &Hir) -> PassBuild {
     // target so downstream passes can sample it.  Inline-tap passes are
     // folded into their consumer (mark retracted); they still get a target id
     // in the plan to keep indices stable, but the runtime shim may skip them.
-    let root_pass = layer_to_pass[effective_render_root(hir)];
+    let root_pass = layer_to_pass[hir.effective_render_root()];
     let mut targets: Vec<IntermediateTarget> = Vec::new();
 
     for pass in passes.iter_mut() {
@@ -399,7 +392,7 @@ fn build_pass_edges(
         if to_pass == usize::MAX {
             continue;
         }
-        for dep in layer_inputs(layer) {
+        for dep in layer.inputs() {
             if !reachable[dep] {
                 continue;
             }
@@ -430,7 +423,7 @@ fn reachable_layers_from_root(hir: &Hir) -> Vec<bool> {
         return reachable;
     }
 
-    let root = effective_render_root(hir);
+    let root = hir.effective_render_root();
     if root >= hir.layers.len() {
         return reachable;
     }
@@ -441,45 +434,12 @@ fn reachable_layers_from_root(hir: &Hir) -> Vec<bool> {
             continue;
         }
         reachable[id] = true;
-        for dep in layer_inputs(&hir.layers[id]) {
+        for dep in hir.layers[id].inputs() {
             stack.push(dep);
         }
     }
 
     reachable
-}
-
-fn layer_inputs(layer: &Layer) -> Vec<usize> {
-    match layer {
-        Layer::Solid(_)
-        | Layer::ColorExpr { .. }
-        | Layer::Grey { .. }
-        | Layer::Fill { .. }
-        | Layer::FillExpr { .. }
-        | Layer::FillGradient { .. }
-        | Layer::Shadow { .. }
-        | Layer::Glow { .. }
-        | Layer::InnerGlow { .. }
-        | Layer::Bevel { .. }
-        | Layer::Soften { .. }
-        | Layer::Image { .. }
-        | Layer::ImageAt { .. } => Vec::new(),
-        Layer::Blur { inner, .. }
-        | Layer::MotionBlur { inner, .. }
-        | Layer::GlowFx { inner, .. }
-        | Layer::Opacity { inner, .. }
-        | Layer::Tint { inner, .. }
-        | Layer::PostProcess { inner, .. }
-        | Layer::InSpace { inner, .. } => vec![*inner],
-        Layer::If {
-            then_layer,
-            else_layer,
-            ..
-        } => vec![*then_layer, *else_layer],
-        Layer::Compose(entries) => entries.iter().map(|(id, _)| *id).collect(),
-        Layer::ScatterBins { body, .. } => vec![*body],
-        Layer::UserEffect { inner, .. } => inner.map(|id| vec![id]).unwrap_or_default(),
-    }
 }
 
 fn locality_order(locality: Locality) -> u8 {

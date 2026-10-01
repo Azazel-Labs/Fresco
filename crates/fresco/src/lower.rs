@@ -61,46 +61,6 @@ pub(crate) fn pass_target_texture_name(canvas_name: &str, target_id: usize) -> S
     format!("__fresco_pass_target_{canvas_name}_{target_id}")
 }
 
-fn effective_render_root(hir: &Hir) -> LayerId {
-    match &hir.layers[hir.root] {
-        Layer::MotionBlur { inner, .. } => *inner,
-        _ => hir.root,
-    }
-}
-
-fn layer_inputs(layer: &Layer) -> Vec<LayerId> {
-    match layer {
-        Layer::Solid(_)
-        | Layer::ColorExpr { .. }
-        | Layer::Grey { .. }
-        | Layer::Fill { .. }
-        | Layer::FillExpr { .. }
-        | Layer::FillGradient { .. }
-        | Layer::Shadow { .. }
-        | Layer::Glow { .. }
-        | Layer::InnerGlow { .. }
-        | Layer::Bevel { .. }
-        | Layer::Soften { .. }
-        | Layer::Image { .. }
-        | Layer::ImageAt { .. } => Vec::new(),
-        Layer::Blur { inner, .. }
-        | Layer::MotionBlur { inner, .. }
-        | Layer::GlowFx { inner, .. }
-        | Layer::Opacity { inner, .. }
-        | Layer::Tint { inner, .. }
-        | Layer::PostProcess { inner, .. }
-        | Layer::InSpace { inner, .. } => vec![*inner],
-        Layer::If {
-            then_layer,
-            else_layer,
-            ..
-        } => vec![*then_layer, *else_layer],
-        Layer::Compose(entries) => entries.iter().map(|(id, _)| *id).collect(),
-        Layer::ScatterBins { body, .. } => vec![*body],
-        Layer::UserEffect { inner, .. } => inner.map(|id| vec![id]).unwrap_or_default(),
-    }
-}
-
 fn subgraph_stays_in_pass(
     hir: &Hir,
     render_root: LayerId,
@@ -117,7 +77,7 @@ fn subgraph_stays_in_pass(
         if layer_to_pass.get(layer_id).copied() != Some(pass_id) {
             return false;
         }
-        stack.extend(layer_inputs(&hir.layers[layer_id]));
+        stack.extend(hir.layers[layer_id].inputs());
     }
 
     true
@@ -1084,7 +1044,7 @@ pub fn lower_all_with_policy(
             })
             .collect();
 
-        let scene_root = effective_render_root(hir);
+        let scene_root = hir.effective_render_root();
         let root_pass_id = pass_plan.layer_to_pass[scene_root];
 
         let (scene_fn, stats) = lower_scene_fn(
@@ -1283,7 +1243,7 @@ mod tests {
             "expected no non-error diagnostics: {diags:#?}"
         );
 
-        let scene_root = effective_render_root(&hir);
+        let scene_root = hir.effective_render_root();
         let layer_to_pass = vec![0usize; hir.layers.len()];
 
         let mut builder = ModuleBuilder::new();
@@ -1390,7 +1350,7 @@ mod tests {
             "expected no non-error diagnostics: {diags:#?}"
         );
 
-        let scene_root = effective_render_root(&hir);
+        let scene_root = hir.effective_render_root();
         let mut builder = ModuleBuilder::new();
         let t = builder.register_core_types();
         let original = lower_scene_pass_fn(

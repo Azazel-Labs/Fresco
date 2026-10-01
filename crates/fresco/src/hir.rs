@@ -3398,6 +3398,14 @@ pub struct TemporalPurityRequirementRef<'a> {
 }
 
 impl Hir {
+    /// Return the scene root after removing the synthetic outer motion blur.
+    pub fn effective_render_root(&self) -> LayerId {
+        match &self.layers[self.root] {
+            Layer::MotionBlur { inner, .. } => *inner,
+            _ => self.root,
+        }
+    }
+
     /// The single shape that defines an effect's local color frame, if any.
     pub fn color_shape(&self, id: LayerId) -> Option<ShapeId> {
         match &self.layers[id] {
@@ -3420,6 +3428,40 @@ impl Hir {
 }
 
 impl Layer {
+    /// Return the layer nodes this operation reads from.
+    pub fn inputs(&self) -> Vec<LayerId> {
+        match self {
+            Layer::Solid(_)
+            | Layer::ColorExpr { .. }
+            | Layer::Grey { .. }
+            | Layer::Fill { .. }
+            | Layer::FillExpr { .. }
+            | Layer::FillGradient { .. }
+            | Layer::Shadow { .. }
+            | Layer::Glow { .. }
+            | Layer::InnerGlow { .. }
+            | Layer::Bevel { .. }
+            | Layer::Soften { .. }
+            | Layer::Image { .. }
+            | Layer::ImageAt { .. } => Vec::new(),
+            Layer::Blur { inner, .. }
+            | Layer::MotionBlur { inner, .. }
+            | Layer::GlowFx { inner, .. }
+            | Layer::Opacity { inner, .. }
+            | Layer::Tint { inner, .. }
+            | Layer::PostProcess { inner, .. }
+            | Layer::InSpace { inner, .. } => vec![*inner],
+            Layer::If {
+                then_layer,
+                else_layer,
+                ..
+            } => vec![*then_layer, *else_layer],
+            Layer::Compose(entries) => entries.iter().map(|(id, _)| *id).collect(),
+            Layer::ScatterBins { body, .. } => vec![*body],
+            Layer::UserEffect { inner, .. } => inner.iter().copied().collect(),
+        }
+    }
+
     /// Visit color expressions owned by this node (not its input layers).
     pub fn for_each_color_sx(&self, mut visit: impl FnMut(&Sx)) {
         match self {

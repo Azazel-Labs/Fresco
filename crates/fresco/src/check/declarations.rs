@@ -2177,39 +2177,6 @@ impl Checker {
             }
         }
 
-        fn layer_inputs(layer: &Layer) -> Vec<usize> {
-            match layer {
-                Layer::Solid(_)
-                | Layer::ColorExpr { .. }
-                | Layer::Grey { .. }
-                | Layer::Fill { .. }
-                | Layer::FillExpr { .. }
-                | Layer::FillGradient { .. }
-                | Layer::Shadow { .. }
-                | Layer::Glow { .. }
-                | Layer::InnerGlow { .. }
-                | Layer::Bevel { .. }
-                | Layer::Soften { .. }
-                | Layer::Image { .. }
-                | Layer::ImageAt { .. } => Vec::new(),
-                Layer::Blur { inner, .. }
-                | Layer::MotionBlur { inner, .. }
-                | Layer::GlowFx { inner, .. }
-                | Layer::Opacity { inner, .. }
-                | Layer::Tint { inner, .. }
-                | Layer::PostProcess { inner, .. }
-                | Layer::InSpace { inner, .. } => vec![*inner],
-                Layer::If {
-                    then_layer,
-                    else_layer,
-                    ..
-                } => vec![*then_layer, *else_layer],
-                Layer::Compose(entries) => entries.iter().map(|(id, _)| *id).collect(),
-                Layer::ScatterBins { body, .. } => vec![*body],
-                Layer::UserEffect { inner, .. } => inner.map(|id| vec![id]).unwrap_or_default(),
-            }
-        }
-
         fn collect_temporal_purity_requirements(
             layers: &[Layer],
         ) -> Vec<TemporalPurityRequirement> {
@@ -2271,7 +2238,7 @@ impl Checker {
                         }
                     }
                 }
-                for child in layer_inputs(&layers[id]) {
+                for child in layers[id].inputs() {
                     let mut child_path = path.clone();
                     child_path.push(child);
                     stack.push((child, child_path));
