@@ -563,25 +563,25 @@ impl<'h> FnCtx<'h> {
             self.ir.restore_locality(prev_locality);
             return sampled;
         }
-        let out = match self.hir.layers[id].clone() {
+        let out = match &self.hir.layers[id] {
             Layer::Solid(c) => {
-                let rgb = self.color3(c);
+                let rgb = self.color3(*c);
                 let a = self.ir.lit(c[3]);
                 (rgb, a)
             }
             Layer::Fill { shape, color } => {
-                let cov = self.shape_coverage(shape, p);
+                let cov = self.shape_coverage(*shape, p);
                 let ca = self.ir.lit(color[3]);
                 let a = self.ir.mul(cov, ca);
                 self.ir.name(a, &format!("fill_a_l{id}"));
-                (self.color3(color), a)
+                (self.color3(*color), a)
             }
             Layer::FillExpr { shape, r, g, b, a } => {
-                let cov = self.shape_coverage(shape, p);
-                let r = self.sx_at(&r, p);
-                let g = self.sx_at(&g, p);
-                let b = self.sx_at(&b, p);
-                let ca = self.sx_at(&a, p);
+                let cov = self.shape_coverage(*shape, p);
+                let r = self.sx_at(r, p);
+                let g = self.sx_at(g, p);
+                let b = self.sx_at(b, p);
+                let ca = self.sx_at(a, p);
                 let a = self.ir.mul(cov, ca);
                 self.ir.name(a, &format!("fill_expr_a_l{id}"));
                 let rgb = self.ir.add(Ex::Compose {
@@ -591,15 +591,15 @@ impl<'h> FnCtx<'h> {
                 (rgb, a)
             }
             Layer::FillGradient { shape, kind, stops } => {
-                let cov = self.shape_coverage(shape, p);
+                let cov = self.shape_coverage(*shape, p);
                 let grad_p = match &kind {
                     GradientKind::Linear {
                         anchor: GradientAnchor::Shape,
                         ..
-                    } => self.shape_local_point(shape, p),
+                    } => self.shape_local_point(*shape, p),
                     _ => p,
                 };
-                let (rgb_dithered, grad_a) = self.gradient_color_at(&kind, &stops, grad_p);
+                let (rgb_dithered, grad_a) = self.gradient_color_at(kind, stops, grad_p);
                 let a = self.ir.mul(cov, grad_a);
                 self.ir.name(a, &format!("fill_grad_a_l{id}"));
                 (rgb_dithered, a)
@@ -609,12 +609,12 @@ impl<'h> FnCtx<'h> {
                 radius,
                 color,
             } => {
-                let d = self.sdf(shape, p);
-                let cov = self.soft_coverage(shape, d, &radius, p);
+                let d = self.sdf(*shape, p);
+                let cov = self.soft_coverage(*shape, d, radius, p);
                 let ca = self.sx_at(&color[3], p);
                 let a = self.ir.mul(cov, ca);
                 self.ir.name(a, &format!("soft_a_l{id}"));
-                (self.color_expr3_at(&color, p), a)
+                (self.color_expr3_at(color, p), a)
             }
             Layer::Shadow {
                 shape,
@@ -625,14 +625,14 @@ impl<'h> FnCtx<'h> {
                 // sdf(translate(shape, off)) is sdf evaluated at p - off; the
                 // shifted coordinate is its own CSE key, so a fill of the
                 // same shape at `p` still shares nothing incorrectly.
-                let off = self.v2x_at(&off, p);
+                let off = self.v2x_at(off, p);
                 let ps = self.ir.sub(p, off);
-                let d = self.sdf(shape, ps);
-                let cov = self.soft_coverage(shape, d, &soften, p);
+                let d = self.sdf(*shape, ps);
+                let cov = self.soft_coverage(*shape, d, soften, p);
                 let ca = self.sx_at(&color[3], p);
                 let a = self.ir.mul(cov, ca);
                 self.ir.name(a, &format!("shadow_a_l{id}"));
-                (self.color_expr3_at(&color, p), a)
+                (self.color_expr3_at(color, p), a)
             }
             Layer::Glow {
                 shape,
@@ -643,29 +643,29 @@ impl<'h> FnCtx<'h> {
                 color_space,
             } => {
                 let (glow_p, glow_reach) = match reach {
-                    GlowReach::Scalar(reach) => (p, self.sx_at(&reach, p)),
+                    GlowReach::Scalar(reach) => (p, self.sx_at(reach, p)),
                     GlowReach::Vec2((rx, ry)) => {
-                        let rx = self.sx_at(&rx, p);
-                        let ry = self.sx_at(&ry, p);
-                        self.shape_glow_warp(shape, p, rx, ry)
+                        let rx = self.sx_at(rx, p);
+                        let ry = self.sx_at(ry, p);
+                        self.shape_glow_warp(*shape, p, rx, ry)
                     }
                 };
-                let shape_color_p = self.shape_anchor_space_point(shape, p, p);
-                let glow_color_p = self.shape_anchor_space_point(shape, p, glow_p);
+                let shape_color_p = self.shape_anchor_space_point(*shape, p, p);
+                let glow_color_p = self.shape_anchor_space_point(*shape, p, glow_p);
                 let color_p = match color_space {
                     GlowColorSpace::Scene => p,
                     GlowColorSpace::Shape => shape_color_p,
                     GlowColorSpace::Glow => glow_color_p,
                 };
-                let d = self.sdf(shape, glow_p);
+                let d = self.sdf(*shape, glow_p);
                 let zero = self.ir.lit(0.0);
                 let dpos = self.ir.m2(Mf::Max, d, zero);
                 self.ir.name(dpos, &format!("glow_dpos_l{id}"));
-                let g = self.glow_falloff_at(falloff, dpos, glow_reach);
+                let g = self.glow_falloff_at(*falloff, dpos, glow_reach);
                 self.ir.name(g, &format!("glow_falloff_l{id}"));
-                let strength = self.sx_at(&strength, p);
+                let strength = self.sx_at(strength, p);
                 let gs = self.ir.mul(g, strength);
-                let (glow_rgb, ca) = self.color_source_at(&color, color_p);
+                let (glow_rgb, ca) = self.color_source_at(color, color_p);
                 let a = self.ir.mul(gs, ca);
                 self.ir.name(a, &format!("glow_a_l{id}"));
                 (glow_rgb, a)
@@ -679,30 +679,30 @@ impl<'h> FnCtx<'h> {
                 color_space,
             } => {
                 let (glow_p, glow_reach) = match reach {
-                    GlowReach::Scalar(reach) => (p, self.sx_at(&reach, p)),
+                    GlowReach::Scalar(reach) => (p, self.sx_at(reach, p)),
                     GlowReach::Vec2((rx, ry)) => {
-                        let rx = self.sx_at(&rx, p);
-                        let ry = self.sx_at(&ry, p);
-                        self.shape_glow_warp(shape, p, rx, ry)
+                        let rx = self.sx_at(rx, p);
+                        let ry = self.sx_at(ry, p);
+                        self.shape_glow_warp(*shape, p, rx, ry)
                     }
                 };
-                let shape_color_p = self.shape_anchor_space_point(shape, p, p);
-                let glow_color_p = self.shape_anchor_space_point(shape, p, glow_p);
+                let shape_color_p = self.shape_anchor_space_point(*shape, p, p);
+                let glow_color_p = self.shape_anchor_space_point(*shape, p, glow_p);
                 let color_p = match color_space {
                     GlowColorSpace::Scene => p,
                     GlowColorSpace::Shape => shape_color_p,
                     GlowColorSpace::Glow => glow_color_p,
                 };
-                let d = self.sdf(shape, glow_p);
-                let inside = self.coverage(shape, d, glow_p);
+                let d = self.sdf(*shape, glow_p);
+                let inside = self.coverage(*shape, d, glow_p);
                 let zero = self.ir.lit(0.0);
                 let neg_d = self.ir.neg(d);
                 let din = self.ir.m2(Mf::Max, neg_d, zero);
-                let fall = self.glow_falloff_at(falloff, din, glow_reach);
-                let strength = self.sx_at(&strength, p);
+                let fall = self.glow_falloff_at(*falloff, din, glow_reach);
+                let strength = self.sx_at(strength, p);
                 let fall_strength = self.ir.mul(fall, strength);
                 let s = self.ir.mul(inside, fall_strength);
-                let (glow_rgb, ca) = self.color_source_at(&color, color_p);
+                let (glow_rgb, ca) = self.color_source_at(color, color_p);
                 let a = self.ir.mul(s, ca);
                 self.ir.name(a, &format!("inner_glow_a_l{id}"));
                 (glow_rgb, a)
@@ -715,7 +715,7 @@ impl<'h> FnCtx<'h> {
                 highlight,
                 shadow,
             } => {
-                let d = self.sdf(shape, p);
+                let d = self.sdf(*shape, p);
 
                 let px = self.ir.px;
                 let zero = self.ir.lit(0.0);
@@ -726,11 +726,11 @@ impl<'h> FnCtx<'h> {
                 let pmx = self.ir.sub(p, dx);
                 let ppy = self.ir.addx(p, dy);
                 let pmy = self.ir.sub(p, dy);
-                let sdf_ppx = self.sdf(shape, ppx);
-                let sdf_pmx = self.sdf(shape, pmx);
+                let sdf_ppx = self.sdf(*shape, ppx);
+                let sdf_pmx = self.sdf(*shape, pmx);
                 let ddx = self.ir.sub(sdf_ppx, sdf_pmx);
-                let sdf_ppy = self.sdf(shape, ppy);
-                let sdf_pmy = self.sdf(shape, pmy);
+                let sdf_ppy = self.sdf(*shape, ppy);
+                let sdf_pmy = self.sdf(*shape, pmy);
                 let ddy = self.ir.sub(sdf_ppy, sdf_pmy);
                 let grad = self.ir.vec2(ddx, ddy);
                 let grad_len = self.ir.m1(Mf::Length, grad);
@@ -739,7 +739,7 @@ impl<'h> FnCtx<'h> {
                 let safe_grad_len2 = self.ir.splat2(safe_grad_len);
                 let n = self.ir.div(grad, safe_grad_len2);
 
-                let lv = self.v2x_at(&light, p);
+                let lv = self.v2x_at(light, p);
                 let lv_len = self.ir.m1(Mf::Length, lv);
                 let safe_lv_len = self.ir.m2(Mf::Max, lv_len, eps);
                 let safe_lv_len2 = self.ir.splat2(safe_lv_len);
@@ -759,22 +759,22 @@ impl<'h> FnCtx<'h> {
                 let zero3 = self.ir.lit(0.0);
                 let shade = self.ir.m3(Mf::Clamp, shade_raw, zero3, one);
 
-                let w = self.sx_at(&width, p);
+                let w = self.sx_at(width, p);
                 let hw = self.ir.mul(w, half);
                 let ad = self.ir.m1(Mf::Abs, d);
                 let zero4 = self.ir.lit(0.0);
                 let edge_step = self.ir.m3(Mf::SmoothStep, zero4, hw, ad);
                 let edge01 = self.ir.sub(one, edge_step);
 
-                let hi_rgb = self.color_expr3_at(&highlight, p);
-                let lo_rgb = self.color_expr3_at(&shadow, p);
+                let hi_rgb = self.color_expr3_at(highlight, p);
+                let lo_rgb = self.color_expr3_at(shadow, p);
                 let shade3 = self.ir.splat3(shade);
                 let rgb = self.ir.m3(Mf::Mix, lo_rgb, hi_rgb, shade3);
 
                 let hi_a = self.sx_at(&highlight[3], p);
                 let lo_a = self.sx_at(&shadow[3], p);
                 let a_mix = self.ir.m3(Mf::Mix, lo_a, hi_a, shade);
-                let stren = self.sx_at(&strength, p);
+                let stren = self.sx_at(strength, p);
                 let bevel_strength = self.ir.mul(a_mix, stren);
                 let a = self.ir.mul(edge01, bevel_strength);
                 self.ir.name(a, &format!("bevel_a_l{id}"));
@@ -787,27 +787,27 @@ impl<'h> FnCtx<'h> {
                 color,
                 falloff,
             } => {
-                let (inner_rgb, inner_a) = self.layer_color(inner, p);
+                let (inner_rgb, inner_a) = self.layer_color(*inner, p);
                 let reach = match reach {
-                    GlowReach::Scalar(reach) => self.sx_at(&reach, p),
+                    GlowReach::Scalar(reach) => self.sx_at(reach, p),
                     GlowReach::Vec2((rx, ry)) => {
-                        let rx = self.sx_at(&rx, p);
-                        let ry = self.sx_at(&ry, p);
+                        let rx = self.sx_at(rx, p);
+                        let ry = self.sx_at(ry, p);
                         let abs_rx = self.ir.m1(Mf::Abs, rx);
                         let abs_ry = self.ir.m1(Mf::Abs, ry);
                         self.ir.m2(Mf::Max, abs_rx, abs_ry)
                     }
                 };
-                let strength = self.sx_at(&strength, p);
+                let strength = self.sx_at(strength, p);
                 let one = self.ir.lit(1.0);
                 let d_nonnegative = self.ir.sub(one, inner_a);
-                let fall = self.glow_falloff_at(falloff, d_nonnegative, reach);
+                let fall = self.glow_falloff_at(*falloff, d_nonnegative, reach);
                 let base = self.ir.mul(inner_a, strength);
                 let glow_scalar = self.ir.mul(base, fall);
                 self.ir
                     .name(glow_scalar, &format!("layer_glow_scalar_l{id}"));
 
-                let (glow_rgb, ca) = self.color_source_at(&color, p);
+                let (glow_rgb, ca) = self.color_source_at(color, p);
                 let glow_scalar3 = self.ir.splat3(glow_scalar);
                 let glow = self.ir.mul(glow_rgb, glow_scalar3);
                 self.ir.name(glow, &format!("layer_glow_rgb_l{id}"));
@@ -856,8 +856,8 @@ impl<'h> FnCtx<'h> {
                 let nx = self.ir.m3(Mf::Clamp, nx_raw, zero, one_bin);
                 let ny = self.ir.m3(Mf::Clamp, ny_raw, zero, one_bin);
 
-                let bins_x_f = self.ir.lit(bins_x as f32);
-                let bins_y_f = self.ir.lit(bins_y as f32);
+                let bins_x_f = self.ir.lit(*bins_x as f32);
+                let bins_y_f = self.ir.lit(*bins_y as f32);
                 let bx_scaled = self.ir.mul(nx, bins_x_f);
                 let by_scaled = self.ir.mul(ny, bins_y_f);
                 let bx = self.ir.m1(Mf::Floor, bx_scaled);
@@ -936,8 +936,8 @@ impl<'h> FnCtx<'h> {
                     });
                     let (out, out_alpha) = self.lower_scatter_procedural_rgb(
                         id,
-                        body,
-                        &lifecycle,
+                        *body,
+                        lifecycle,
                         p,
                         px,
                         py,
@@ -947,8 +947,8 @@ impl<'h> FnCtx<'h> {
                         height,
                         time,
                         selected,
-                        bins_x,
-                        bins_y,
+                        *bins_x,
+                        *bins_y,
                         emitted_instances,
                         procedural_samples,
                         avg_footprint,
@@ -1006,8 +1006,8 @@ impl<'h> FnCtx<'h> {
                     if use_compact {
                         let (bin_rgb, bin_alpha) = self.lower_scatter_bin_rgb(
                             id,
-                            body,
-                            &lifecycle,
+                            *body,
+                            lifecycle,
                             p,
                             px,
                             py,
@@ -1040,8 +1040,8 @@ impl<'h> FnCtx<'h> {
                         self.ir.begin_block();
                         let (bin_rgb, bin_alpha) = self.lower_scatter_bin_rgb(
                             id,
-                            body,
-                            &lifecycle,
+                            *body,
+                            lifecycle,
                             p,
                             px,
                             py,
@@ -1110,7 +1110,7 @@ impl<'h> FnCtx<'h> {
 
                 // Compose local-space Jacobian into the active footprint so AA/filtering
                 // inside this block tracks explicit `in space` transforms.
-                let (l11_sx, l12_sx, l21_sx, l22_sx) = crate::deriv::jacobian(&xforms);
+                let (l11_sx, l12_sx, l21_sx, l22_sx) = crate::deriv::jacobian(xforms);
                 let l11 = self.sx_at(&l11_sx, p);
                 let l12 = self.sx_at(&l12_sx, p);
                 let l21 = self.sx_at(&l21_sx, p);
@@ -1133,8 +1133,8 @@ impl<'h> FnCtx<'h> {
                     None => local,
                 });
 
-                let p2 = self.enter_space(p, &xforms);
-                let out = self.layer_color(inner, p2);
+                let p2 = self.enter_space(p, xforms);
+                let out = self.layer_color(*inner, p2);
 
                 self.ir.jacobian = prev_j;
 
@@ -1147,7 +1147,7 @@ impl<'h> FnCtx<'h> {
                 then_layer,
                 else_layer,
             } => {
-                let cond_sx = self.sx_at(&cond, p);
+                let cond_sx = self.sx_at(cond, p);
                 let zero = self.ir.lit(0.0);
                 let cond_bool = self.ir.bin(Bo::NotEqual, cond_sx, zero);
 
@@ -1165,7 +1165,7 @@ impl<'h> FnCtx<'h> {
                 self.clear_block_scoped_caches(true);
                 self.ir.begin_block();
                 {
-                    let (then_rgb, then_a) = self.layer_color(then_layer, p);
+                    let (then_rgb, then_a) = self.layer_color(*then_layer, p);
                     self.ir.store(out_rgb_ptr, then_rgb);
                     self.ir.store(out_a_ptr, then_a);
                 }
@@ -1174,7 +1174,7 @@ impl<'h> FnCtx<'h> {
                 self.clear_block_scoped_caches(true);
                 self.ir.begin_block();
                 {
-                    let (else_rgb, else_a) = self.layer_color(else_layer, p);
+                    let (else_rgb, else_a) = self.layer_color(*else_layer, p);
                     self.ir.store(out_rgb_ptr, else_rgb);
                     self.ir.store(out_a_ptr, else_a);
                 }
@@ -1237,8 +1237,8 @@ impl<'h> FnCtx<'h> {
                 }
             }
             Layer::Opacity { inner, alpha } => {
-                let (rgb, a) = self.layer_color(inner, p);
-                let alpha = self.sx_at(&alpha, p);
+                let (rgb, a) = self.layer_color(*inner, p);
+                let alpha = self.sx_at(alpha, p);
                 let out_a = self.ir.mul(a, alpha);
                 self.ir.name(out_a, &format!("opacity_a_l{id}"));
                 (rgb, out_a)
@@ -1248,16 +1248,16 @@ impl<'h> FnCtx<'h> {
                 color,
                 amount,
             } => {
-                let (inner_rgb, inner_a) = self.layer_color(inner, p);
-                let tint_rgb = self.color_expr3_at(&color, p);
-                let amount = self.sx_at(&amount, p);
+                let (inner_rgb, inner_a) = self.layer_color(*inner, p);
+                let tint_rgb = self.color_expr3_at(color, p);
+                let amount = self.sx_at(amount, p);
                 let amount3 = self.ir.splat3(amount);
                 let rgb = self.ir.m3(Mf::Mix, inner_rgb, tint_rgb, amount3);
                 self.ir.name(rgb, &format!("tint_rgb_l{id}"));
                 (rgb, inner_a)
             }
             Layer::PostProcess { inner, rgba } => {
-                let (src_rgb, src_a) = self.layer_color(inner, p);
+                let (src_rgb, src_a) = self.layer_color(*inner, p);
                 let source_ctx = SourceColorCtx {
                     r: self.ir.x_of(src_rgb),
                     g: self.ir.y_of(src_rgb),
@@ -1286,7 +1286,7 @@ impl<'h> FnCtx<'h> {
                 (rgb, a)
             }
             Layer::Image { tex_name } => {
-                let (rgb, a) = self.sample_bound_texture(&tex_name, p);
+                let (rgb, a) = self.sample_bound_texture(tex_name, p);
                 self.ir.name(rgb, &format!("img_rgb_l{id}"));
                 self.ir.name(a, &format!("img_a_l{id}"));
                 (rgb, a)
@@ -1296,19 +1296,19 @@ impl<'h> FnCtx<'h> {
                 sample_x,
                 sample_y,
             } => {
-                let x = self.sx_at(&sample_x, p);
-                let y = self.sx_at(&sample_y, p);
+                let x = self.sx_at(sample_x, p);
+                let y = self.sx_at(sample_y, p);
                 let sample_p = self.ir.vec2(x, y);
-                let (rgb, a) = self.sample_bound_texture(&tex_name, sample_p);
+                let (rgb, a) = self.sample_bound_texture(tex_name, sample_p);
                 self.ir.name(rgb, &format!("img_rgb_l{id}"));
                 self.ir.name(a, &format!("img_a_l{id}"));
                 (rgb, a)
             }
             Layer::ColorExpr { r, g, b, a } => {
-                let r = self.sx_at(&r, p);
-                let g = self.sx_at(&g, p);
-                let b = self.sx_at(&b, p);
-                let a = self.sx_at(&a, p);
+                let r = self.sx_at(r, p);
+                let g = self.sx_at(g, p);
+                let b = self.sx_at(b, p);
+                let a = self.sx_at(a, p);
                 let rgb = self.ir.add(Ex::Compose {
                     ty: self.ir.types.v3,
                     components: vec![r, g, b],
@@ -1316,12 +1316,12 @@ impl<'h> FnCtx<'h> {
                 (rgb, a)
             }
             Layer::Grey { value } => {
-                let v = self.sx_at(&value, p);
+                let v = self.sx_at(value, p);
                 let rgb = self.ir.splat3(v);
                 let one = self.ir.lit(1.0);
                 (rgb, one)
             }
-            Layer::Compose(entries) => self.fold_compose(&entries, p),
+            Layer::Compose(entries) => self.fold_compose(entries, p),
             Layer::Blur { inner, radius, .. } => {
                 let prev_feature_tag = self.ir.set_feature_tag(Some("blur"));
                 // Inline N-tap box filter (§11 step 3, rung 1).
@@ -1334,7 +1334,7 @@ impl<'h> FnCtx<'h> {
                 // programs still compile and produce visible output (with
                 // reduced quality for large radii).
                 const HALF: i32 = crate::driver::pass_plan::INLINE_HALF_TAPS as i32;
-                let radius_h = self.sx_at(&radius, p);
+                let radius_h = self.sx_at(radius, p);
                 let half_f = self.ir.lit(HALF as f32);
                 let tap_step = self.ir.div(radius_h, half_f);
 
@@ -1355,7 +1355,7 @@ impl<'h> FnCtx<'h> {
                         // Clear caches so each tap evaluates independently at
                         // its own coordinate.
                         self.clear_point_sensitive_caches();
-                        let (rgb, a) = self.layer_color(inner, tp);
+                        let (rgb, a) = self.layer_color(*inner, tp);
                         let a3 = self.ir.splat3(a);
                         let premul = self.ir.mul(rgb, a3);
                         acc_rgb = self.ir.addx(acc_rgb, premul);
@@ -1383,7 +1383,7 @@ impl<'h> FnCtx<'h> {
                 const HALF: i32 = crate::driver::pass_plan::INLINE_HALF_TAPS as i32;
                 let sample_count = (2 * HALF + 1) as f32;
                 let n = self.ir.lit(sample_count);
-                let shutter_h = self.sx_at(&shutter, p);
+                let shutter_h = self.sx_at(shutter, p);
                 let eps = self.ir.lit(1.0e-6);
                 let safe_delta = self.ir.m2(Mf::Max, self.ir.delta, eps);
                 let frame_div = self.ir.div(self.ir.time, safe_delta);
@@ -1423,7 +1423,7 @@ impl<'h> FnCtx<'h> {
                     self.ir.time_override = Some(tau);
 
                     self.clear_point_sensitive_caches();
-                    let (rgb, a) = self.layer_color(inner, p);
+                    let (rgb, a) = self.layer_color(*inner, p);
                     self.ir.time_override = saved_time_override;
 
                     let a3 = self.ir.splat3(a);
@@ -1455,8 +1455,8 @@ impl<'h> FnCtx<'h> {
                 // Point effects: inline the body directly at `p`.
                 // Local/Global effects: currently lowered the same as point
                 // (pass-based lowering for Local/Global is a future concern).
-                let body_layer = self.hir.effects[def_idx].body_layer;
-                let param_names: Vec<String> = self.hir.effects[def_idx].param_names.clone();
+                let body_layer = self.hir.effects[*def_idx].body_layer;
+                let param_names: Vec<String> = self.hir.effects[*def_idx].param_names.clone();
 
                 // Symbolic `Sx::Var` references inside the body are resolved
                 // when `sx_at` encounters them via the `Sx::Var` arm in
@@ -1473,7 +1473,7 @@ impl<'h> FnCtx<'h> {
                 }
 
                 if let Some(inner_id) = inner {
-                    self.effect_input_layer_ctx.push(inner_id);
+                    self.effect_input_layer_ctx.push(*inner_id);
                     self.clear_point_sensitive_caches();
                 }
 

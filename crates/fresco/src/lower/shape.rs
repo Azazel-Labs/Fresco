@@ -135,33 +135,39 @@ impl<'h> FnCtx<'h> {
             center,
             half,
             round: Sx::Lit(0.0),
-        } = self.hir.shapes[id].clone()
+        } = &self.hir.shapes[id]
             && self.sx_is_sample_point_invariant(&center.0)
             && self.sx_is_sample_point_invariant(&center.1)
             && self.sx_is_sample_point_invariant(&half.0)
             && self.sx_is_sample_point_invariant(&half.1)
         {
-            return self.box_filtered_coverage(&center, &half, p);
+            return self.box_filtered_coverage(center, half, p);
         }
-        if let Shape::Outline { inner, width } = self.hir.shapes[id].clone()
+        if let Shape::Outline { inner, width } = &self.hir.shapes[id]
             && let Shape::LineFamily {
                 axis,
                 spacing,
                 offset,
-            } = self.hir.shapes[inner].clone()
+            } = &self.hir.shapes[*inner]
         {
-            return self.line_family_analytic_coverage(axis, spacing, offset, width, p);
+            return self.line_family_analytic_coverage(
+                *axis,
+                spacing.clone(),
+                offset.clone(),
+                width.clone(),
+                p,
+            );
         }
 
-        if let Shape::Outline { width, .. } = self.hir.shapes[id].clone() {
+        if let Shape::Outline { width, .. } = &self.hir.shapes[id] {
             self.stats.outline_thin_fade_count += 1;
-            let Shape::Outline { inner, .. } = self.hir.shapes[id].clone() else {
+            let Shape::Outline { inner, .. } = &self.hir.shapes[id] else {
                 unreachable!()
             };
-            let inner_d = self.sdf(inner, p);
+            let inner_d = self.sdf(*inner, p);
             let inner_abs = self.ir.m1(Mf::Abs, inner_d);
             self.ir.name(inner_abs, &format!("outline_abs_s{id}"));
-            let stroke_width_raw = self.sx_at(&width, p);
+            let stroke_width_raw = self.sx_at(width, p);
             let half = self.ir.lit(0.5);
             let stroke_half_w = self.ir.mul(stroke_width_raw, half);
             self.ir
@@ -292,23 +298,23 @@ impl<'h> FnCtx<'h> {
             return cached;
         }
 
-        let anchor = match self.hir.shapes[id].clone() {
+        let anchor = match &self.hir.shapes[id] {
             Shape::Circle { center, .. }
             | Shape::RBox { center, .. }
             | Shape::Ellipse { center, .. }
-            | Shape::Star { center, .. } => self.v2x_at(&center, p),
+            | Shape::Star { center, .. } => self.v2x_at(center, p),
             Shape::Capsule { from, to, .. } => {
-                let a = self.v2x_at(&from, p);
-                let b = self.v2x_at(&to, p);
+                let a = self.v2x_at(from, p);
+                let b = self.v2x_at(to, p);
                 let half = self.ir.lit(0.5);
                 let ab = self.ir.addx(a, b);
                 let half2 = self.ir.splat2(half);
                 self.ir.mul(ab, half2)
             }
             Shape::Triangle { a, b, c } => {
-                let va = self.v2x_at(&a, p);
-                let vb = self.v2x_at(&b, p);
-                let vc = self.v2x_at(&c, p);
+                let va = self.v2x_at(a, p);
+                let vb = self.v2x_at(b, p);
+                let vc = self.v2x_at(c, p);
                 let sum_ab = self.ir.addx(va, vb);
                 let sum = self.ir.addx(sum_ab, vc);
                 let third = self.ir.lit(1.0 / 3.0);
@@ -320,7 +326,7 @@ impl<'h> FnCtx<'h> {
                 let mut sum: Option<Handle<Ex>> = None;
                 for contour in contours {
                     for vertex in contour {
-                        let v = self.v2x_at(&vertex, p);
+                        let v = self.v2x_at(vertex, p);
                         sum = Some(match sum {
                             Some(acc) => self.ir.addx(acc, v),
                             None => v,
@@ -344,12 +350,12 @@ impl<'h> FnCtx<'h> {
                 self.ir.vec2(half, half_y)
             }
             Shape::Outline { inner, .. } | Shape::Offset { inner, .. } => {
-                self.shape_anchor(inner, p)
+                self.shape_anchor(*inner, p)
             }
-            Shape::Rotate { inner, .. } => self.shape_anchor(inner, p),
+            Shape::Rotate { inner, .. } => self.shape_anchor(*inner, p),
             Shape::Mix(a, b, _) => {
-                let aa = self.shape_anchor(a, p);
-                let bb = self.shape_anchor(b, p);
+                let aa = self.shape_anchor(*a, p);
+                let bb = self.shape_anchor(*b, p);
                 let sum = self.ir.addx(aa, bb);
                 let half = self.ir.lit(0.5);
                 let half2 = self.ir.splat2(half);
@@ -359,8 +365,8 @@ impl<'h> FnCtx<'h> {
             | Shape::SmoothUnion(a, b, _)
             | Shape::Intersect(a, b)
             | Shape::Subtract(a, b) => {
-                let aa = self.shape_anchor(a, p);
-                let bb = self.shape_anchor(b, p);
+                let aa = self.shape_anchor(*a, p);
+                let bb = self.shape_anchor(*b, p);
                 let sum = self.ir.addx(aa, bb);
                 let half = self.ir.lit(0.5);
                 let half2 = self.ir.splat2(half);
@@ -376,34 +382,34 @@ impl<'h> FnCtx<'h> {
             return cached;
         }
 
-        let extent = match self.hir.shapes[id].clone() {
+        let extent = match &self.hir.shapes[id] {
             Shape::Circle { radius, .. } => {
-                let r = self.sx_at(&radius, p);
+                let r = self.sx_at(radius, p);
                 self.ir.splat2(r)
             }
             Shape::Capsule { from, to, radius } => {
-                let a = self.v2x_at(&from, p);
-                let b = self.v2x_at(&to, p);
+                let a = self.v2x_at(from, p);
+                let b = self.v2x_at(to, p);
                 let delta = self.ir.sub(b, a);
                 let abs_delta = self.ir.m1(Mf::Abs, delta);
                 let half = self.ir.lit(0.5);
                 let half2 = self.ir.splat2(half);
                 let half_delta = self.ir.mul(abs_delta, half2);
-                let r = self.sx_at(&radius, p);
+                let r = self.sx_at(radius, p);
                 let r2 = self.ir.splat2(r);
                 self.ir.addx(half_delta, r2)
             }
-            Shape::RBox { half, .. } => self.v2x_at(&half, p),
-            Shape::Ellipse { radii, .. } => self.v2x_at(&radii, p),
+            Shape::RBox { half, .. } => self.v2x_at(half, p),
+            Shape::Ellipse { radii, .. } => self.v2x_at(radii, p),
             Shape::Star { outer, .. } => {
-                let r = self.sx_at(&outer, p);
+                let r = self.sx_at(outer, p);
                 self.ir.splat2(r)
             }
             Shape::Triangle { a, b, c } => {
                 let anchor = self.shape_anchor(id, p);
-                let va = self.v2x_at(&a, p);
-                let vb = self.v2x_at(&b, p);
-                let vc = self.v2x_at(&c, p);
+                let va = self.v2x_at(a, p);
+                let vb = self.v2x_at(b, p);
+                let vc = self.v2x_at(c, p);
                 let va_delta = self.ir.sub(va, anchor);
                 let vb_delta = self.ir.sub(vb, anchor);
                 let vc_delta = self.ir.sub(vc, anchor);
@@ -419,7 +425,7 @@ impl<'h> FnCtx<'h> {
                 let mut extent = self.ir.vec2(zero, zero);
                 for contour in contours {
                     for vertex in contour {
-                        let v = self.v2x_at(&vertex, p);
+                        let v = self.v2x_at(vertex, p);
                         let v_delta = self.ir.sub(v, anchor);
                         let d = self.ir.m1(Mf::Abs, v_delta);
                         extent = self.ir.m2(Mf::Max, extent, d);
@@ -433,22 +439,22 @@ impl<'h> FnCtx<'h> {
                 self.ir.splat2(big)
             }
             Shape::Outline { inner, width } => {
-                let inner_extent = self.shape_half_extent(inner, p);
+                let inner_extent = self.shape_half_extent(*inner, p);
                 let half = self.ir.lit(0.5);
-                let w = self.sx_at(&width, p);
+                let w = self.sx_at(width, p);
                 let pad = self.ir.mul(w, half);
                 let pad2 = self.ir.splat2(pad);
                 self.ir.addx(inner_extent, pad2)
             }
             Shape::Offset { inner, delta } => {
-                let inner_extent = self.shape_half_extent(inner, p);
-                let delta = self.sx_at(&delta, p);
+                let inner_extent = self.shape_half_extent(*inner, p);
+                let delta = self.sx_at(delta, p);
                 let delta_abs = self.ir.m1(Mf::Abs, delta);
                 let delta2 = self.ir.splat2(delta_abs);
                 self.ir.addx(inner_extent, delta2)
             }
             Shape::Rotate { inner, .. } => {
-                let inner_extent = self.shape_half_extent(inner, p);
+                let inner_extent = self.shape_half_extent(*inner, p);
                 let ex = self.ir.x_of(inner_extent);
                 let ey = self.ir.y_of(inner_extent);
                 let max_extent = self.ir.m2(Mf::Max, ex, ey);
@@ -459,8 +465,8 @@ impl<'h> FnCtx<'h> {
             | Shape::SmoothUnion(a, b, _)
             | Shape::Intersect(a, b)
             | Shape::Subtract(a, b) => {
-                let ea = self.shape_half_extent(a, p);
-                let eb = self.shape_half_extent(b, p);
+                let ea = self.shape_half_extent(*a, p);
+                let eb = self.shape_half_extent(*b, p);
                 self.ir.m2(Mf::Max, ea, eb)
             }
         };
@@ -559,18 +565,18 @@ impl<'h> FnCtx<'h> {
             return *h;
         }
         self.stats.sdf_evals += 1;
-        let d = match self.hir.shapes[id].clone() {
+        let d = match &self.hir.shapes[id] {
             Shape::Circle { center, radius } => {
-                let c = self.v2x_at(&center, p);
+                let c = self.v2x_at(center, p);
                 let q = self.ir.sub(p, c);
                 let len = self.ir.m1(Mf::Length, q);
-                let r = self.sx_at(&radius, p);
+                let r = self.sx_at(radius, p);
                 self.ir.sub(len, r)
             }
             Shape::Capsule { from, to, radius } => {
                 // Segment SDF: |pa - ba * clamp(dot(pa,ba)/dot(ba,ba), 0,1)| - r
-                let a = self.v2x_at(&from, p);
-                let b = self.v2x_at(&to, p);
+                let a = self.v2x_at(from, p);
+                let b = self.v2x_at(to, p);
                 let pa = self.ir.sub(p, a);
                 let ba = self.ir.sub(b, a);
 
@@ -596,7 +602,7 @@ impl<'h> FnCtx<'h> {
                 let qy = self.ir.sub(pay, tbay);
                 let q = self.ir.vec2(qx, qy);
                 let len = self.ir.m1(Mf::Length, q);
-                let r = self.sx_at(&radius, p);
+                let r = self.sx_at(radius, p);
                 self.ir.sub(len, r)
             }
             Shape::RBox {
@@ -605,9 +611,9 @@ impl<'h> FnCtx<'h> {
                 round,
             } => {
                 // q = abs(p - c) - half + r;  d = length(max(q,0)) + min(max(q.x,q.y),0) - r
-                let c = self.v2x_at(&center, p);
-                let half = self.v2x_at(&half, p);
-                let r = self.sx_at(&round, p);
+                let c = self.v2x_at(center, p);
+                let half = self.v2x_at(half, p);
+                let r = self.sx_at(round, p);
                 let pc = self.ir.sub(p, c);
                 let apc = self.ir.m1(Mf::Abs, pc);
                 let q0 = self.ir.sub(apc, half);
@@ -629,8 +635,8 @@ impl<'h> FnCtx<'h> {
             }
             Shape::Ellipse { center, radii } => {
                 // Ellipse SDF approximation
-                let c = self.v2x_at(&center, p);
-                let ab = self.v2x_at(&radii, p);
+                let c = self.v2x_at(center, p);
+                let ab = self.v2x_at(radii, p);
                 let pc = self.ir.sub(p, c);
 
                 let px = self.ir.x_of(pc);
@@ -659,7 +665,7 @@ impl<'h> FnCtx<'h> {
                 points,
             } => {
                 // Star SDF: use polar coordinates and modulo to repeat around center
-                let c = self.v2x_at(&center, p);
+                let c = self.v2x_at(center, p);
                 let pc = self.ir.sub(p, c);
                 let px = self.ir.x_of(pc);
                 let py = self.ir.y_of(pc);
@@ -670,7 +676,7 @@ impl<'h> FnCtx<'h> {
                 let angle = self.ir.sub(angle_raw, up_phase);
 
                 // Sector angle for one star point (full rotation / points)
-                let sector = std::f32::consts::TAU / points as f32;
+                let sector = std::f32::consts::TAU / *points as f32;
                 let half_sector = sector * 0.5;
 
                 // Fold angle into one sector: angle_mod = angle - floor(angle / sector) * sector
@@ -686,8 +692,8 @@ impl<'h> FnCtx<'h> {
                 // Compute radius at this angle (lerp between inner and outer)
                 let abs_folded = self.ir.m1(Mf::Abs, folded);
                 let t = self.ir.div(abs_folded, half_lit);
-                let outer_r = self.sx_at(&outer, p);
-                let inner_r = self.sx_at(&inner, p);
+                let outer_r = self.sx_at(outer, p);
+                let inner_r = self.sx_at(inner, p);
                 let r = self.ir.m3(Mf::Mix, outer_r, inner_r, t);
 
                 // Distance from this radius
@@ -698,9 +704,9 @@ impl<'h> FnCtx<'h> {
             }
             Shape::Triangle { a, b, c } => {
                 // Triangle SDF using edge distances with winding-invariant sign.
-                let va = self.v2x_at(&a, p);
-                let vb = self.v2x_at(&b, p);
-                let vc = self.v2x_at(&c, p);
+                let va = self.v2x_at(a, p);
+                let vb = self.v2x_at(b, p);
+                let vc = self.v2x_at(c, p);
 
                 let pa = self.ir.sub(p, va);
                 let ba = self.ir.sub(vb, va);
@@ -824,7 +830,7 @@ impl<'h> FnCtx<'h> {
                 let px = self.ir.x_of(p);
                 let py = self.ir.y_of(p);
 
-                for contour in &contours {
+                for contour in contours {
                     if contour.len() < 2 {
                         continue;
                     }
@@ -962,17 +968,17 @@ impl<'h> FnCtx<'h> {
             } => {
                 // Periodic line family SDF: d(p) = (|fract(p[axis]/spacing + offset + 0.5) - 0.5|) * spacing
                 // This is 1-Lipschitz exact (§10.1).
-                let coord = if axis == 0 {
+                let coord = if *axis == 0 {
                     self.ir.x_of(p)
                 } else {
                     self.ir.y_of(p)
                 };
-                let spacing_raw = self.sx_at(&spacing, p);
+                let spacing_raw = self.sx_at(spacing, p);
                 // Keep periodic spacing positive and non-zero to avoid
                 // unstable fract/divide behavior when authored spacing is
                 // zero, negative, or extremely small.
                 let spacing_val = self.clamp_abs_nonzero(spacing_raw);
-                let offset_val = self.sx_at(&offset, p);
+                let offset_val = self.sx_at(offset, p);
 
                 // coord / spacing
                 let normalized = self.ir.div(coord, spacing_val);
@@ -995,12 +1001,12 @@ impl<'h> FnCtx<'h> {
                 // Single infinite line SDF: d(p) = |p[axis] - at|
                 // Avoids the precision loss from emulating a single line
                 // via an extremely large periodic spacing.
-                let coord = if axis == 0 {
+                let coord = if *axis == 0 {
                     self.ir.x_of(p)
                 } else {
                     self.ir.y_of(p)
                 };
-                let at = self.sx_at(&at, p);
+                let at = self.sx_at(at, p);
                 let delta = self.ir.sub(coord, at);
                 let d = self.ir.m1(Mf::Abs, delta);
                 self.ir.name(d, &format!("gridline_d_s{id}"));
@@ -1008,10 +1014,10 @@ impl<'h> FnCtx<'h> {
             }
             Shape::Outline { inner, width } => {
                 // stroke(w) ⇒ |d| - w/2  (§10.1)
-                let d = self.sdf(inner, p);
+                let d = self.sdf(*inner, p);
                 let ad = self.ir.m1(Mf::Abs, d);
                 self.ir.name(ad, &format!("outline_abs_s{id}"));
-                let w = self.sx_at(&width, p);
+                let w = self.sx_at(width, p);
                 let half = self.ir.lit(0.5);
                 let hw = self.ir.mul(w, half);
                 self.ir.name(hw, &format!("outline_half_w_s{id}"));
@@ -1019,19 +1025,19 @@ impl<'h> FnCtx<'h> {
             }
             Shape::Offset { inner, delta } => {
                 // d' = d - delta
-                let d = self.sdf(inner, p);
-                let delta = self.sx_at(&delta, p);
+                let d = self.sdf(*inner, p);
+                let delta = self.sx_at(delta, p);
                 self.ir.sub(d, delta)
             }
             Shape::Rotate { inner, angle } => {
                 // Rotate query point into the inner shape's local frame.
                 // d_rot(p) = d_inner(anchor + R(-a) * (p - anchor))
-                let anchor = self.shape_anchor(inner, p);
+                let anchor = self.shape_anchor(*inner, p);
                 let delta = self.ir.sub(p, anchor);
                 let dx = self.ir.x_of(delta);
                 let dy = self.ir.y_of(delta);
 
-                let a = self.sx_at(&angle, p);
+                let a = self.sx_at(angle, p);
                 let ca = self.ir.m1(Mf::Cos, a);
                 let sa = self.ir.m1(Mf::Sin, a);
 
@@ -1045,36 +1051,36 @@ impl<'h> FnCtx<'h> {
 
                 let local = self.ir.vec2(local_x, local_y);
                 let rotated_p = self.ir.addx(anchor, local);
-                self.sdf(inner, rotated_p)
+                self.sdf(*inner, rotated_p)
             }
             Shape::Mix(a, b, t) => {
-                let da = self.sdf(a, p);
-                let db = self.sdf(b, p);
-                let t = self.sx_at(&t, p);
+                let da = self.sdf(*a, p);
+                let db = self.sdf(*b, p);
+                let t = self.sx_at(t, p);
                 self.ir.m3(Mf::Mix, da, db, t)
             }
             Shape::Union(a, b) => {
-                let da = self.sdf(a, p);
-                let db = self.sdf(b, p);
+                let da = self.sdf(*a, p);
+                let db = self.sdf(*b, p);
                 self.ir.m2(Mf::Min, da, db)
             }
             Shape::Intersect(a, b) => {
-                let da = self.sdf(a, p);
-                let db = self.sdf(b, p);
+                let da = self.sdf(*a, p);
+                let db = self.sdf(*b, p);
                 self.ir.m2(Mf::Max, da, db)
             }
             Shape::Subtract(a, b) => {
-                let da = self.sdf(a, p);
-                let db = self.sdf(b, p);
+                let da = self.sdf(*a, p);
+                let db = self.sdf(*b, p);
                 let nb = self.ir.neg(db);
                 self.ir.m2(Mf::Max, da, nb)
             }
             Shape::SmoothUnion(a, b, k) => {
                 // polynomial smin: h = clamp(0.5 + 0.5*(db-da)/k, 0, 1)
                 //                  d = mix(db, da, h) - k*h*(1-h)
-                let da = self.sdf(a, p);
-                let db = self.sdf(b, p);
-                let k_raw = self.sx_at(&k, p);
+                let da = self.sdf(*a, p);
+                let db = self.sdf(*b, p);
+                let k_raw = self.sx_at(k, p);
                 // Smooth radius behaves as a magnitude; clamp away from zero
                 // so (db-da)/k remains numerically stable.
                 let k = self.clamp_abs_nonzero(k_raw);
