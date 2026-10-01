@@ -38,7 +38,6 @@ use crate::material_hir::MaterialHir;
 // ResourceLayout relocates these classes to engine-declared groups after lowering.
 pub(crate) const STORAGE_BUFFER_GROUP: u32 = 2;
 
-mod canvas;
 mod cellular;
 mod contour;
 use contour::ContourResult;
@@ -46,15 +45,17 @@ pub(crate) mod compute;
 mod ir;
 mod layer;
 mod numeric;
+mod raster_entry;
 mod scalar;
+mod scene;
 mod shape;
 mod space;
 mod surface;
 
-use canvas::{
-    lower_path_arc_sample_fn, lower_path_nearest_fn, lower_raster_entry_fn,
-    lower_raster_pass_entry_fn, lower_scatter_body_fn, lower_scene_fn, lower_scene_pass_fn,
-    lower_user_helper_fn,
+use raster_entry::{lower_raster_entry_fn, lower_raster_pass_entry_fn};
+use scene::{
+    lower_path_arc_sample_fn, lower_path_nearest_fn, lower_scatter_body_fn, lower_scene_fn,
+    lower_scene_pass_fn, lower_user_helper_fn,
 };
 
 pub(crate) fn pass_target_texture_name(entry_name: &str, target_id: usize) -> String {

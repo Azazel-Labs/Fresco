@@ -1,5 +1,5 @@
-use super::canvas::lower_user_helper_fn;
 use super::ir::project_context;
+use super::scene::lower_user_helper_fn;
 use super::*;
 use crate::context::ContextRole;
 use crate::hir::Hir;

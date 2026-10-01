@@ -649,7 +649,7 @@ const identifiers. The old literal-only proposal is not a current restriction.
   for footprint requirements, reference filtering, limitations, and acceptance tests.
 
 Investigate against current code before applying the old diagnosis: regressions in
-`crates/fresco/src/lower/canvas.rs` already cover derivative-based shape bands and
+`crates/fresco/src/lower/scene.rs` already cover derivative-based shape bands and
 mean-coverage saturation for soften/shadow, with glow kept separate.
 
 - [ ] Reproduce excess blur near projective horizons and determine where scalar
