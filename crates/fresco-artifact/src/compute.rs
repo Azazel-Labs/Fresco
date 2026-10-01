@@ -220,14 +220,8 @@ impl crate::ManifestGpuProgram {
                 ManifestComputeBindingSource::Value { parameter, .. } => {
                     reads.values.insert(parameter.clone());
                 }
-                ManifestComputeBindingSource::Resource { parameter } => {
-                    if binding.query_only_entries.contains(entry) {
-                        reads.dimensions.insert(parameter.clone());
-                    } else {
-                        reads.data.insert(parameter.clone());
-                    }
-                }
-                ManifestComputeBindingSource::Geometry {
+                ManifestComputeBindingSource::Resource { parameter }
+                | ManifestComputeBindingSource::Geometry {
                     parameter,
                     role:
                         ManifestComputeGeometryRole::Vertices | ManifestComputeGeometryRole::Indices,

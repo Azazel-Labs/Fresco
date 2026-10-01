@@ -5,6 +5,7 @@ use syn::{
     Block, Expr, Ident, LitStr, Result, Token,
     parse::{Parse, ParseStream},
     parse_macro_input,
+    punctuated::Punctuated,
 };
 
 struct BuiltinDef {
@@ -62,6 +63,25 @@ enum ArgType {
     Optional(Ident),
 }
 
+impl ArgType {
+    fn ident(&self) -> &Ident {
+        match self {
+            Self::Required(ty) | Self::Optional(ty) => ty,
+        }
+    }
+}
+
+/// Parses `key = <value>` when the next token is the identifier `key`;
+/// otherwise consumes nothing.
+fn parse_optional_keyed<T: Parse>(input: ParseStream<'_>, key: &str) -> Result<Option<T>> {
+    if !input.peek(Ident) || input.fork().parse::<Ident>()? != key {
+        return Ok(None);
+    }
+    input.parse::<Ident>()?;
+    input.parse::<Token![=]>()?;
+    input.parse().map(Some)
+}
+
 impl Parse for BuiltinDef {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         // name = "..."
@@ -80,16 +100,13 @@ impl Parse for BuiltinDef {
             syn::braced!(sig_content in input);
 
             // Parse receiver if present
-            let mut receiver = None;
-            if sig_content.peek(Ident) && sig_content.peek2(Token![=]) {
-                let lookahead = sig_content.fork();
-                let key = lookahead.parse::<Ident>()?;
-                if key == "receiver" {
-                    sig_content.parse::<Ident>()?;
-                    sig_content.parse::<Token![=]>()?;
-                    receiver = Some(sig_content.parse::<Ident>()?);
-                    sig_content.parse::<Token![,]>()?;
-                }
+            let receiver = if sig_content.peek2(Token![=]) {
+                parse_optional_keyed::<Ident>(&sig_content, "receiver")?
+            } else {
+                None
+            };
+            if receiver.is_some() {
+                sig_content.parse::<Token![,]>()?;
             }
 
             // args(...)
@@ -99,7 +116,7 @@ impl Parse for BuiltinDef {
             // result = Type
             sig_content.parse::<Ident>()?;
             sig_content.parse::<Token![=]>()?;
-            let result = parse_result_types(&sig_content)?;
+            let result = parse_bar_separated(&sig_content)?;
             sig_content.parse::<Token![,]>()?;
 
             // caps = CAP1 | CAP2 | ...
@@ -123,16 +140,9 @@ impl Parse for BuiltinDef {
             sig_content.parse::<Token![,]>()?;
 
             // default = "variant" (optional)
-            let mut default = None;
-            if sig_content.peek(Ident) {
-                let lookahead = sig_content.fork();
-                let key = lookahead.parse::<Ident>()?;
-                if key == "default" {
-                    sig_content.parse::<Ident>()?;
-                    sig_content.parse::<Token![=]>()?;
-                    default = Some(sig_content.parse::<LitStr>()?);
-                    sig_content.parse::<Token![,]>()?;
-                }
+            let default = parse_optional_keyed::<LitStr>(&sig_content, "default")?;
+            if default.is_some() {
+                sig_content.parse::<Token![,]>()?;
             }
 
             // variants = { "name" => { args(...) }, ... }
@@ -164,7 +174,7 @@ impl Parse for BuiltinDef {
             // result = Type
             sig_content.parse::<Ident>()?;
             sig_content.parse::<Token![=]>()?;
-            let result = parse_result_types(&sig_content)?;
+            let result = parse_bar_separated(&sig_content)?;
             sig_content.parse::<Token![,]>()?;
 
             // caps = CAP1 | CAP2 | ...
@@ -206,16 +216,7 @@ impl Parse for BuiltinDef {
                 }
             }
         };
-        let mut docs = None;
-        if input.peek(Ident) {
-            let lookahead = input.fork();
-            let key = lookahead.parse::<Ident>()?;
-            if key == "docs" {
-                input.parse::<Ident>()?;
-                input.parse::<Token![=]>()?;
-                docs = Some(input.parse::<LitStr>()?);
-            }
-        }
+        let docs = parse_optional_keyed::<LitStr>(input, "docs")?;
 
         let _ = input.parse::<Token![,]>().ok();
         let _ = input.parse::<Token![,]>();
@@ -336,12 +337,16 @@ fn parse_args(input: ParseStream<'_>) -> Result<Vec<ArgDef>> {
 fn parse_caps(input: ParseStream<'_>) -> Result<Vec<Ident>> {
     input.parse::<Ident>()?; // "caps"
     input.parse::<Token![=]>()?;
-    let mut caps = vec![input.parse::<Ident>()?];
-    while input.peek(Token![|]) {
-        input.parse::<Token![|]>()?;
-        caps.push(input.parse::<Ident>()?);
-    }
-    Ok(caps)
+    parse_bar_separated(input)
+}
+
+/// `A | B | ...` with at least one identifier.
+fn parse_bar_separated(input: ParseStream<'_>) -> Result<Vec<Ident>> {
+    Ok(
+        Punctuated::<Ident, Token![|]>::parse_separated_nonempty(input)?
+            .into_iter()
+            .collect(),
+    )
 }
 
 fn is_numeric_value_doc(doc: &str) -> bool {
@@ -409,15 +414,6 @@ fn synthesize_builtin_docs(
     }
 
     format!("Use {name} with the provided arguments.")
-}
-
-fn parse_result_types(input: ParseStream<'_>) -> Result<Vec<Ident>> {
-    let mut results = vec![input.parse::<Ident>()?];
-    while input.peek(Token![|]) {
-        input.parse::<Token![|]>()?;
-        results.push(input.parse::<Ident>()?);
-    }
-    Ok(results)
 }
 
 #[proc_macro]
@@ -513,7 +509,6 @@ fn generate_single_builtin(
     check_body: Block,
     docs: Option<&LitStr>,
 ) -> TokenStream {
-    let name_str = name;
     let func_name = if let Some(recv) = &receiver {
         Ident::new(
             &format!(
@@ -534,7 +529,7 @@ fn generate_single_builtin(
     let mut func_params = vec![quote! { ctx: &mut crate::check::Checker }];
 
     // Add receiver parameter if present
-    let (_recv_param, recv_type_ref) = if let Some(recv) = &receiver {
+    let recv_type_ref = if let Some(recv) = &receiver {
         let recv_param_name = Ident::new("_receiver", recv.span());
         let recv_id_type = Ident::new(&format!("{}Id", recv), recv.span());
         func_params.push(quote! { #recv_param_name: crate::hir::#recv_id_type });
@@ -545,12 +540,9 @@ fn generate_single_builtin(
             _ => panic!("Unknown receiver type: {}", recv),
         };
 
-        (
-            Some(recv_param_name),
-            quote! { Some(crate::registry::TypeRef::Primitive(#prim_type)) },
-        )
+        quote! { Some(crate::registry::TypeRef::Primitive(#prim_type)) }
     } else {
-        (None, quote! { None })
+        quote! { None }
     };
 
     func_params.push(quote! { bag: &mut crate::check::ArgBag });
@@ -561,79 +553,32 @@ fn generate_single_builtin(
 
     for arg in &args {
         let arg_name = &arg.name;
-        let arg_doc = &arg.doc;
-        let arg_viz_role = arg.viz_role.as_ref();
+        arg_decls.push(arg_decl_tokens(arg, matches!(arg.ty, ArgType::Required(_))));
 
-        match &arg.ty {
-            ArgType::Required(ty) => {
-                let prim_type = type_to_primitive(ty);
-
-                if ty == "Expr" || ty == "ColorExpr" {
-                    extract_stmts.push(quote! {
-                        let #arg_name = bag.require(stringify!(#arg_name), &mut ctx.diags)?;
-                    });
-                } else {
-                    let converter = type_converter(ty);
-                    extract_stmts.push(quote! {
-                        let __arg = bag.require(stringify!(#arg_name), &mut ctx.diags)?;
-                        let #arg_name = ctx.#converter(__arg)?;
-                    });
-                }
-
-                if let Some(viz_role) = arg_viz_role {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::required_with_role(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            stringify!(#viz_role),
-                            #arg_doc,
-                        )
-                    });
-                } else {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::required(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            #arg_doc,
-                        )
-                    });
+        let ty = arg.ty.ident();
+        let extract = match &arg.ty {
+            ArgType::Required(_) if ty == "Expr" || ty == "ColorExpr" => quote! {
+                let #arg_name = bag.require(stringify!(#arg_name), &mut ctx.diags)?;
+            },
+            ArgType::Required(_) => {
+                let converter = type_converter(ty);
+                quote! {
+                    let __arg = bag.require(stringify!(#arg_name), &mut ctx.diags)?;
+                    let #arg_name = ctx.#converter(__arg)?;
                 }
             }
-            ArgType::Optional(ty) => {
-                let prim_type = type_to_primitive(ty);
-
-                if ty == "Expr" || ty == "ColorExpr" {
-                    extract_stmts.push(quote! {
-                        let #arg_name = bag.take(stringify!(#arg_name));
-                    });
-                } else {
-                    let converter = type_converter(ty);
-                    extract_stmts.push(quote! {
-                        let #arg_name = bag.take(stringify!(#arg_name))
-                            .and_then(|__arg| ctx.#converter(__arg));
-                    });
-                }
-
-                if let Some(viz_role) = arg_viz_role {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::optional_with_role(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            stringify!(#viz_role),
-                            #arg_doc,
-                        )
-                    });
-                } else {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::optional(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            #arg_doc,
-                        )
-                    });
+            ArgType::Optional(_) if ty == "Expr" || ty == "ColorExpr" => quote! {
+                let #arg_name = bag.take(stringify!(#arg_name));
+            },
+            ArgType::Optional(_) => {
+                let converter = type_converter(ty);
+                quote! {
+                    let #arg_name = bag.take(stringify!(#arg_name))
+                        .and_then(|__arg| ctx.#converter(__arg));
                 }
             }
-        }
+        };
+        extract_stmts.push(extract);
     }
 
     // Build result type references (first is primary, rest are alternatives)
@@ -678,8 +623,8 @@ fn generate_single_builtin(
         #[doc(hidden)]
         inventory::submit! {
             crate::registry::BuiltinDecl {
-                id: crate::registry::BuiltinId(#name_str),
-                name: #name_str,
+                id: crate::registry::BuiltinId(#name),
+                name: #name,
                 discriminator: None,
                 signature: crate::registry::BuiltinSignature {
                     receiver: #recv_type_ref,
@@ -724,17 +669,15 @@ fn generate_discriminated_builtin(input: DiscriminatedBuiltinInput<'_>) -> Token
         docs,
     } = input;
 
-    let name_str = name;
     let func_name = Ident::new(
         &format!("{}_check_impl", builtin_rust_name(&name.value())),
         name.span(),
     );
     let discriminator_str = &discriminator;
     let default_str = default.as_ref();
-    let mut variant_names_sorted = variants.keys().cloned().collect::<Vec<_>>();
-    variant_names_sorted.sort();
-    let variant_name_lits = variant_names_sorted
-        .iter()
+    // BTreeMap keys are already sorted.
+    let variant_name_lits = variants
+        .keys()
         .map(|name| LitStr::new(name, proc_macro2::Span::call_site()))
         .collect::<Vec<_>>();
 
@@ -754,69 +697,18 @@ fn generate_discriminated_builtin(input: DiscriminatedBuiltinInput<'_>) -> Token
             let key = arg.name.to_string();
             // If we see the same arg in multiple variants, keep the first one
             // (in practice, discriminated signatures usually have non-overlapping args per variant)
-            all_args_map.entry(key).or_insert_with(|| ArgDef {
-                name: arg.name.clone(),
-                ty: arg.ty.clone(),
-                viz_role: arg.viz_role.clone(),
-                doc: arg.doc.clone(),
-            });
+            all_args_map.entry(key).or_insert_with(|| arg.clone());
         }
     }
 
-    let mut arg_decls = Vec::new();
-    for arg in all_args_map.values() {
-        let arg_name = &arg.name;
-        let arg_doc = &arg.doc;
-        let arg_viz_role = arg.viz_role.as_ref();
-
-        match &arg.ty {
-            ArgType::Required(ty) => {
-                let prim_type = type_to_primitive(ty);
-                // Discriminated builtins validate required fields per variant in the
-                // generated impl function. The coarse registry signature must stay
-                // permissive enough for dispatch to reach that variant logic.
-                if let Some(viz_role) = arg_viz_role {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::optional_with_role(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            stringify!(#viz_role),
-                            #arg_doc,
-                        )
-                    });
-                } else {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::optional(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            #arg_doc,
-                        )
-                    });
-                }
-            }
-            ArgType::Optional(ty) => {
-                let prim_type = type_to_primitive(ty);
-                if let Some(viz_role) = arg_viz_role {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::optional_with_role(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            stringify!(#viz_role),
-                            #arg_doc,
-                        )
-                    });
-                } else {
-                    arg_decls.push(quote! {
-                        crate::registry::BuiltinArgDecl::optional(
-                            stringify!(#arg_name),
-                            crate::registry::TypeRef::Primitive(#prim_type),
-                            #arg_doc,
-                        )
-                    });
-                }
-            }
-        }
-    }
+    // Discriminated builtins validate required fields per variant in the
+    // generated impl function. The coarse registry signature must stay
+    // permissive enough for dispatch to reach that variant logic, so every
+    // argument is registered as optional.
+    let arg_decls: Vec<_> = all_args_map
+        .values()
+        .map(|arg| arg_decl_tokens(arg, false))
+        .collect();
 
     // Build result type references (first is primary, rest are alternatives)
     let result_type_ref = type_to_typeref(&result[0]);
@@ -850,8 +742,8 @@ fn generate_discriminated_builtin(input: DiscriminatedBuiltinInput<'_>) -> Token
         #[doc(hidden)]
         inventory::submit! {
             crate::registry::BuiltinDecl {
-                id: crate::registry::BuiltinId(#name_str),
-                name: #name_str,
+                id: crate::registry::BuiltinId(#name),
+                name: #name,
                 discriminator: Some(crate::registry::BuiltinDiscriminatorDecl {
                     name: #discriminator_str,
                     default: #default_option,
@@ -881,6 +773,29 @@ fn generate_discriminated_builtin(input: DiscriminatedBuiltinInput<'_>) -> Token
     TokenStream::from(quote! { const _: () = { #expanded }; })
 }
 
+/// A `BuiltinArgDecl` constructor call for `arg`, registered as required or
+/// optional independently of how the argument is declared.
+fn arg_decl_tokens(arg: &ArgDef, required: bool) -> proc_macro2::TokenStream {
+    let arg_name = &arg.name;
+    let arg_doc = &arg.doc;
+    let prim_type = type_to_primitive(arg.ty.ident());
+    let constructor = match (required, arg.viz_role.is_some()) {
+        (true, false) => quote! { required },
+        (true, true) => quote! { required_with_role },
+        (false, false) => quote! { optional },
+        (false, true) => quote! { optional_with_role },
+    };
+    let viz_role = arg.viz_role.iter();
+    quote! {
+        crate::registry::BuiltinArgDecl::#constructor(
+            stringify!(#arg_name),
+            crate::registry::TypeRef::Primitive(#prim_type),
+            #(stringify!(#viz_role),)*
+            #arg_doc,
+        )
+    }
+}
+
 fn type_converter(ty: &Ident) -> proc_macro2::TokenStream {
     match ty.to_string().as_str() {
         "Vec2" => quote! { as_vec2 },
@@ -907,35 +822,10 @@ fn type_to_primitive(ty: &Ident) -> proc_macro2::TokenStream {
 
 fn type_to_typeref(ty: &Ident) -> proc_macro2::TokenStream {
     match ty.to_string().as_str() {
-        "Vec2" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Vec2) }
-        }
-        "Vec3" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Vec3) }
-        }
-        "Vec4" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Vec4) }
-        }
-        "Scalar" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Scalar) }
-        }
-        "Mask" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Mask) }
-        }
-        "Shape" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Shape) }
-        }
-        "Layer" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Layer) }
-        }
-        "Color" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Color) }
-        }
-        "ColorField" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::ColorField) }
-        }
-        "Gradient" => {
-            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::Gradient) }
+        name @ ("Vec2" | "Vec3" | "Vec4" | "Scalar" | "Mask" | "Shape" | "Layer" | "Color"
+        | "ColorField" | "Gradient") => {
+            let prim = Ident::new(name, proc_macro2::Span::call_site());
+            quote! { crate::registry::TypeRef::Primitive(crate::registry::PrimitiveType::#prim) }
         }
         _ => panic!("Unknown result type: {}", ty),
     }
