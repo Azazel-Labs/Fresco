@@ -229,17 +229,6 @@ fn same_simple_value(a: &Value, b: &Value) -> bool {
     }
 }
 
-fn color_to_sx(value: Value) -> Option<[Sx; 4]> {
-    match value {
-        Value::Color {
-            rgba: [r, g, b, a], ..
-        } => Some([Sx::Lit(r), Sx::Lit(g), Sx::Lit(b), Sx::Lit(a)]),
-        Value::ColorField { rgba, .. } => Some(rgba),
-        Value::Gradient { kind, stops } => Some(crate::hir::GradientSample::channels(kind, stops)),
-        _ => None,
-    }
-}
-
 fn color_luma([r, g, b, _a]: &[Sx; 4]) -> Sx {
     let wr = Sx::Lit(0.2126);
     let wg = Sx::Lit(0.7152);
@@ -266,7 +255,7 @@ fn require_color_transform_args(
     name: &str,
 ) -> Option<[Sx; 4]> {
     let color_value = ctx.eval(color).unwrap_or(Value::Error);
-    let Some(rgba) = color_to_sx(color_value.clone()) else {
+    let Some(rgba) = color_value.clone().into_color_channels() else {
         if !matches!(color_value, Value::Error) {
             ctx.diags.push(
                 crate::diag::Diag::error(
@@ -1923,8 +1912,8 @@ builtin! {
                     let tv_kind = tv.kind();
                     // Color/ColorField mixing: mix(color_a, color_b, t) — per-channel linear blend.
                     if let (Some(ca), Some(cb), Some((st, _))) = (
-                        color_to_sx(av),
-                        color_to_sx(bv),
+                        av.into_color_channels(),
+                        bv.into_color_channels(),
                         crate::check::Checker::as_numeric_scalar(&tv),
                     ) {
                         let [ar, ag, ab, aa] = ca;

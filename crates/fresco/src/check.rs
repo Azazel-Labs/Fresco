@@ -2039,6 +2039,16 @@ impl Value {
         }
     }
 
+    /// The RGBA channel expressions of a color, color field, or gradient sample.
+    pub(crate) fn into_color_channels(self) -> Option<[Sx; 4]> {
+        match self {
+            Self::Color { rgba, .. } => Some(rgba.map(Sx::Lit)),
+            Self::ColorField { rgba, .. } => Some(rgba),
+            Self::Gradient { kind, stops } => Some(hir::GradientSample::channels(kind, stops)),
+            _ => None,
+        }
+    }
+
     /// A scalar for one lane, or a vec2/vec3/vec4 for two to four lanes.
     pub(crate) fn from_lanes(lanes: Vec<Sx>) -> Option<Self> {
         let lanes = match <[Sx; 1]>::try_from(lanes) {

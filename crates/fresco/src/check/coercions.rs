@@ -124,18 +124,18 @@ impl Checker {
         let t0 = Instant::now();
         let out = match self.eval(e)? {
             Value::Error => None,
-            Value::Color { rgba, .. } => Some(rgba.map(Sx::Lit)),
-            Value::ColorField { rgba, .. } => Some(rgba),
-            Value::Gradient { kind, stops } => Some(hir::GradientSample::channels(kind, stops)),
             v => {
-                self.diags.push(Diag::error(
-                    e.span.clone(),
-                    format!(
-                        "expected a color expression (literal, rgb, rgba, or color arithmetic), found a {}",
-                        v.kind()
-                    ),
-                ));
-                None
+                let kind = v.kind();
+                let rgba = v.into_color_channels();
+                if rgba.is_none() {
+                    self.diags.push(Diag::error(
+                        e.span.clone(),
+                        format!(
+                            "expected a color expression (literal, rgb, rgba, or color arithmetic), found a {kind}"
+                        ),
+                    ));
+                }
+                rgba
             }
         };
         self.record_check_profile_timing("as_color_expr", t0.elapsed());
