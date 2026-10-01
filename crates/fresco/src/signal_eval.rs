@@ -44,7 +44,7 @@ pub(crate) fn evaluate(sx: &Sx, vars: &HashMap<&str, f32>) -> Result<f32, Error>
                 naga::Literal::F32(v) => Ok(v),
                 naga::Literal::U32(v) => Ok(v as f32),
                 naga::Literal::I32(v) => Ok(v as f32),
-                naga::Literal::Bool(v) => Ok(if v { 1.0 } else { 0.0 }),
+                naga::Literal::Bool(v) => Ok(f32::from(v)),
                 _ => unreachable!("concrete scalar type"),
             }
         }
@@ -70,36 +70,12 @@ pub(crate) fn evaluate(sx: &Sx, vars: &HashMap<&str, f32>) -> Result<f32, Error>
             }
             Ok(evaluate(a, vars)? / den)
         }
-        Sx::Lt(a, b) => Ok(if evaluate(a, vars)? < evaluate(b, vars)? {
-            1.0
-        } else {
-            0.0
-        }),
-        Sx::Le(a, b) => Ok(if evaluate(a, vars)? <= evaluate(b, vars)? {
-            1.0
-        } else {
-            0.0
-        }),
-        Sx::Gt(a, b) => Ok(if evaluate(a, vars)? > evaluate(b, vars)? {
-            1.0
-        } else {
-            0.0
-        }),
-        Sx::Ge(a, b) => Ok(if evaluate(a, vars)? >= evaluate(b, vars)? {
-            1.0
-        } else {
-            0.0
-        }),
-        Sx::Eq(a, b) => Ok(if evaluate(a, vars)? == evaluate(b, vars)? {
-            1.0
-        } else {
-            0.0
-        }),
-        Sx::Ne(a, b) => Ok(if evaluate(a, vars)? != evaluate(b, vars)? {
-            1.0
-        } else {
-            0.0
-        }),
+        Sx::Lt(a, b) => Ok(f32::from(evaluate(a, vars)? < evaluate(b, vars)?)),
+        Sx::Le(a, b) => Ok(f32::from(evaluate(a, vars)? <= evaluate(b, vars)?)),
+        Sx::Gt(a, b) => Ok(f32::from(evaluate(a, vars)? > evaluate(b, vars)?)),
+        Sx::Ge(a, b) => Ok(f32::from(evaluate(a, vars)? >= evaluate(b, vars)?)),
+        Sx::Eq(a, b) => Ok(f32::from(evaluate(a, vars)? == evaluate(b, vars)?)),
+        Sx::Ne(a, b) => Ok(f32::from(evaluate(a, vars)? != evaluate(b, vars)?)),
         Sx::Sin(v) => Ok(evaluate(v, vars)?.sin()),
         Sx::Cos(v) => Ok(evaluate(v, vars)?.cos()),
         Sx::Tan(v) => Ok(evaluate(v, vars)?.tan()),
