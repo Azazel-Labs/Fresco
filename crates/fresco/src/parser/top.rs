@@ -8,6 +8,28 @@ use crate::ast::{
 };
 use crate::pipeline_layout::canonical_layout_signature_from_tokens;
 
+/// Any token sequence that is balanced with respect to `open`/`close`,
+/// excluding the outer delimiters themselves.
+fn opaque_balanced<'src>(open: Token, close: Token) -> PBox<'src, ()> {
+    recursive(|nested| {
+        let (open_tok, close_tok) = (open.clone(), close.clone());
+        choice((
+            chumsky::primitive::select(move |tok: Token, _| {
+                (tok != open_tok && tok != close_tok).then_some(())
+            })
+            .boxed(),
+            just(open.clone())
+                .ignore_then(nested.repeated())
+                .then_ignore(just(close.clone()))
+                .ignored()
+                .boxed(),
+        ))
+    })
+    .repeated()
+    .ignored()
+    .boxed()
+}
+
 pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     let nl = nl();
     let comma_sep = comma_sep();
@@ -19,46 +41,17 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
 
     // Opaque balanced-brace parser used by staged declarations where syntax is
     // accepted before semantic/lowering support lands.
-    let opaque_braced_block = recursive(|nested| {
-        choice((
-            select! { tok if !matches!(tok, Token::LBrace | Token::RBrace) => () }
-                .ignored()
-                .boxed(),
-            just(Token::LBrace)
-                .ignore_then(nested.repeated())
-                .then_ignore(just(Token::RBrace))
-                .ignored()
-                .boxed(),
-        ))
-    })
-    .repeated()
-    .ignored()
-    .delimited_by(
-        just(Token::LBrace).then_ignore(nl.clone()),
-        nl.clone().ignore_then(just(Token::RBrace)),
-    )
-    .boxed();
+    let opaque_braced_block = opaque_balanced(Token::LBrace, Token::RBrace)
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
+        .boxed();
 
-    let opaque_paren_block = recursive(|nested| {
-        choice((
-            select! { tok if !matches!(tok, Token::LParen | Token::RParen) => () }
-                .ignored()
-                .boxed(),
-            just(Token::LParen)
-                .ignore_then(nested.repeated())
-                .then_ignore(just(Token::RParen))
-                .ignored()
-                .boxed(),
-        ))
-    })
-    .repeated()
-    .ignored()
-    .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map_with(|_, e| e.span())
-    .boxed();
+    let opaque_paren_block = opaque_balanced(Token::LParen, Token::RParen)
+        .delimited_by(just(Token::LParen), just(Token::RParen))
+        .map_with(|_, e| e.span())
+        .boxed();
 
     let pipeline_attr_arg = choice((
-        select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits).to_string() }.boxed(),
+        plain_number().map(|n| n.to_string()).boxed(),
         select! { Token::Str(s) => s }.boxed(),
         ident_sp.clone().map(|(name, _)| name).boxed(),
         just(Token::Pass).to("pass".to_string()).boxed(),
@@ -212,10 +205,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .separated_by(comma_sep.clone())
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        )
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
         .boxed();
 
     let entry_template_parts = ident_sp
@@ -234,18 +224,15 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .ignore_then(
                     choice((
                         ident.clone(),
-                        just(Token::Minus)
-                            .or_not()
-                            .then(
-                                select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) },
-                            )
-                            .map(|(negative, value)| {
+                        just(Token::Minus).or_not().then(plain_number()).map(
+                            |(negative, value)| {
                                 if negative.is_some() {
                                     format!("-{value}")
                                 } else {
                                     value.to_string()
                                 }
-                            }),
+                            },
+                        ),
                     ))
                     .separated_by(just(Token::Comma))
                     .allow_trailing()
@@ -366,7 +353,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .map(|value| value.is_some());
     let fn_param = context_param
         .then(
-            select! { Token::Ident(s) if s == "static" => () }
+            keyword("static")
                 .or_not()
                 .ignore_then(ident_sp.clone())
                 .then_ignore(just(Token::Colon))
@@ -404,10 +391,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .separated_by(comma_sep.clone())
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        )
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
         .boxed();
 
     enum FnParamItem {
@@ -439,10 +423,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .or_not()
         .map(Option::unwrap_or_default)
         .then_ignore(comma_sep.clone().or_not())
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        )
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
         .try_map(|items, _span| {
             let mut params = Vec::new();
             let mut saw_keyword_separator = false;
@@ -522,7 +503,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let const_param = select! { Token::Ident(s) if s == "const" => () }
+    let const_param = keyword("const")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::Colon))
         .then(const_param_kind)
@@ -650,10 +631,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .allow_leading()
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
     let entry_registration = select! { Token::Attribute(name) if name == "entry" => () }
@@ -917,11 +895,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
 
     let enum_variant = ident_sp
         .clone()
-        .then(
-            just(Token::Eq)
-                .ignore_then(select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) })
-                .or_not(),
-        )
+        .then(just(Token::Eq).ignore_then(plain_number()).or_not())
         .map(|((name, span), _value)| EnumVariant { name, span })
         .boxed();
 
@@ -941,10 +915,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_trailing()
                 .at_least(1)
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|(((name, name_span), _backing_ty), variants), e| EnumDecl {
             name,
@@ -994,10 +965,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|((attrs, (name, name_span)), fields), e| StructDecl {
             attrs,
@@ -1010,7 +978,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
 
     let resource_decl = pipeline_attrs
         .clone()
-        .then_ignore(style_graph::keyword("resource"))
+        .then_ignore(keyword("resource"))
         .then(ident_sp.clone())
         .then(
             struct_field
@@ -1018,10 +986,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|((mut attrs, (name, name_span)), fields), e| {
             attrs.push(crate::ast::PipelineAttribute {
@@ -1066,10 +1031,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|((name, name_span), methods), e| InterfaceDecl {
             entry: None,
@@ -1089,10 +1051,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(
             |(((type_name, type_name_span), (interface_name, interface_name_span)), methods), e| {
@@ -1205,12 +1164,12 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     let optional = just(Token::Optional).or_not().map(|v| v.is_some());
     let contract_member = choice((
         style_hook.map(|hook| ContractMember::Hook(Box::new(hook))),
-        style_graph::keyword("input")
+        keyword("input")
             .ignore_then(style_graph::member())
             .map(ContractMember::Input),
         optional
             .clone()
-            .then_ignore(style_graph::keyword("capability"))
+            .then_ignore(keyword("capability"))
             .then(ident.clone())
             .map_with(|(optional, name), e| {
                 ContractMember::Capability(crate::ast::StyleCapabilityUse {
@@ -1220,7 +1179,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 })
             }),
         optional
-            .then_ignore(style_graph::keyword("point"))
+            .then_ignore(keyword("point"))
             .then(style_graph::member())
             .then(style_graph::fields())
             .map_with(|((optional, member), fields), e| {
@@ -1234,7 +1193,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
             }),
     ))
     .boxed();
-    let style_contract_decl = select! { Token::Ident(s) if s == "contract" => () }
+    let style_contract_decl = keyword("contract")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::For))
         .then(ident_sp.clone())
@@ -1244,10 +1203,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(
             |(((name, name_span), (schema, schema_span)), hooks), e| StyleContractDecl {
@@ -1309,11 +1265,11 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         Graph(crate::ast::Spanned<crate::ast::StyleGraphNode>),
         ShadingInput(crate::ast::StyleShadingInputDecl),
     }
-    let shading_input = style_graph::keyword("shading_input")
+    let shading_input = keyword("shading_input")
         .ignore_then(ident.clone())
         .then_ignore(just(Token::Colon))
         .then(fn_param_type_sp())
-        .then_ignore(style_graph::keyword("scope"))
+        .then_ignore(keyword("scope"))
         .then(ident.clone())
         .map_with(
             |((name, (ty, _)), scope), e| crate::ast::StyleShadingInputDecl {
@@ -1333,7 +1289,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
             choice((
                 func.clone().map(StyleMember::Method),
                 shading_input.map(StyleMember::ShadingInput),
-                select! { Token::Ident(s) if s == "static" => () }
+                keyword("static")
                     .ignore_then(choice((
                         constrained_style_param.clone(),
                         global_param_decl.clone(),
@@ -1341,7 +1297,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                     .map(StyleMember::StaticParameter),
                 constrained_style_param.map(StyleMember::Parameter),
                 global_param_decl.clone().map(StyleMember::Parameter),
-                style_graph::keyword("requires")
+                keyword("requires")
                     .ignore_then(
                         expr::expr_parser()
                             .separated_by(just(Token::Comma))
@@ -1356,10 +1312,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
             .allow_leading()
             .allow_trailing()
             .collect::<Vec<_>>()
-            .delimited_by(
-                just(Token::LBrace).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RBrace)),
-            ),
+            .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(
             |((((name, name_span), (schema, schema_span)), (contract, contract_span)), methods),
@@ -1538,7 +1491,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .boxed();
 
     let texture_type_body_item = choice((
-        select! { Token::Ident(s) if s == "sample" => () }
+        keyword("sample")
             .ignore_then(just(Token::Colon))
             .ignore_then(choice((
                 ident_sp.clone().map(|(mode, _)| mode).boxed(),
@@ -1548,7 +1501,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
             .ignored()
             .map(|_| TextureTypeBodyItem::SampleMode)
             .boxed(),
-        select! { Token::Ident(s) if s == "layered" => () }
+        keyword("layered")
             .map(|_| TextureTypeBodyItem::Layered)
             .boxed(),
         texture_type_at_signature,
@@ -1576,10 +1529,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_trailing()
                 .at_least(1)
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|(((name, name_span), result_ty), items), e| {
             let mut channels = Vec::new();
@@ -1606,7 +1556,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let material_model_channel = select! { Token::Ident(s) if s == "channel" => () }
+    let material_model_channel = keyword("channel")
         .ignore_then(template_attrs.clone())
         .then(ident_sp.clone())
         .then_ignore(just(Token::Colon))
@@ -1640,13 +1590,9 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     let material_properties_decl = pipeline_attrs
         .clone()
         .then(
-            select! { Token::Ident(s) if s == "material_properties" => () }
+            keyword("material_properties")
                 .ignore_then(ident_sp.clone())
-                .then(
-                    select! { Token::Ident(s) if s == "extends" => () }
-                        .ignore_then(ident_sp.clone())
-                        .or_not(),
-                )
+                .then(keyword("extends").ignore_then(ident_sp.clone()).or_not())
                 .then(
                     material_model_channel
                         .clone()
@@ -1654,10 +1600,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                         .allow_leading()
                         .allow_trailing()
                         .collect::<Vec<_>>()
-                        .delimited_by(
-                            just(Token::LBrace).then_ignore(nl.clone()),
-                            nl.clone().ignore_then(just(Token::RBrace)),
-                        ),
+                        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
                 )
                 .map_with(
                     |(((name, name_span), extends), channels), e| MaterialPropertiesDecl {
@@ -1709,18 +1652,15 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let schema_expression_decl = select! { Token::Ident(s) if s == "schema_expression" => () }
+    let schema_expression_decl = keyword("schema_expression")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::For))
         .then(ident_sp.clone())
         .then(
-            select! { Token::Ident(s) if s == "shade" => () }
+            keyword("shade")
                 .ignore_then(just(Token::Colon))
                 .ignore_then(expr::expr_parser_with_casts(true))
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(
             |(((name, name_span), (properties_name, properties_span)), shade), e| {
@@ -1743,13 +1683,13 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     }
     let schema_program_item = choice((
         func.clone().map(SchemaProgramItem::Function),
-        select! { Token::Ident(s) if s == "output" => () }
+        keyword("output")
             .ignore_then(just(Token::Colon))
             .ignore_then(expr::expr_parser_with_casts(true))
             .map(SchemaProgramItem::Output),
     ))
     .boxed();
-    let schema_program_decl = select! { Token::Ident(s) if s == "schema_program" => () }
+    let schema_program_decl = keyword("schema_program")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::For))
         .then(ident_sp.clone())
@@ -1759,10 +1699,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .try_map(
             |(((name, name_span), (material_model_name, material_model_span)), items), _span| {
@@ -1819,7 +1756,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let const_decl = select! { Token::Ident(s) if s == "const" => () }
+    let const_decl = keyword("const")
         .ignore_then(choice((
             ident_sp
                 .clone()
@@ -1845,7 +1782,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     let evaluation_contract_binding_sep = comma_sep.clone().or(sep.clone()).boxed();
 
     let evaluation_contract_item = choice((
-        select! { Token::Ident(s) if s == "inputs" => () }
+        keyword("inputs")
             .ignore_then(just(Token::Colon))
             .ignore_then(
                 evaluation_contract_binding
@@ -1855,7 +1792,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                     .collect::<Vec<_>>(),
             )
             .map(EvaluationContractItem::Inputs),
-        select! { Token::Ident(s) if s == "runtime" => () }
+        keyword("runtime")
             .ignore_then(just(Token::Colon))
             .ignore_then(
                 evaluation_contract_binding
@@ -1865,7 +1802,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                     .collect::<Vec<_>>(),
             )
             .map(EvaluationContractItem::Runtime),
-        select! { Token::Ident(s) if s == "input" => () }
+        keyword("input")
             .ignore_then(
                 evaluation_contract_binding
                     .clone()
@@ -1877,17 +1814,14 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     ))
     .boxed();
 
-    let evaluation_contract_decl = select! { Token::Ident(s) if s == "contract" => () }
+    let evaluation_contract_decl = keyword("contract")
         .ignore_then(
             evaluation_contract_item
                 .separated_by(sep.clone())
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .try_map(|items, span| {
             let mut inputs = Vec::new();
@@ -1909,17 +1843,14 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let evaluation_input_decl = select! { Token::Ident(s) if s == "input" => () }
+    let evaluation_input_decl = keyword("input")
         .ignore_then(
             evaluation_contract_binding
                 .clone()
                 .separated_by(evaluation_contract_binding_sep)
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|bindings, e| SchemaEvaluatorContractDecl {
             inputs: Vec::new(),
@@ -1939,7 +1870,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
             .clone()
             .map(|(name, _span)| EvaluationPermutationAtomItem::Ident(name))
             .boxed(),
-        select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) }
+        plain_number()
             .map(|count| EvaluationPermutationAtomItem::Number(count as u32))
             .boxed(),
     ))
@@ -1949,9 +1880,9 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .clone()
         .then_ignore(just(Token::Colon))
         .then(choice((
-            select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) }
+            plain_number()
                 .then_ignore(just(Token::RangeOp))
-                .then(select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) })
+                .then(plain_number())
                 .map(|(start, end)| EvaluationPermutationSpec::Range {
                     start: start as u32,
                     end: end as u32,
@@ -1993,27 +1924,24 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         )
         .boxed();
 
-    let evaluation_permutations_decl = select! { Token::Ident(s) if s == "permutations" => () }
+    let evaluation_permutations_decl = keyword("permutations")
         .ignore_then(
             evaluation_permutation_item
                 .separated_by(sep.clone())
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .boxed();
 
-    let evaluation_specialize_decl = select! { Token::Ident(s) if s == "specialize" => () }
-        .ignore_then(select! { Token::Ident(s) if s == "as" => () })
+    let evaluation_specialize_decl = keyword("specialize")
+        .ignore_then(keyword("as"))
         .ignore_then(select! { Token::Str(s) => s })
         .map_with(|pattern, e| (pattern, e.span()))
         .boxed();
 
-    let evaluation_variant_decl = select! { Token::Ident(s) if s == "variant" => () }
+    let evaluation_variant_decl = keyword("variant")
         .ignore_then(ident_sp.clone())
         .then(
             just(Token::When)
@@ -2057,11 +1985,11 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         evaluation_specialize_decl
             .map(|(pattern, span)| SchemaEvaluatorItem::Specialize(pattern, span))
             .boxed(),
-        select! { Token::Ident(s) if s == "shade" => () }
+        keyword("shade")
             .ignore_then(just(Token::Colon))
             .ignore_then(expr::expr_parser_with_casts(true))
             .map(SchemaEvaluatorItem::Shade),
-        select! { Token::Ident(s) if s == "shader" => () }
+        keyword("shader")
             .ignore_then(just(Token::Colon))
             .ignore_then(select! { Token::Str(s) => s })
             .map(SchemaEvaluatorItem::ShaderSource),
@@ -2069,7 +1997,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     ))
     .boxed();
 
-    let schema_evaluator_decl = select! { Token::Ident(s) if s == "schema_evaluator" => () }
+    let schema_evaluator_decl = keyword("schema_evaluator")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::For))
         .then(ident_sp.clone())
@@ -2079,10 +2007,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .try_map(
             |(((name, name_span), (material_model_name, material_model_span)), items), span| {
@@ -2142,15 +2067,11 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     // }
 
     // Locality clause: `point`, `local`, `local(<expr>)`, `global`
-    let locality_point = select! { Token::Ident(s) if s == "point" => () }
-        .map(|_| LocalityClass::Point)
-        .boxed();
+    let locality_point = keyword("point").map(|_| LocalityClass::Point).boxed();
 
-    let locality_global = select! { Token::Ident(s) if s == "global" => () }
-        .map(|_| LocalityClass::Global)
-        .boxed();
+    let locality_global = keyword("global").map(|_| LocalityClass::Global).boxed();
 
-    let locality_local_with_radius = select! { Token::Ident(s) if s == "local" => () }
+    let locality_local_with_radius = keyword("local")
         .ignore_then(
             just(Token::LParen)
                 .ignore_then(expr::expr_parser())
@@ -2162,7 +2083,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         )
         .boxed();
 
-    let locality_local_bare = select! { Token::Ident(s) if s == "local" => () }
+    let locality_local_bare = keyword("local")
         .map(|_| LocalityClass::Local { constraint: None })
         .boxed();
 
@@ -2183,10 +2104,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .separated_by(comma_sep.clone())
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LParen).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RParen)),
-                ),
+                .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen)),
         )
         .map_with(|((name, name_span), args), e| RewritePattern {
             name,
@@ -2262,10 +2180,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .or_not()
                 .map(Option::unwrap_or_default),
         )
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
     let effect_decl = just(Token::Effect)
@@ -2327,7 +2242,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .ignore_then(entry_template_parts.clone())
         .then(
             just(Token::Arrow)
-                .ignore_then(select! { Token::Ident(s) if s == "material" => () })
+                .ignore_then(keyword("material"))
                 .ignore_then(
                     just(Token::LParen)
                         .ignore_then(select! { Token::Ident(s) => s })
@@ -2389,10 +2304,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_trailing()
                 .at_least(1)
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map_with(|((domain, domain_span), values), e| crate::ast::TagsDecl {
             domain,
@@ -2402,7 +2314,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let budget_block = select! { Token::Ident(s) if s == "budget" => () }
+    let budget_block = keyword("budget")
         .ignore_then(opaque_braced_block.clone())
         .boxed();
 
@@ -2419,7 +2331,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
 
     let group_decl = pipeline_attrs
         .clone()
-        .then_ignore(select! { Token::Ident(s) if s == "group" => () })
+        .then_ignore(keyword("group"))
         .then(
             group_name
                 .separated_by(comma_sep.clone())
@@ -2469,7 +2381,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
             .filter(|(value, _)| value != "when" && value != "else")
             .map(|(value, span)| crate::ast::Spanned { node: value, span })
             .boxed(),
-        select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) }
+        plain_number()
             .map_with(|value, e| crate::ast::Spanned {
                 node: value.to_string(),
                 span: e.span(),
@@ -2555,7 +2467,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     ))
     .boxed();
 
-    let pass_binding_block = select! { Token::Ident(s) if s == "binding" => () }
+    let pass_binding_block = keyword("binding")
         .ignore_then(
             pass_binding_decl
                 .clone()
@@ -2564,15 +2476,13 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_trailing()
                 .collect::<Vec<_>>()
                 .delimited_by(
-                    just(Token::LBrace)
-                        .or(nl.clone().ignore_then(just(Token::LBrace)))
-                        .then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
+                    nl.clone().ignore_then(open_nl(Token::LBrace)),
+                    nl_close(Token::RBrace),
                 ),
         )
         .boxed();
 
-    let pass_permutations_block = select! { Token::Ident(s) if s == "permutations" => () }
+    let pass_permutations_block = keyword("permutations")
         .ignore_then(
             pass_permutation_decl
                 .clone()
@@ -2581,15 +2491,13 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_trailing()
                 .collect::<Vec<_>>()
                 .delimited_by(
-                    just(Token::LBrace)
-                        .or(nl.clone().ignore_then(just(Token::LBrace)))
-                        .then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
+                    nl.clone().ignore_then(open_nl(Token::LBrace)),
+                    nl_close(Token::RBrace),
                 ),
         )
         .boxed();
 
-    let pass_require_block = select! { Token::Ident(s) if s == "require" => () }
+    let pass_require_block = keyword("require")
         .ignore_then(
             pass_requirement_clause
                 .clone()
@@ -2598,15 +2506,13 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_trailing()
                 .collect::<Vec<_>>()
                 .delimited_by(
-                    just(Token::LBrace)
-                        .or(nl.clone().ignore_then(just(Token::LBrace)))
-                        .then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
+                    nl.clone().ignore_then(open_nl(Token::LBrace)),
+                    nl_close(Token::RBrace),
                 ),
         )
         .boxed();
 
-    let pass_group_size_item = select! { Token::Ident(s) if s == "group_size" => () }
+    let pass_group_size_item = keyword("group_size")
         .ignore_then(just(Token::Colon))
         .ignore_then(
             select! { tok if !matches!(tok, Token::Newline | Token::RBrace) => tok }
@@ -2616,7 +2522,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         )
         .boxed();
 
-    let pass_dispatch_block_item = select! { Token::Ident(s) if s == "dispatch" => () }
+    let pass_dispatch_block_item = keyword("dispatch")
         .ignore_then(
             select! { tok if !matches!(tok, Token::LBrace | Token::Newline | Token::RBrace) => tok }
                 .repeated()
@@ -2659,10 +2565,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .separated_by(comma_sep.clone())
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LParen).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RParen)),
-                )
+                .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
                 .or(just(Token::LParen)
                     .then_ignore(just(Token::RParen))
                     .map(|_| Vec::new()))
@@ -2737,13 +2640,13 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .ignored()
         .boxed();
 
-    let pass_stage_item = select! { Token::Ident(s) if s == "stage" => () }
+    let pass_stage_item = keyword("stage")
         .ignore_then(just(Token::Colon))
         .ignore_then(pass_scalar_value.clone())
         .then_ignore(pass_scalar_tail.clone())
         .boxed();
 
-    let pass_draw_item = select! { Token::Ident(s) if s == "draw" => () }
+    let pass_draw_item = keyword("draw")
         .ignore_then(just(Token::Colon))
         .ignore_then(pass_scalar_value.clone())
         .then_ignore(pass_scalar_tail.clone())
@@ -2755,7 +2658,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .then_ignore(pass_scalar_tail)
         .boxed();
 
-    let pass_cull_item = select! { Token::Ident(s) if s == "cull" => () }
+    let pass_cull_item = keyword("cull")
         .ignore_then(just(Token::Colon))
         .ignore_then(expr::expr_parser())
         .boxed();
@@ -2767,13 +2670,10 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .allow_leading()
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
-    let pass_sort_item = select! { Token::Ident(s) if s == "sort" => () }
+    let pass_sort_item = keyword("sort")
         .ignore_then(just(Token::Colon))
         .ignore_then(
             select! { tok if !matches!(tok, Token::Newline | Token::RBrace) => tok }
@@ -2783,23 +2683,21 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         )
         .boxed();
 
-    let pass_depth_block_item = select! { Token::Ident(s) if s == "depth" => () }
-        .ignore_then(state_fields.clone())
-        .boxed();
+    let pass_depth_block_item = keyword("depth").ignore_then(state_fields.clone()).boxed();
 
-    let pass_stencil_block_item = select! { Token::Ident(s) if s == "stencil" => () }
+    let pass_stencil_block_item = keyword("stencil")
         .ignore_then(opaque_braced_block.clone())
         .ignored()
         .boxed();
 
     let pass_blend_block_item = just(Token::Blend).ignore_then(state_fields).boxed();
 
-    let pass_reads_item = select! { Token::Ident(s) if s == "reads" => () }
+    let pass_reads_item = keyword("reads")
         .ignore_then(just(Token::Colon))
         .ignore_then(pass_resource_list.clone())
         .boxed();
 
-    let pass_writes_item = select! { Token::Ident(s) if s == "writes" => () }
+    let pass_writes_item = keyword("writes")
         .ignore_then(just(Token::Colon))
         .ignore_then(pass_resource_list.clone())
         .boxed();
@@ -2840,13 +2738,10 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .allow_trailing()
         .at_least(1)
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        )
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
         .boxed();
     let compute_item = choice((
-        style_graph::keyword("output")
+        keyword("output")
             .ignore_then(style_graph::member())
             .then(operation_dimensions.clone())
             .map_with(|(member, extents), e| {
@@ -2857,12 +2752,12 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                     span: e.span(),
                 })
             }),
-        style_graph::keyword("workgroup_size")
+        keyword("workgroup_size")
             .then_ignore(just(Token::Colon))
             .ignore_then(operation_dimensions.clone())
             .map(PassItem::Workgroup),
-        style_graph::keyword("dispatch")
-            .ignore_then(style_graph::keyword("threads"))
+        keyword("dispatch")
+            .ignore_then(keyword("threads"))
             .ignore_then(operation_dimensions)
             .map(PassItem::Threads),
         just(Token::Return)
@@ -2871,27 +2766,27 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     ))
     .boxed();
     let pass_item = choice((
-        style_graph::keyword("requires")
+        keyword("requires")
             .ignore_then(expr::expr_parser())
             .map(PassItem::OperationRequires),
-        style_graph::keyword("raster")
+        keyword("raster")
             .ignore_then(expr::expr_parser())
             .then(
-                style_graph::keyword("using")
+                keyword("using")
                     .ignore_then(expr::expr_parser())
-                    .then_ignore(style_graph::keyword("base_vertex"))
+                    .then_ignore(keyword("base_vertex"))
                     .then(expr::expr_parser())
                     .or_not(),
             )
             .map(|(geometry, vertices)| PassItem::Raster(geometry, vertices)),
-        style_graph::keyword("attachments")
+        keyword("attachments")
             .ignore_then(style_graph::fields())
             .map(PassItem::Attachments),
-        style_graph::keyword("visibility")
+        keyword("visibility")
             .ignore_then(just(Token::Colon))
             .ignore_then(expr::expr_parser())
             .map(PassItem::Visibility),
-        style_graph::keyword("sort_position")
+        keyword("sort_position")
             .ignore_then(just(Token::Colon))
             .ignore_then(expr::expr_parser())
             .map(PassItem::SortPosition),
@@ -2928,26 +2823,20 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .allow_leading()
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
     let operation_inputs = style_graph::member()
         .separated_by(comma_sep.clone())
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        );
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen));
     let pass_header = choice((
         just(Token::Pass)
             .ignore_then(ident_sp.clone())
             .then(just(Token::For).ignore_then(ident_sp.clone()).or_not())
             .map(|(name, material)| (name, material, None)),
-        style_graph::keyword("draw")
+        keyword("draw")
             .ignore_then(ident_sp.clone())
             .then(operation_inputs.clone())
             .then(just(Token::For).ignore_then(ident_sp.clone()).or_not())
@@ -2967,7 +2856,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                     })),
                 )
             }),
-        style_graph::keyword("compute")
+        keyword("compute")
             .ignore_then(ident_sp.clone())
             .then(operation_inputs)
             .then_ignore(just(Token::Arrow))
@@ -3195,7 +3084,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         PassRef(crate::ast::PipelinePassRef),
     }
 
-    let pipeline_type_item = select! { Token::Ident(s) if s == "type" => () }
+    let pipeline_type_item = keyword("type")
         .ignore_then(just(Token::Colon))
         .ignore_then(select! { Token::Str(s) => s }.map_with(|value, e| (value, e.span())))
         .map(PipelineItem::Type)
@@ -3226,10 +3115,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .allow_leading()
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
     let pipeline_kind_header = just(Token::LParen)
@@ -3310,7 +3196,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         )
         .boxed();
 
-    let payload_encoding_decl = select! { Token::Ident(s) if s == "payload_encoding" => () }
+    let payload_encoding_decl = keyword("payload_encoding")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::For))
         .then(ident_sp.clone())
@@ -3359,10 +3245,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .allow_leading()
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
     let vertex_format_section_keyword = nl
@@ -3385,10 +3268,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                 .allow_leading()
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBrace).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBrace)),
-                ),
+                .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
         )
         .map(|(section_name, members)| {
             let optional = section_name == "optional";
@@ -3407,13 +3287,10 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .repeated()
         .collect::<Vec<Vec<VertexInterfaceMemberDecl>>>()
         .map(|sections| sections.into_iter().flatten().collect::<Vec<_>>())
-        .delimited_by(
-            just(Token::LBrace).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
         .boxed();
 
-    let vertex_interface_decl = select! { Token::Ident(s) if s == "vertex_interface" => () }
+    let vertex_interface_decl = keyword("vertex_interface")
         .ignore_then(ident_sp.clone())
         .then(vertex_interface_decl_body)
         .map_with(|((name, name_span), members), e| VertexInterfaceDecl {
@@ -3424,13 +3301,9 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let vertex_format_decl = select! { Token::Ident(s) if s == "vertex_format" => () }
+    let vertex_format_decl = keyword("vertex_format")
         .ignore_then(ident_sp.clone())
-        .then(
-            select! { Token::Ident(s) if s == "extends" => () }
-                .ignore_then(ident_sp.clone())
-                .or_not(),
-        )
+        .then(keyword("extends").ignore_then(ident_sp.clone()).or_not())
         .then(vertex_format_decl_body)
         .map_with(
             |(((name, name_span), parent), members), e| VertexFormatDecl {
@@ -3464,13 +3337,10 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     .allow_leading()
     .allow_trailing()
     .collect::<Vec<_>>()
-    .delimited_by(
-        just(Token::LBrace).then_ignore(nl.clone()),
-        nl.clone().ignore_then(just(Token::RBrace)),
-    )
+    .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
     .boxed();
 
-    let vertex_factory_decl = select! { Token::Ident(s) if s == "vertex_factory" => () }
+    let vertex_factory_decl = keyword("vertex_factory")
         .ignore_then(ident_sp.clone())
         .then_ignore(just(Token::For))
         .then(ident_sp.clone())

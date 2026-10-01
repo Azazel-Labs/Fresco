@@ -34,6 +34,7 @@ use chumsky::{
     input::{Input as _, MappedInput},
     prelude::*,
 };
+use std::fmt::Write as _;
 
 pub type PInput<'src> = MappedInput<'src, Token, Span, &'src [(Token, Span)]>;
 pub type PError<'src> = Rich<'src, Token, Span>;
@@ -83,13 +84,12 @@ pub(crate) fn executable_pass_hook_body<'src>(
 fn extract_leading_doc_comment(src: &str, anchor: usize) -> Option<String> {
     let mut line_start = src[..anchor.min(src.len())]
         .rfind('\n')
-        .map(|idx| idx + 1)
-        .unwrap_or(0);
+        .map_or(0, |idx| idx + 1);
     let mut lines = Vec::new();
 
     while line_start > 0 {
         let prev_end = line_start.saturating_sub(1);
-        let prev_start = src[..prev_end].rfind('\n').map(|idx| idx + 1).unwrap_or(0);
+        let prev_start = src[..prev_end].rfind('\n').map_or(0, |idx| idx + 1);
         let line = src[prev_start..prev_end].trim_end_matches('\r');
         let trimmed = line.trim_start();
 
@@ -217,11 +217,9 @@ pub fn attach_leading_fn_docs(src: &str, program: &mut Program) {
 }
 
 pub(super) fn ident<'src>() -> PBox<'src, String> {
-    select! {
-        token if identifier_token(&token).is_some() => identifier_token(&token).expect("identifier token").to_string(),
-    }
-    .labelled("identifier")
-    .boxed()
+    chumsky::primitive::select(|token: Token, _| identifier_token(&token).map(str::to_string))
+        .labelled("identifier")
+        .boxed()
 }
 
 /// Shared contextual identifier spelling for parsing and resolved AST linking.
@@ -309,10 +307,7 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
             .allow_trailing()
             .at_least(1)
             .collect::<Vec<_>>()
-            .delimited_by(
-                just(Token::LParen).then_ignore(nl()),
-                nl().ignore_then(just(Token::RParen)),
-            )
+            .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
             .map_with(|items, e| {
                 let members = items
                     .into_iter()
@@ -331,31 +326,24 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
             })
             .then(
                 ty.clone()
-                    .or(
-                        select! {Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits)}.try_map(
-                            |value, span| {
-                                if value.is_finite()
-                                    && value >= 0.0
-                                    && value.fract() == 0.0
-                                    && value <= f64::from(u32::MAX)
-                                {
-                                    Ok((format!("{value:.0}"), span))
-                                } else {
-                                    Err(Rich::custom(
-                                        span,
-                                        "type size must be a nonnegative u32 integer",
-                                    ))
-                                }
-                            },
-                        ),
-                    )
+                    .or(plain_number().try_map(|value, span| {
+                        if value.is_finite()
+                            && value >= 0.0
+                            && value.fract() == 0.0
+                            && value <= f64::from(u32::MAX)
+                        {
+                            Ok((format!("{value:.0}"), span))
+                        } else {
+                            Err(Rich::custom(
+                                span,
+                                "type size must be a nonnegative u32 integer",
+                            ))
+                        }
+                    }))
                     .separated_by(comma_sep.clone())
                     .allow_trailing()
                     .collect::<Vec<_>>()
-                    .delimited_by(
-                        just(Token::Lt).then_ignore(nl()),
-                        nl().ignore_then(just(Token::Gt)),
-                    )
+                    .delimited_by(open_nl(Token::Lt), nl_close(Token::Gt))
                     .or_not(),
             )
             .then(
@@ -364,9 +352,9 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
                         .ignore_then(type_ident_sp())
                         .map(|(tag, _)| format!(" in {tag}"))
                         .boxed(),
-                    select! { Token::Ident(s) if s == "from" => () }
+                    keyword("from")
                         .ignore_then(type_ident_sp())
-                        .then_ignore(select! { Token::Ident(s) if s == "to" => () })
+                        .then_ignore(keyword("to"))
                         .then(type_ident_sp())
                         .map(|((from, _), (to, _))| format!(" from {from} to {to}"))
                         .boxed(),
@@ -375,9 +363,7 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
             )
             .then(
                 just(Token::LBracket)
-                    .ignore_then(
-                        select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) as usize },
-                    )
+                    .ignore_then(plain_number().map(|n| n as usize))
                     .then_ignore(just(Token::RBracket))
                     .repeated()
                     .collect::<Vec<_>>(),
@@ -398,7 +384,7 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
                     ty_name.push_str(&suffix);
                 }
                 for dim in array_dims {
-                    ty_name.push_str(&format!("[{dim}]"));
+                    let _ = write!(ty_name, "[{dim}]");
                 }
                 (ty_name, e.span())
             })
@@ -439,10 +425,7 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
                 .separated_by(comma_sep)
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LParen).then_ignore(nl()),
-                    nl().ignore_then(just(Token::RParen)),
-                ),
+                .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen)),
         )
         .then(
             just(Token::Arrow)
@@ -483,6 +466,35 @@ pub(super) fn comma_sep<'src>() -> PBox<'src, ()> {
         .then_ignore(nl())
         .ignored()
         .boxed()
+}
+
+/// An opening delimiter that tolerates newlines after it; pair with
+/// [`nl_close`] in `.delimited_by(..)`.
+pub(super) fn open_nl<'src>(open: Token) -> PBox<'src, Token> {
+    just(open).then_ignore(nl()).boxed()
+}
+
+/// A closing delimiter that tolerates newlines before it.
+pub(super) fn nl_close<'src>(close: Token) -> PBox<'src, Token> {
+    nl().ignore_then(just(close)).boxed()
+}
+
+/// A unitless numeric literal (plain or type-suffixed), as its `f64` value.
+pub(super) fn plain_number<'src>() -> PBox<'src, f64> {
+    select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) }
+        .boxed()
+}
+
+/// An infix operator that may have newlines on either side.
+pub(super) fn infix<'src, O: 'src>(
+    op: impl Parser<'src, PInput<'src>, O, PExtra<'src>> + 'src,
+) -> PBox<'src, O> {
+    nl().ignore_then(op).then_ignore(nl()).boxed()
+}
+
+/// A contextual keyword: an identifier token spelled exactly `name`.
+pub(super) fn keyword<'src>(name: &'static str) -> PBox<'src, ()> {
+    select! { Token::Ident(s) if s == name => () }.boxed()
 }
 
 #[cfg(test)]

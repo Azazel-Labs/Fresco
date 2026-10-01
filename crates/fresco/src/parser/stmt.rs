@@ -67,6 +67,120 @@ fn extract_compose_pipe_blend(expr: SExpr) -> BlendStmtResult {
     }
 }
 
+/// The resolved pieces of a C-style `for (i = start; i <cmp> end [&& guard]; i++/i--)`.
+struct CForParts {
+    name: String,
+    name_span: Span,
+    start: SExpr,
+    cmp: BinOp,
+    end: SExpr,
+    incrementing: bool,
+    extra_cond: Option<SExpr>,
+    body: Vec<Stmt>,
+}
+
+/// A C-style `for` desugared to a range loop. Decrementing loops iterate a
+/// hidden ascending index and rebind the user's variable at the top of `body`.
+struct LoweredCFor {
+    name: String,
+    name_span: Span,
+    iterable: SExpr,
+    body: Vec<Stmt>,
+}
+
+fn lower_c_for<'src>(parts: CForParts, span: &Span) -> Result<LoweredCFor, PError<'src>> {
+    let CForParts {
+        name,
+        name_span,
+        start,
+        cmp,
+        end,
+        incrementing,
+        extra_cond,
+        body,
+    } = parts;
+    let num = |v: f64| sp(Expr::Num(v, Unit::None), span.clone());
+    let plus_one = |e: SExpr| binx(BinOp::Add, e, num(1.0));
+    let minus_expr = |a: SExpr, b: SExpr| binx(BinOp::Sub, a, b);
+    let range_expr = |a: SExpr, b: SExpr| {
+        let range_span = a.span.start..b.span.end;
+        sp(Expr::Range(Box::new(a), Box::new(b)), range_span)
+    };
+    let guard_stmt = |cond: SExpr| Stmt::If {
+        cond,
+        then_body: Vec::new(),
+        else_body: Some(vec![Stmt::Break { span: span.clone() }]),
+        span: span.clone(),
+    };
+
+    if incrementing {
+        let end_expr = match cmp {
+            BinOp::Lt => end,
+            BinOp::Le => plus_one(end),
+            BinOp::Gt | BinOp::Ge => {
+                return Err(Rich::custom(
+                    span.clone(),
+                    "`i++` loop requires `<` or `<=` condition",
+                ));
+            }
+            _ => unreachable!(),
+        };
+
+        let iterable = range_expr(start, end_expr);
+
+        let mut lowered_body = Vec::with_capacity(body.len() + usize::from(extra_cond.is_some()));
+        if let Some(cond) = extra_cond {
+            lowered_body.push(guard_stmt(cond));
+        }
+        lowered_body.extend(body);
+
+        return Ok(LoweredCFor {
+            name,
+            name_span,
+            iterable,
+            body: lowered_body,
+        });
+    }
+
+    let lower = match cmp {
+        BinOp::Gt => plus_one(end),
+        BinOp::Ge => end,
+        BinOp::Lt | BinOp::Le => {
+            return Err(Rich::custom(
+                span.clone(),
+                "`i--` loop requires `>` or `>=` condition",
+            ));
+        }
+        _ => unreachable!(),
+    };
+    let upper = plus_one(start.clone());
+    let idx_name = format!("__cfor_{}", span.start);
+    let idx_var = sp(Expr::Var(idx_name.clone()), span.clone());
+    let lowered_idx = minus_expr(idx_var, lower.clone());
+    let user_value = minus_expr(start, lowered_idx);
+
+    let mut lowered_body = Vec::with_capacity(body.len() + 1 + usize::from(extra_cond.is_some()));
+    lowered_body.push(Stmt::Let {
+        mutable: false,
+        name,
+        name_span: name_span.clone(),
+        declared_ty_name: None,
+        declared_ty_span: None,
+        value: user_value,
+    });
+    if let Some(cond) = extra_cond {
+        lowered_body.push(guard_stmt(cond));
+    }
+    lowered_body.extend(body);
+
+    Ok(LoweredCFor {
+        name: idx_name,
+        name_span,
+        iterable: range_expr(lower, upper),
+        body: lowered_body,
+    })
+}
+
 pub(super) fn stmt_parser<'src>() -> PBox<'src, Stmt> {
     stmt_parser_with_casts(false)
 }
@@ -81,11 +195,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
     let array_param_ty = select! { Token::Ident(name) if name.as_str() == "array" => () }
         .ignore_then(just(Token::Lt))
         .ignore_then(ident.clone())
-        .then(
-            just(Token::Comma)
-                .ignore_then(select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) })
-                .or_not(),
-        )
+        .then(just(Token::Comma).ignore_then(plain_number()).or_not())
         .then_ignore(just(Token::Gt))
         .try_map(|(elem_ty, len_opt), span| {
             if let Some(len) = len_opt {
@@ -131,10 +241,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
         .separated_by(comma_sep.clone())
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        )
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
         .boxed();
 
     let space_call = ident_sp
@@ -217,10 +324,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
         .separated_by(comma_sep.clone())
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(
-            just(Token::LParen).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RParen)),
-        )
+        .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
         .or_not()
         .map(Option::unwrap_or_default)
         .boxed();
@@ -242,10 +346,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
         })
         .repeated()
         .ignored()
-        .delimited_by(
-            nl.clone().ignore_then(just(Token::LBrace)).then_ignore(nl.clone()),
-            nl.clone().ignore_then(just(Token::RBrace)),
-        )
+        .delimited_by(nl.clone().ignore_then(open_nl(Token::LBrace)), nl_close(Token::RBrace))
         .boxed();
 
         let block = stmt
@@ -253,10 +354,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             .then_ignore(sep.clone().or_not())
             .repeated()
             .collect::<Vec<_>>()
-            .delimited_by(
-                nl.clone().ignore_then(just(Token::LBrace)).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RBrace)),
-            )
+            .delimited_by(nl.clone().ignore_then(open_nl(Token::LBrace)), nl_close(Token::RBrace))
             .labelled("block")
             .boxed();
 
@@ -279,7 +377,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
         .boxed();
         let let_stmt = local_decl;
 
-        let const_stmt = select! { Token::Ident(s) if s == "const" => () }
+        let const_stmt = keyword("const")
            .ignore_then(choice((
                 ident_sp.clone().then_ignore(just(Token::Colon)).then(fn_param_type_sp())
                     .map(|(name, ty)| (ty, name)),
@@ -470,7 +568,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             .or(for_body.clone())
             .boxed();
 
-        let for_stmt = select! { Token::Ident(s) if s == "unroll" => () }
+        let for_stmt = keyword("unroll")
             .or_not()
             .ignore_then(just(Token::For))
             .ignore_then(ident_sp.clone())
@@ -487,7 +585,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             })
             .boxed();
 
-        let c_for_stmt = select! { Token::Ident(s) if s == "unroll" => () }
+        let c_for_stmt = keyword("unroll")
             .or_not()
             .ignore_then(just(Token::For))
             .ignore_then(just(Token::LParen))
@@ -553,93 +651,24 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
                         ));
                     };
 
-                    let num = |v: f64| sp(Expr::Num(v, Unit::None), span.clone());
-                    let plus_one = |e: SExpr| binx(BinOp::Add, e, num(1.0));
-                    let minus_expr = |a: SExpr, b: SExpr| binx(BinOp::Sub, a, b);
-                    let range_expr = |a: SExpr, b: SExpr| {
-                        let range_span = a.span.start..b.span.end;
-                        sp(Expr::Range(Box::new(a), Box::new(b)), range_span)
-                    };
-                    let guard_stmt = |cond: SExpr| Stmt::If {
-                        cond,
-                        then_body: Vec::new(),
-                        else_body: Some(vec![Stmt::Break { span: span.clone() }]),
-                        span: span.clone(),
-                    };
-
-                    if incrementing {
-                        let end_expr = match cmp {
-                            BinOp::Lt => end,
-                            BinOp::Le => plus_one(end),
-                            BinOp::Gt | BinOp::Ge => {
-                                return Err(Rich::custom(
-                                    span,
-                                    "`i++` loop requires `<` or `<=` condition",
-                                ));
-                            }
-                            _ => unreachable!(),
-                        };
-
-                        let iterable_span = start.span.start..end_expr.span.end;
-                        let iterable =
-                            sp(Expr::Range(Box::new(start), Box::new(end_expr)), iterable_span);
-
-                        let mut lowered_body =
-                            Vec::with_capacity(body.len() + usize::from(extra_cond.is_some()));
-                        if let Some(cond) = extra_cond {
-                            lowered_body.push(guard_stmt(cond));
-                        }
-                        lowered_body.extend(body);
-
-                        return Ok(Stmt::For {
+                    let lowered = lower_c_for(
+                        CForParts {
                             name,
                             name_span,
-                            iterable,
-                            body: lowered_body,
-                            index_name: None,
-                            span,
-                        });
-                    }
-
-                    let lower = match cmp {
-                        BinOp::Gt => plus_one(end),
-                        BinOp::Ge => end,
-                        BinOp::Lt | BinOp::Le => {
-                            return Err(Rich::custom(
-                                span,
-                                "`i--` loop requires `>` or `>=` condition",
-                            ));
-                        }
-                        _ => unreachable!(),
-                    };
-                    let upper = plus_one(start.clone());
-                    let idx_name = format!("__cfor_{}", span.start);
-                    let idx_var = sp(Expr::Var(idx_name.clone()), span.clone());
-                    let lowered_idx = minus_expr(idx_var, lower.clone());
-                    let user_value = minus_expr(start, lowered_idx);
-
-                    let mut lowered_body =
-                        Vec::with_capacity(body.len() + 1 + usize::from(extra_cond.is_some()));
-                    lowered_body.push(Stmt::Let {
-                        mutable: false,
-                        name: name.clone(),
-                        name_span: name_span.clone(),
-                        declared_ty_name: None,
-                        declared_ty_span: None,
-                        value: user_value,
-                    });
-                    if let Some(cond) = extra_cond {
-                        lowered_body.push(guard_stmt(cond));
-                    }
-                    lowered_body.extend(body);
-
-                    let iterable = range_expr(lower, upper);
-
+                            start,
+                            cmp,
+                            end,
+                            incrementing,
+                            extra_cond,
+                            body,
+                        },
+                        &span,
+                    )?;
                     Ok(Stmt::For {
-                        name: idx_name,
-                        name_span,
-                        iterable,
-                        body: lowered_body,
+                        name: lowered.name,
+                        name_span: lowered.name_span,
+                        iterable: lowered.iterable,
+                        body: lowered.body,
                         index_name: None,
                         span,
                     })
@@ -1010,72 +1039,23 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
                         ));
                     }
 
-                    let num = |v: f64| sp(Expr::Num(v, Unit::None), span.clone());
-                    let plus_one = |e: SExpr| binx(BinOp::Add, e, num(1.0));
-                    let minus_expr = |a: SExpr, b: SExpr| binx(BinOp::Sub, a, b);
-
-                    if incrementing {
-                        let end_expr = match cmp {
-                            BinOp::Lt => end,
-                            BinOp::Le => plus_one(end),
-                            BinOp::Gt | BinOp::Ge => {
-                                return Err(Rich::custom(
-                                    span,
-                                    "`i++` loop requires `<` or `<=` condition",
-                                ));
-                            }
-                            _ => unreachable!(),
-                        };
-
-                        let iterable_span = start.span.start..end_expr.span.end;
-                        let iterable =
-                            sp(Expr::Range(Box::new(start), Box::new(end_expr)), iterable_span);
-
-                        return Ok(ComposeEntry::For {
+                    let lowered = lower_c_for(
+                        CForParts {
                             name,
-                            iterable,
+                            name_span,
+                            start,
+                            cmp,
+                            end,
+                            incrementing,
+                            extra_cond: None,
                             body,
-                            blend: blend_pipe_mode,
-                            index_name: None,
-                            span,
-                        });
-                    }
-
-                    let lower = match cmp {
-                        BinOp::Gt => plus_one(end),
-                        BinOp::Ge => end,
-                        BinOp::Lt | BinOp::Le => {
-                            return Err(Rich::custom(
-                                span,
-                                "`i--` loop requires `>` or `>=` condition",
-                            ));
-                        }
-                        _ => unreachable!(),
-                    };
-                    let upper = plus_one(start.clone());
-                    let idx_name = format!("__cfor_{}", span.start);
-                    let idx_var = sp(Expr::Var(idx_name.clone()), span.clone());
-                    let lowered_idx = minus_expr(idx_var, lower.clone());
-                    let user_value = minus_expr(start, lowered_idx);
-
-                    let mut lowered_body = Vec::with_capacity(body.len() + 1);
-                    lowered_body.push(Stmt::Let {
-                        mutable: false,
-                        name,
-                        name_span,
-                        declared_ty_name: None,
-                        declared_ty_span: None,
-                        value: user_value,
-                    });
-                    lowered_body.extend(body);
-
-                    let iterable_span = lower.span.start..upper.span.end;
-                    let iterable = sp(Expr::Range(Box::new(lower), Box::new(upper)), iterable_span);
-
+                        },
+                        &span,
+                    )?;
                     Ok(ComposeEntry::For {
-                        name: idx_name,
-                        iterable,
-                        body: lowered_body,
+                        name: lowered.name,
+                        iterable: lowered.iterable,
+                        body: lowered.body,
                         blend: blend_pipe_mode,
                         index_name: None,
                         span,
@@ -1150,10 +1130,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
                     .allow_leading()
                     .allow_trailing()
                     .collect::<Vec<_>>()
-                    .delimited_by(
-                        nl.clone().ignore_then(just(Token::LBrace)).then_ignore(nl.clone()),
-                        nl.clone().ignore_then(just(Token::RBrace)),
-                    ),
+                    .delimited_by(nl.clone().ignore_then(open_nl(Token::LBrace)), nl_close(Token::RBrace)),
             )
             .boxed();
 
@@ -1179,7 +1156,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
         let vertex_field = ident_sp.clone().then_ignore(just(Token::Colon)).then(expr.clone());
         let vertex_stmt = just(Token::Vertex)
             .ignore_then(vertex_field.separated_by(sep.clone()).allow_leading().allow_trailing().collect::<Vec<_>>()
-                .delimited_by(nl.clone().ignore_then(just(Token::LBrace)).then_ignore(nl.clone()), nl.clone().ignore_then(just(Token::RBrace))))
+                .delimited_by(nl.clone().ignore_then(open_nl(Token::LBrace)), nl_close(Token::RBrace)))
             .try_map(|fields, span| {
                 let mut seen = std::collections::HashSet::new();
                 if fields.is_empty() { return Err(Rich::custom(span, "vertex block must define at least one context field")); }
@@ -1283,15 +1260,15 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             })
             .boxed();
 
-        let match_default_item = select! { Token::Ident(s) if s == "default" => () }
+        let match_default_item = keyword("default")
             .then_ignore(just(Token::Colon))
             .then(match_arm_body.clone())
             .map_with(|(_, body), e| MatchItem::Default(body, e.span()))
             .boxed();
 
-        let match_stmt = select! { Token::Ident(s) if s == "unroll" => () }
+        let match_stmt = keyword("unroll")
             .or_not()
-            .ignore_then(select! { Token::Ident(s) if s == "match" => () })
+            .ignore_then(keyword("match"))
             .ignore_then(expr.clone())
             .then(
                 choice((match_default_item, match_arm_item))
@@ -1299,10 +1276,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
                     .allow_leading()
                     .allow_trailing()
                     .collect::<Vec<_>>()
-                    .delimited_by(
-                        just(Token::LBrace).then_ignore(nl.clone()),
-                        nl.clone().ignore_then(just(Token::RBrace)),
-                    ),
+                    .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
             )
             .try_map(|(value, items), span| {
                 let mut arms = Vec::new();
@@ -1389,10 +1363,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             .or_not()
             .map(Option::unwrap_or_default)
             .then_ignore(comma_sep.clone().or_not())
-            .delimited_by(
-                just(Token::LParen).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RParen)),
-            )
+            .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
             .try_map(|items, _span| {
                 let mut params = Vec::new();
                 let mut saw_keyword_separator = false;

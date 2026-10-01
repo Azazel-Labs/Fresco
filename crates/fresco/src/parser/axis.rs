@@ -27,11 +27,9 @@ pub(super) fn constraint(mut expr: SExpr) -> SExpr {
 pub(super) fn declaration<'src>() -> PBox<'src, AxisDecl> {
     let atom = choice((
         ident_sp().map(|(node, span)| AstSpanned { node, span }),
-        select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) }.map_with(|n, e| {
-            AstSpanned {
-                node: n.to_string(),
-                span: e.span(),
-            }
+        plain_number().map_with(|n, e| AstSpanned {
+            node: n.to_string(),
+            span: e.span(),
         }),
     ))
     .boxed();
@@ -51,10 +49,7 @@ pub(super) fn declaration<'src>() -> PBox<'src, AxisDecl> {
                     .separated_by(comma_sep())
                     .allow_trailing()
                     .collect::<Vec<_>>()
-                    .delimited_by(
-                        just(Token::LBrace).then_ignore(nl()),
-                        nl().ignore_then(just(Token::RBrace)),
-                    )
+                    .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace))
                     .or_not(),
             )
             .map_with(|(name, children), e| AxisValueDecl {
@@ -67,7 +62,7 @@ pub(super) fn declaration<'src>() -> PBox<'src, AxisDecl> {
             .collect::<Vec<_>>()
             .map(AxisDomain::ValueSet)
     });
-    select! { Token::Ident(s) if s == "axis" => () }
+    keyword("axis")
         .ignore_then(select! { Token::Attribute(s) if s == "known" => () })
         .ignore_then(
             ident_sp()

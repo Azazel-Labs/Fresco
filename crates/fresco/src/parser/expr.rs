@@ -31,22 +31,19 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .separated_by(comma_sep.clone())
             .allow_trailing()
             .collect::<Vec<_>>()
-            .delimited_by(
-                just(Token::LParen).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RParen)),
-            )
+            .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
             .labelled("argument list")
             .boxed();
 
         let const_template_arg = choice((
             just(Token::Minus)
-                .ignore_then(select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) })
+                .ignore_then(plain_number())
                 .map_with(|v, e| crate::ast::ConstTemplateArg {
                     value: sp(Expr::Num(-v, Unit::None), e.span()),
                     span: e.span(),
                 })
                 .boxed(),
-            select! { Token::Num((bits, Unit::None)) | Token::TypedNum((bits, _)) => f64::from_bits(bits) }
+            plain_number()
                 .map_with(|v, e| crate::ast::ConstTemplateArg {
                     value: sp(Expr::Num(v, Unit::None), e.span()),
                     span: e.span(),
@@ -299,10 +296,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .at_least(1)
             .at_most(4)
             .collect::<Vec<_>>()
-            .delimited_by(
-                just(Token::LParen).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RParen)),
-            )
+            .delimited_by(open_nl(Token::LParen), nl_close(Token::RParen))
             .try_map(|items, span| match items.as_slice() {
                 [a] => Ok(a.clone()),
                 [a, b] => Ok(sp(
@@ -339,10 +333,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .then(expr.clone())
             .then_ignore(just(Token::FatArrow))
             .then(expr.clone())
-            .delimited_by(
-                just(Token::LBracket).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RBracket)),
-            )
+            .delimited_by(open_nl(Token::LBracket), nl_close(Token::RBracket))
             .map_with(|(((name, _name_span), iterable), body), e| {
                 sp(
                     Expr::ArrayComp {
@@ -361,18 +352,11 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
                 .separated_by(comma_sep.clone())
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(
-                    just(Token::LBracket).then_ignore(nl.clone()),
-                    nl.clone().ignore_then(just(Token::RBracket)),
-                )
+                .delimited_by(open_nl(Token::LBracket), nl_close(Token::RBracket))
                 .map_with(|items, e| sp(Expr::Array(items), e.span())))
             .boxed();
 
-        let kw = |s: &'static str| {
-            select! { Token::Ident(name) if name.as_str() == s => () }
-                .labelled(s)
-                .boxed()
-        };
+        let kw = |s: &'static str| keyword(s).labelled(s).boxed();
 
         let path_move = kw("move")
             .ignore_then(expr.clone())
@@ -435,10 +419,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
                     .then_ignore(nl.clone())
                     .repeated()
                     .collect::<Vec<_>>()
-                    .delimited_by(
-                        just(Token::LBrace).then_ignore(nl.clone()),
-                        nl.clone().ignore_then(just(Token::RBrace)),
-                    ),
+                    .delimited_by(open_nl(Token::LBrace), nl_close(Token::RBrace)),
             )
             .map_with(|commands, e| sp(Expr::PathFuture { commands }, e.span()))
             .boxed();
@@ -539,10 +520,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
 
         let postfix_index = expr
             .clone()
-            .delimited_by(
-                just(Token::LBracket).then_ignore(nl.clone()),
-                nl.clone().ignore_then(just(Token::RBracket)),
-            )
+            .delimited_by(open_nl(Token::LBracket), nl_close(Token::RBracket))
             .map_with(|index_expr, e| AccessStep::Index(index_expr, e.span()))
             .boxed();
 
@@ -631,20 +609,12 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .map_with(|(base, _tag), _e| base)
             .boxed();
 
-        let mul_div_op = nl
-            .clone()
-            .ignore_then(
-                just(Token::Star)
-                    .to(BinOp::Mul)
-                    .or(just(Token::Slash).to(BinOp::Div))
-                    .or(just(Token::Percent).to(BinOp::Mod)),
-            )
-            .or(just(Token::Star)
+        let mul_div_op = infix(
+            just(Token::Star)
                 .to(BinOp::Mul)
                 .or(just(Token::Slash).to(BinOp::Div))
-                .or(just(Token::Percent).to(BinOp::Mod)))
-            .then_ignore(nl.clone())
-            .boxed();
+                .or(just(Token::Percent).to(BinOp::Mod)),
+        );
 
         let product = tagged_expr
             .clone()
@@ -662,47 +632,30 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             })
             .boxed();
 
-        let add_sub_op = nl
-            .clone()
-            .ignore_then(
-                just(Token::Plus)
-                    .to(BinOp::Add)
-                    .or(just(Token::Minus).to(BinOp::Sub)),
-            )
-            .or(just(Token::Plus)
+        let add_sub_op = infix(
+            just(Token::Plus)
                 .to(BinOp::Add)
-                .or(just(Token::Minus).to(BinOp::Sub)))
-            .then_ignore(nl.clone())
-            .boxed();
+                .or(just(Token::Minus).to(BinOp::Sub)),
+        );
 
         let sum = product
             .clone()
-            .then(
-                add_sub_op
-                    .then(product.clone())
-                    .repeated()
-                    .collect::<Vec<_>>(),
-            )
-            .map(|(l, ops)| ops.into_iter().fold(l, |l, (op, r)| binx(op, l, r)))
+            .foldl(add_sub_op.then(product.clone()).repeated(), |l, (op, r)| {
+                binx(op, l, r)
+            })
             .boxed();
 
-        let shift_op = nl
-            .clone()
-            .ignore_then(
-                just(Token::Shl)
-                    .to(BinOp::Shl)
-                    .or(just(Token::Gt).then(just(Token::Gt)).to(BinOp::Shr)),
-            )
-            .or(just(Token::Shl)
+        let shift_op = infix(
+            just(Token::Shl)
                 .to(BinOp::Shl)
-                .or(just(Token::Gt).then(just(Token::Gt)).to(BinOp::Shr)))
-            .then_ignore(nl.clone())
-            .boxed();
+                .or(just(Token::Gt).then(just(Token::Gt)).to(BinOp::Shr)),
+        );
 
         let shift = sum
             .clone()
-            .then(shift_op.then(sum.clone()).repeated().collect::<Vec<_>>())
-            .map(|(l, ops)| ops.into_iter().fold(l, |l, (op, r)| binx(op, l, r)))
+            .foldl(shift_op.then(sum.clone()).repeated(), |l, (op, r)| {
+                binx(op, l, r)
+            })
             .boxed();
 
         let range = shift
@@ -735,39 +688,28 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             })
             .boxed();
 
-        let shape_op = nl
-            .clone()
-            .ignore_then(
-                just(Token::Bar)
-                    .to(BinOp::Union)
-                    .or(just(Token::Amp).to(BinOp::Intersect)),
-            )
-            .or(just(Token::Bar)
+        let shape_op = infix(
+            just(Token::Bar)
                 .to(BinOp::Union)
-                .or(just(Token::Amp).to(BinOp::Intersect)))
-            .then_ignore(nl.clone())
-            .boxed();
+                .or(just(Token::Amp).to(BinOp::Intersect)),
+        );
 
         let logical_and = cmp
             .clone()
-            .then(
-                just(Token::AndAnd)
-                    .ignore_then(cmp.clone())
-                    .repeated()
-                    .collect::<Vec<_>>(),
+            .foldl(
+                just(Token::AndAnd).ignore_then(cmp.clone()).repeated(),
+                logical_and_desugar,
             )
-            .map(move |(l, rest)| rest.into_iter().fold(l, logical_and_desugar))
             .boxed();
 
         let logical_or = logical_and
             .clone()
-            .then(
+            .foldl(
                 just(Token::OrOr)
                     .ignore_then(logical_and.clone())
-                    .repeated()
-                    .collect::<Vec<_>>(),
+                    .repeated(),
+                logical_or_desugar,
             )
-            .map(move |(l, rest)| rest.into_iter().fold(l, logical_or_desugar))
             .boxed();
 
         let ternary = logical_or
@@ -785,28 +727,20 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             })
             .boxed();
 
-        let bit_xor_op = nl
-            .clone()
-            .ignore_then(just(Token::Caret).to(BinOp::BitXor))
-            .or(just(Token::Caret).to(BinOp::BitXor))
-            .then_ignore(nl.clone())
-            .boxed();
+        let bit_xor_op = infix(just(Token::Caret).to(BinOp::BitXor));
 
         let bit_xor = ternary
             .clone()
-            .then(
-                bit_xor_op
-                    .then(ternary.clone())
-                    .repeated()
-                    .collect::<Vec<_>>(),
-            )
-            .map(|(l, ops)| ops.into_iter().fold(l, |l, (op, r)| binx(op, l, r)))
+            .foldl(bit_xor_op.then(ternary.clone()).repeated(), |l, (op, r)| {
+                binx(op, l, r)
+            })
             .boxed();
 
         let shape = bit_xor
             .clone()
-            .then(shape_op.then(bit_xor).repeated().collect::<Vec<_>>())
-            .map(|(l, ops)| ops.into_iter().fold(l, |l, (op, r)| binx(op, l, r)))
+            .foldl(shape_op.then(bit_xor).repeated(), |l, (op, r)| {
+                binx(op, l, r)
+            })
             .boxed();
 
         let pipe_rhs = ident_sp
@@ -815,11 +749,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .map_with(|(n, a), e| (n, a.unwrap_or_default(), e.span()))
             .boxed();
 
-        let pipe_sep = nl
-            .clone()
-            .ignore_then(just(Token::PipeOp))
-            .or(just(Token::PipeOp))
-            .boxed();
+        let pipe_sep = nl.clone().ignore_then(just(Token::PipeOp)).boxed();
 
         // Space chain parser for `through space <chain>`.
         // Uses the same `args` and `ident_sp` already in scope so that space
@@ -880,8 +810,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .boxed();
         let through_step = nl
             .clone()
-            .ignore_then(through_space_chain.clone())
-            .or(through_space_chain)
+            .ignore_then(through_space_chain)
             .map_with(|chain, e| PostfixStep::Through {
                 chain,
                 end_span: e.span(),

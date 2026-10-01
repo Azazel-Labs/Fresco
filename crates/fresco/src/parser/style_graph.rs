@@ -89,9 +89,6 @@ pub(super) fn graph<'src>() -> PBox<'src, crate::ast::Spanned<crate::ast::StyleG
     .boxed()
 }
 
-pub(super) fn keyword<'src>(name: &'static str) -> PBox<'src, ()> {
-    select! { Token::Ident(s) if s == name => () }.boxed()
-}
 pub(super) fn member<'src>() -> PBox<'src, StyleInputDecl> {
     ident()
         .separated_by(just(Token::Dot))
