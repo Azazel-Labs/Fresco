@@ -1351,6 +1351,32 @@ pub(super) fn anchor_variant_coords(name: &str) -> Option<(f32, f32)> {
     }
 }
 
+/// Record the first entry parameter of a role, reporting any later duplicate
+/// as "duplicate `{role}` {owner} parameter".
+fn note_unique_entry_param(
+    seen: &mut Option<(String, Span)>,
+    param: &NormalizedRootEntryParam,
+    role: &str,
+    owner: &str,
+    prep_diags: &mut Vec<Diag>,
+) {
+    if let Some((first_name, first_span)) = seen {
+        prep_diags.push(
+            Diag::error(
+                param.name_span.clone(),
+                format!("duplicate `{role}` {owner} parameter"),
+            )
+            .with_label(format!("`{role}` parameter already declared"))
+            .with_help(format!(
+                "first `{role}` parameter is `{first_name}` at bytes {}..{}",
+                first_span.start, first_span.end
+            )),
+        );
+    } else {
+        *seen = Some((param.name.clone(), param.name_span.clone()));
+    }
+}
+
 pub(super) fn validate_normalized_root_entry_params(
     entry: &NormalizedRootEntry,
     prep_diags: &mut Vec<Diag>,
@@ -1369,86 +1395,25 @@ pub(super) fn validate_normalized_root_entry_params(
         // and to word diagnostics — never to redetermine the classification.
         match param.role {
             RootEntryParamRole::Primary if param.ty_name == "coord" => {
-                if let Some((first_name, first_span)) = &seen_coord {
-                    prep_diags.push(
-                        Diag::error(
-                            param.name_span.clone(),
-                            "duplicate `coord` canvas parameter",
-                        )
-                        .with_label("`coord` parameter already declared")
-                        .with_help(format!(
-                            "first `coord` parameter is `{first_name}` at bytes {}..{}",
-                            first_span.start, first_span.end
-                        )),
-                    );
-                } else {
-                    seen_coord = Some((param.name.clone(), param.name_span.clone()));
-                }
+                note_unique_entry_param(&mut seen_coord, param, "coord", "canvas", prep_diags);
             }
             RootEntryParamRole::Primary => {
-                if let Some((first_name, first_span)) = &seen_surf {
-                    prep_diags.push(
-                        Diag::error(param.name_span.clone(), "duplicate `surf` entry parameter")
-                            .with_label("`surf` parameter already declared")
-                            .with_help(format!(
-                                "first `surf` parameter is `{first_name}` at bytes {}..{}",
-                                first_span.start, first_span.end
-                            )),
-                    );
-                } else {
-                    seen_surf = Some((param.name.clone(), param.name_span.clone()));
-                }
+                note_unique_entry_param(&mut seen_surf, param, "surf", "entry", prep_diags);
             }
             RootEntryParamRole::Signal => {
-                if let Some((first_name, first_span)) = &seen_signal {
-                    prep_diags.push(
-                        Diag::error(
-                            param.name_span.clone(),
-                            "duplicate `signal` canvas parameter",
-                        )
-                        .with_label("`signal` parameter already declared")
-                        .with_help(format!(
-                            "first `signal` parameter is `{first_name}` at bytes {}..{}",
-                            first_span.start, first_span.end
-                        )),
-                    );
-                } else {
-                    seen_signal = Some((param.name.clone(), param.name_span.clone()));
-                }
+                note_unique_entry_param(&mut seen_signal, param, "signal", "canvas", prep_diags);
             }
             RootEntryParamRole::Delta => {
-                if let Some((first_name, first_span)) = &seen_delta {
-                    prep_diags.push(
-                        Diag::error(
-                            param.name_span.clone(),
-                            "duplicate `delta` canvas parameter",
-                        )
-                        .with_label("`delta` parameter already declared")
-                        .with_help(format!(
-                            "first `delta` parameter is `{first_name}` at bytes {}..{}",
-                            first_span.start, first_span.end
-                        )),
-                    );
-                } else {
-                    seen_delta = Some((param.name.clone(), param.name_span.clone()));
-                }
+                note_unique_entry_param(&mut seen_delta, param, "delta", "canvas", prep_diags);
             }
             RootEntryParamRole::Resolution => {
-                if let Some((first_name, first_span)) = &seen_resolution {
-                    prep_diags.push(
-                        Diag::error(
-                            param.name_span.clone(),
-                            "duplicate `resolution` canvas parameter",
-                        )
-                        .with_label("`resolution` parameter already declared")
-                        .with_help(format!(
-                            "first `resolution` parameter is `{first_name}` at bytes {}..{}",
-                            first_span.start, first_span.end
-                        )),
-                    );
-                } else {
-                    seen_resolution = Some((param.name.clone(), param.name_span.clone()));
-                }
+                note_unique_entry_param(
+                    &mut seen_resolution,
+                    param,
+                    "resolution",
+                    "canvas",
+                    prep_diags,
+                );
             }
             RootEntryParamRole::Other => {
                 let is_likely_reversed = (param.name == "coord" && param.ty_name == "uv")
