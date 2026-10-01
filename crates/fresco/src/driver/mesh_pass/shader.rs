@@ -224,9 +224,10 @@ pub(in crate::driver) fn emit(
             "uniform" => type_name(&ty)?,
             _ => ty.clone(),
         };
-        code.push_str(&format!(
-            "@group({group}) @binding({index}) var{address} {variable}: {wgsl};\n"
-        ));
+        let _ = writeln!(
+            code,
+            "@group({group}) @binding({index}) var{address} {variable}: {wgsl};"
+        );
         if let Some(alias) = &binding.operation_alias
             && variables.insert(alias.as_str(), variable.clone()).is_some()
         {
@@ -342,9 +343,19 @@ pub(in crate::driver) fn emit(
             while hook.params.iter().any(|p| p.name == temporary) {
                 temporary.push('_');
             }
-            code.push_str(&format!("fn {}({params}) -> {} {{ let {temporary} = {internal}({args}); return {}({}); }}\n",
-                aliases[&hook.name], type_name(&record.name)?, type_name(&record.name)?,
-                record.fields.iter().map(|f| format!("{temporary}.{}", f.name)).collect::<Vec<_>>().join(", ")));
+            let _ = writeln!(
+                code,
+                "fn {}({params}) -> {} {{ let {temporary} = {internal}({args}); return {}({}); }}",
+                aliases[&hook.name],
+                type_name(&record.name)?,
+                type_name(&record.name)?,
+                record
+                    .fields
+                    .iter()
+                    .map(|f| format!("{temporary}.{}", f.name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
             continue;
         }
         if has_attr(&hook.attrs, "evaluate") {
@@ -364,15 +375,16 @@ pub(in crate::driver) fn emit(
             {
                 return Err("@evaluate(surface) requires an empty function with the material context and schema result".into());
             }
-            code.push_str(&format!(
-                "fn {}({}: {}) -> {} {{ return fresco_{}({}); }}\n",
+            let _ = writeln!(
+                code,
+                "fn {}({}: {}) -> {} {{ return fresco_{}({}); }}",
                 aliases[&hook.name],
                 hook.params[0].name,
                 material.context.ty.name,
                 type_name(&hook.return_ty.as_ref().expect("checked result").node)?,
                 sanitize(&material.name),
                 hook.params[0].name
-            ));
+            );
             continue;
         }
         let mut attrs = String::new();
@@ -383,7 +395,7 @@ pub(in crate::driver) fn emit(
                     if stage.replace(attr.name.as_str()).is_some() {
                         return Err("GPU function has multiple stages".into());
                     }
-                    attrs.push_str(&format!("@{} ", attr.name));
+                    let _ = write!(attrs, "@{} ", attr.name);
                 }
                 "workgroup_size" => {
                     if attr.args.is_empty() || attr.args.len() > 3 {
@@ -402,10 +414,11 @@ pub(in crate::driver) fn emit(
                         );
                     }
                     workgroup = Some(size);
-                    attrs.push_str(&format!(
+                    let _ = write!(
+                        attrs,
                         "@workgroup_size({}, {}, {}) ",
                         size[0], size[1], size[2]
-                    ));
+                    );
                 }
                 _ => {
                     return Err(format!(
@@ -511,12 +524,13 @@ pub(in crate::driver) fn emit(
             structs,
             &names.iter().map(|name| (*name).clone()).collect(),
         )?;
-        code.push_str(&format!(
-            "{attrs}fn {}({}){result} {{\n{}\n}}\n",
+        let _ = writeln!(
+            code,
+            "{attrs}fn {}({}){result} {{\n{}\n}}",
             aliases[&hook.name],
             params.join(", "),
             emit_statements(&body, &context)?
-        ));
+        );
         if let Some(stage) = stage {
             if pass.stage.as_ref().map(|s| s.node.as_str())
                 != Some(if stage == "compute" {
@@ -585,7 +599,7 @@ pub(in crate::driver) fn emit(
             }
         }
         let mut next_location = 0u32;
-        code.push_str(&format!("struct {} {{\n", aliases[&name]));
+        let _ = writeln!(code, "struct {} {{", aliases[&name]);
         for field in &record.fields {
             if aliases.contains_key(&field.ty_name) {
                 needed.insert(field.ty_name.clone());
@@ -611,7 +625,7 @@ pub(in crate::driver) fn emit(
                 } else if matches!(name.as_str(), "location" | "builtin" | "interpolate")
                     && !args.is_empty()
                 {
-                    attrs.push_str(&format!("@{name}({}) ", args.join(", ")));
+                    let _ = write!(attrs, "@{name}({}) ", args.join(", "));
                 } else {
                     return Err(format!("unsupported GPU record field attribute `@{name}`"));
                 }
@@ -627,14 +641,15 @@ pub(in crate::driver) fn emit(
                         .checked_add(1)
                         .ok_or("varying location overflow")?;
                 }
-                attrs.push_str(&format!("@location({next_location}) "));
+                let _ = write!(attrs, "@location({next_location}) ");
                 occupied_locations.insert(next_location);
             }
-            code.push_str(&format!(
-                "{attrs}{}: {},\n",
+            let _ = writeln!(
+                code,
+                "{attrs}{}: {},",
                 shader_identifier(&field.name),
                 type_name(&field.ty_name)?
-            ));
+            );
         }
         code.push_str("}\n");
     }

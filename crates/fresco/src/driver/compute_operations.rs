@@ -6,6 +6,7 @@ use fresco_artifact::{
     ManifestComputeGeometryRole as GeometryRole, ManifestGpuProgram,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 
 pub(super) struct KernelDefinition {
     pub pass: PassDecl,
@@ -279,10 +280,11 @@ pub(super) fn shader_definition_projected(
                     ty: root_ty.clone(),
                 },
             )?;
-            prelude.push_str(&format!(
-                "let {}: {} = {name}.{member};\n",
+            let _ = writeln!(
+                prelude,
+                "let {}: {} = {name}.{member};",
                 input.name, input.ty
-            ));
+            );
         } else if let Some(resource) = program.resource_types.iter().find(|r| r.name == input.ty) {
             let roles = find_attr(&resource.attrs, "geometry").expect("validated geometry roles");
             for field in &resource.fields {
@@ -409,7 +411,7 @@ pub(super) fn shader_definition_projected(
                     ty: input.ty.clone(),
                 },
             )?;
-            prelude.push_str(&format!("let {} = {name} != 0u;\n", input.name));
+            let _ = writeln!(prelude, "let {} = {name} != 0u;", input.name);
         } else {
             let ty = if input.ty == "color" {
                 "vec4"
@@ -526,7 +528,10 @@ pub(super) fn shader_definition_projected(
                 hook.span.clone(),
             ));
             let id = &parameter.name;
-            capture.push_str(&format!("if {id}.x >= __fresco_dispatch.x || {id}.y >= __fresco_dispatch.y || {id}.z >= __fresco_dispatch.z {{ return }}\n"));
+            let _ = writeln!(
+                capture,
+                "if {id}.x >= __fresco_dispatch.x || {id}.y >= __fresco_dispatch.y || {id}.z >= __fresco_dispatch.z {{ return }}"
+            );
         } else if !hook.attrs.is_empty() {
             return Err(Diag::fail(
                 &hook.span,

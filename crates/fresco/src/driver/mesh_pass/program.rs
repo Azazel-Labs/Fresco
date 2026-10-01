@@ -1080,7 +1080,7 @@ pub(super) fn emit(
         if stage == "fragment" && !outputs.is_empty() && find_struct(structs, result).is_some() {
             let name = format!("{entry_base}_{}", sanitize(result));
             if aliases.insert(result.to_string(), name.clone()).is_none() {
-                declarations.push_str(&format!("struct {name} {{\n"));
+                let _ = writeln!(declarations, "struct {name} {{");
                 // Preserve constructor field order while reflecting explicit locations.
                 for field in &find_struct(structs, result)
                     .expect("selected output")
@@ -1090,12 +1090,13 @@ pub(super) fn emit(
                         .iter()
                         .find(|o| o.name == field.name)
                         .expect("validated field");
-                    declarations.push_str(&format!(
-                        "@location({}) {}: {},\n",
+                    let _ = writeln!(
+                        declarations,
+                        "@location({}) {}: {},",
                         output.location,
                         shader_identifier(&field.name),
                         wgsl_type(&field.ty_name)?
-                    ));
+                    );
                 }
                 declarations.push_str("}\n");
             }
@@ -1122,7 +1123,7 @@ pub(super) fn emit(
                         "stage parameter requires @builtin(name) or a varying struct".into(),
                     );
                 }
-                attrs.push_str(&format!("@builtin({}) ", attr.args[0]));
+                let _ = write!(attrs, "@builtin({}) ", attr.args[0]);
             }
             if stage == "vertex"
                 && let Some((prepare_index, _)) = preparation
@@ -1157,12 +1158,13 @@ pub(super) fn emit(
         } else {
             (format!(" -> {location}{ty}"), "return ")
         };
-        wrappers.push_str(&format!(
-            "@{stage} fn {entry}({}){output} {{ {returning}{}({}); }}\n",
+        let _ = writeln!(
+            wrappers,
+            "@{stage} fn {entry}({}){output} {{ {returning}{}({}); }}",
             params.join(", "),
             functions.names[index],
             args.join(", ")
-        ));
+        );
         entries.push(ManifestRasterEntry {
             function: hook.name.clone(),
             entry,
@@ -1308,10 +1310,11 @@ pub(super) fn emit(
         } else {
             format!("->{}", context_type(result, &context)?)
         };
-        code.push_str(&format!(
-            "fn {}({params}){output}{{\n{body}\n}}\n",
+        let _ = writeln!(
+            code,
+            "fn {}({params}){output}{{\n{body}\n}}",
             functions.names[index]
-        ));
+        );
     }
     let (imported, mut needed_types) = link_imports(
         library.functions(),
@@ -1334,7 +1337,7 @@ pub(super) fn emit(
         }
         let record = find_struct(structs, &name)
             .ok_or_else(|| format!("unknown imported GPU record `{name}`"))?;
-        declarations.push_str(&format!("struct {} {{\n", aliases[&name]));
+        let _ = writeln!(declarations, "struct {} {{", aliases[&name]);
         let context = ExprContext {
             type_aliases: Some(&aliases),
             ..base.clone()
@@ -1348,11 +1351,12 @@ pub(super) fn emit(
             if find_struct(structs, &field.ty_name).is_some() {
                 needed_types.insert(field.ty_name.clone());
             }
-            declarations.push_str(&format!(
-                "{}: {},\n",
+            let _ = writeln!(
+                declarations,
+                "{}: {},",
                 shader_identifier(&field.name),
                 context_type(&field.ty_name, &context)?
-            ));
+            );
         }
         declarations.push_str("}\n");
     }

@@ -2,6 +2,7 @@
 use crate::ast::{BinOp, Expr, SExpr, Stmt, UnOp};
 use crate::material_hir::MaterialHir;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 /// Preserve source identifiers across WGSL's larger reserved-word namespace.
 /// Escape the prefix itself too, so authored names cannot collide with escapes.
@@ -118,18 +119,20 @@ pub(super) fn emit_statements(
                     Some(ty) => format!(": {}", context_type(ty, context)?),
                     None => String::new(),
                 };
-                output.push_str(&format!(
-                    "  {keyword} {name}{annotation} = {};\n",
+                let _ = writeln!(
+                    output,
+                    "  {keyword} {name}{annotation} = {};",
                     emit_expr(value, context)?,
                     name = shader_identifier(name)
-                ));
+                );
             }
             Stmt::Store { target, value, .. } => {
-                output.push_str(&format!(
-                    "  {} = {};\n",
+                let _ = writeln!(
+                    output,
+                    "  {} = {};",
                     emit_expr(target, context)?,
                     emit_expr(value, context)?
-                ));
+                );
             }
             Stmt::Break { .. } => output.push_str("  break;\n"),
             Stmt::Assign {
@@ -142,19 +145,22 @@ pub(super) fn emit_statements(
                     Some(field) => format!("{}.{}", shader_identifier(name), shader_path(field)),
                     None => shader_identifier(name),
                 };
-                output.push_str(&format!("  {target} = {};\n", emit_expr(value, context)?));
+                let _ = writeln!(output, "  {target} = {};", emit_expr(value, context)?);
             }
             Stmt::Const {
                 name,
                 ty_name,
                 value,
                 ..
-            } => output.push_str(&format!(
-                "  const {name}: {} = {};\n",
-                context_type(ty_name, context)?,
-                emit_expr(value, context)?,
-                name = shader_identifier(name)
-            )),
+            } => {
+                let _ = writeln!(
+                    output,
+                    "  const {name}: {} = {};",
+                    context_type(ty_name, context)?,
+                    emit_expr(value, context)?,
+                    name = shader_identifier(name)
+                );
+            }
             Stmt::For {
                 name,
                 iterable,
@@ -171,10 +177,14 @@ pub(super) fn emit_statements(
                     binding_vars: &loop_bindings,
                     ..context.clone()
                 };
-                output.push_str(&format!(
-                    "  for (var {name} = u32({}); {name} < u32({}); {name} = {name} + 1u) {{\n{}  }}\n",
-                    emit_expr(start, context)?, emit_expr(end, context)?, emit_statements(body, &loop_context)?, name = shader_identifier(name)
-                ));
+                let _ = writeln!(
+                    output,
+                    "  for (var {name} = u32({}); {name} < u32({}); {name} = {name} + 1u) {{\n{}  }}",
+                    emit_expr(start, context)?,
+                    emit_expr(end, context)?,
+                    emit_statements(body, &loop_context)?,
+                    name = shader_identifier(name)
+                );
             }
             Stmt::If {
                 cond,
@@ -193,26 +203,26 @@ pub(super) fn emit_statements(
                     }
                     continue;
                 }
-                output.push_str(&format!(
-                    "  if ({}) {{\n{}  }}\n",
+                let _ = writeln!(
+                    output,
+                    "  if ({}) {{\n{}  }}",
                     emit_expr(cond, context)?,
                     emit_statements(then_body, context)?
-                ));
+                );
                 if let Some(body) = else_body {
-                    output.push_str(&format!(
-                        "  else {{\n{}  }}\n",
-                        emit_statements(body, context)?
-                    ));
+                    let _ = writeln!(output, "  else {{\n{}  }}", emit_statements(body, context)?);
                 }
             }
             Stmt::Expr(value) if matches!(&value.node, Expr::Call { name, args, .. } if name == "discard_fragment" && args.is_empty()) =>
             {
                 output.push_str("  discard;\n");
             }
-            Stmt::Expr(value) => output.push_str(&format!("  {};\n", emit_expr(value, context)?)),
+            Stmt::Expr(value) => {
+                let _ = writeln!(output, "  {};", emit_expr(value, context)?);
+            }
             Stmt::ReturnVoid { .. } => output.push_str("  return;\n"),
             Stmt::Return { value, .. } => {
-                output.push_str(&format!("  return {};\n", emit_expr(value, context)?));
+                let _ = writeln!(output, "  return {};", emit_expr(value, context)?);
             }
             other => {
                 return Err(format!("unsupported executable mesh statement: {other:?}"));

@@ -3,6 +3,7 @@
 use super::gpu_function::*;
 use crate::ast::{BinOp, Expr, SExpr, Stmt};
 use crate::ast::{find_attr, has_attr};
+use std::fmt::Write as _;
 mod preparation_shader;
 mod program;
 pub(super) use program::{
@@ -463,9 +464,10 @@ fn for_factory(
             } else {
                 format!("<{address_space}>")
             };
-            resource_decls.push_str(&format!(
-                "@group({group}) @binding({binding_index})\nvar{address} {var_name}: {resource_ty};\n\n"
-            ));
+            let _ = writeln!(
+                resource_decls,
+                "@group({group}) @binding({binding_index})\nvar{address} {var_name}: {resource_ty};\n"
+            );
         }
         if let Some(name) = &binding.operation_alias
             && binding_vars
@@ -557,11 +559,12 @@ fn resolve_format_members<'a>(
 fn emit_vertex_input(name: &str, members: &[&VertexInterfaceMemberDecl]) -> Result<String, String> {
     let mut output = format!("struct {name} {{\n");
     for (location, member) in members.iter().enumerate() {
-        output.push_str(&format!(
-            "  @location({location}) {}: {},\n",
+        let _ = writeln!(
+            output,
+            "  @location({location}) {}: {},",
             shader_identifier(&member.name),
             wgsl_type(&member.ty_name)?
-        ));
+        );
     }
     output.push_str("}\n\n");
     Ok(output)
@@ -572,17 +575,19 @@ fn emit_varying(source: &StructDecl, name: &str) -> Result<String, String> {
     let mut location = 0_u32;
     for field in &source.fields {
         if field.semantic.as_deref() == Some("position") {
-            output.push_str(&format!(
-                "  @builtin(position) {}: {},\n",
+            let _ = writeln!(
+                output,
+                "  @builtin(position) {}: {},",
                 shader_identifier(&field.name),
                 wgsl_type(&field.ty_name)?
-            ));
+            );
         } else {
-            output.push_str(&format!(
-                "  @location({location}) {}: {},\n",
+            let _ = writeln!(
+                output,
+                "  @location({location}) {}: {},",
                 shader_identifier(&field.name),
                 wgsl_type(&field.ty_name)?
-            ));
+            );
             location += 1;
         }
     }
@@ -593,11 +598,12 @@ fn emit_varying(source: &StructDecl, name: &str) -> Result<String, String> {
 fn emit_plain_struct(source: &StructDecl, name: &str) -> Result<String, String> {
     let mut output = format!("struct {name} {{\n");
     for field in &source.fields {
-        output.push_str(&format!(
-            "  {}: {},\n",
+        let _ = writeln!(
+            output,
+            "  {}: {},",
             shader_identifier(&field.name),
             wgsl_type(&field.ty_name)?
-        ));
+        );
     }
     output.push_str("}\n\n");
     Ok(output)

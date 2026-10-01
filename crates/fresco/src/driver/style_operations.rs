@@ -4,6 +4,7 @@ use crate::pipeline_layout::compact_type;
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestImplementationSelection, ManifestStyleInvocation};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 mod bounds;
 mod captures;
 mod compute;
@@ -1645,11 +1646,12 @@ fn instantiate(
                 || source.clone(),
                 |projection| format!("({source}).{}", projection.member),
             );
-            prelude.push_str(&format!(
-                "let {}: {} = {source};\n",
+            let _ = writeln!(
+                prelude,
+                "let {}: {} = {source};",
                 parameter.name,
                 if ty == "color" { "vec4" } else { &ty }
-            ));
+            );
         } else {
             let argument = value.dotted_path().expect("checked resource");
             let contract = context

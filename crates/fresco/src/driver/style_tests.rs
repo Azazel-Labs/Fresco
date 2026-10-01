@@ -1,5 +1,6 @@
 use super::{compile_bundle_virtual, tests::executable_mesh_files};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 fn files() -> HashMap<String, String> {
     let mut files = executable_mesh_files(
@@ -179,14 +180,15 @@ fn shading_hook_effects_reject_derivatives_through_helpers_and_unused_styles() {
         "hidden(value.x)",
     ] {
         let mut input = files();
-        input.get_mut("plain.fr").unwrap().push_str(&format!(
+        let _ = write!(
+            input.get_mut("plain.fr").unwrap(),
             r#"
 fn hidden(value: f32) -> f32 {{ return ddx(value) }}
 style Unselected for base : Response {{
     fn apply(value: vec4) -> vec4 {{ return vec4({expression}) }}
 }}
 "#
-        ));
+        );
         assert_error(&input, "dynamically dispatched shading hooks cannot use");
     }
     let mut input = files();
@@ -351,10 +353,10 @@ fn style_graph_scopes_and_resource_declarations_are_checked() {
         ),
     ] {
         let mut files = files();
-        files
-            .get_mut("engine/mesh.fr")
-            .unwrap()
-            .push_str(&format!("\ncontract Extra for base {{ {member} }}"));
+        let _ = write!(
+            files.get_mut("engine/mesh.fr").unwrap(),
+            "\ncontract Extra for base {{ {member} }}"
+        );
         assert_error(&files, diagnostic);
     }
 }
@@ -448,10 +450,7 @@ fn unused_styles_and_duplicate_declarations_are_checked_in_their_source_file() {
         ),
     ] {
         let mut files = original.clone();
-        files
-            .get_mut(file)
-            .unwrap()
-            .push_str(&format!("\n{addition}\n"));
+        let _ = writeln!(files.get_mut(file).unwrap(), "\n{addition}");
         let errors = compile_bundle_virtual(&files, "main.fr", false).unwrap_err();
         assert!(
             errors

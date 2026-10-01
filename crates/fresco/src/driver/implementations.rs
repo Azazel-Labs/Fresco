@@ -5,6 +5,7 @@ use crate::ast::{attr_arg, attrs_named};
 use crate::diag::Diag;
 use logos::Logos;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 
 pub(super) fn contract_type(ty: &str) -> Option<&str> {
     ty.strip_prefix("implementation<")?.strip_suffix('>')
@@ -363,10 +364,11 @@ pub(super) fn render_dispatch(hook: &mut PassFnHookDecl) -> Result<(), Vec<Diag>
         } else {
             format!("{call}; return;")
         };
-        prefix.push_str(&format!(
-            "if {selector} == u32({}) {{ {action} }}\n",
+        let _ = writeln!(
+            prefix,
+            "if {selector} == u32({}) {{ {action} }}",
             case.selector
-        ));
+        );
     }
     let tokens = crate::lexer::Token::lexer(&prefix)
         .map(|token| {

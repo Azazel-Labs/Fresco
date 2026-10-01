@@ -8,6 +8,7 @@ use crate::ast::{Arg, Expr, FnDecl, SExpr, Stmt, StructDecl};
 use crate::context::EntryContext;
 use crate::material_hir::MaterialChannel;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fmt::Write as _;
 
 /// Resolve the format through the shared resource model before using its shader
 /// image type. Format support and device sampling features remain distinct.
@@ -108,14 +109,15 @@ fn add_type(
                 active,
                 definitions,
             )?;
-            fields.push_str(&format!(
-                "  {}: {},\n",
+            let _ = writeln!(
+                fields,
+                "  {}: {},",
                 shader_identifier(&field.name),
                 context_type(&field.ty_name, cx)?
-            ));
+            );
         }
         active.remove(name);
-        definitions.push_str(&format!("struct {} {{\n{fields}}}\n", aliases[name]));
+        let _ = writeln!(definitions, "struct {} {{\n{fields}}}", aliases[name]);
         used.insert(name.into());
     }
     Ok(())
@@ -196,10 +198,11 @@ pub(super) fn validate_resource_functions(
                         unreachable!("buffer spelling")
                     };
                     let name = format!("fresco_validation_resource_{binding}");
-                    globals.push_str(&format!(
-                        "@group(0) @binding({binding}) var<storage, read> {name}: array<{}>;\n",
+                    let _ = writeln!(
+                        globals,
+                        "@group(0) @binding({binding}) var<storage, read> {name}: array<{}>;",
                         context_type(&element, &context)?
-                    ));
+                    );
                     resource_types.insert(element);
                     bindings.insert(parameter.name.clone(), name);
                 }
@@ -509,11 +512,12 @@ pub(super) fn link_library_function(
         let name = specialization
             .filter(|_| specialized_root)
             .map_or(name.as_str(), |value| value.name.as_str());
-        code.push_str(&format!(
-            "fn {name}({}){result} {{\n{}\n}}\n",
+        let _ = writeln!(
+            code,
+            "fn {name}({}){result} {{\n{}\n}}",
             parameters.join(", "),
             emit_statements(&body, &context)?
-        ));
+        );
     }
     Ok((code, resolver.referenced_types))
 }
@@ -1254,11 +1258,12 @@ impl SchemaFunction {
         let mut used = HashSet::new();
         let mut schema = format!("struct {material_type} {{\n");
         for channel in channels {
-            schema.push_str(&format!(
-                " {}: {},\n",
+            let _ = writeln!(
+                schema,
+                " {}: {},",
                 channel.name,
                 context_type(&channel.ty_name, &type_context)?
-            ));
+            );
         }
         schema.push_str("}\n");
         let mut captures = vec![("fresco_schema_context".into(), context.ty.name.clone())];
@@ -1413,12 +1418,13 @@ impl SchemaFunction {
                 format!("schema function `{}` requires a return type", function.name)
             })?;
             let result = context_type(&result.0, &cx)?;
-            functions.push_str(&format!(
-                "fn {entry}_{}_{index}({}) -> {result} {{\n{}\n}}\n",
+            let _ = writeln!(
+                functions,
+                "fn {entry}_{}_{index}({}) -> {result} {{\n{}\n}}",
                 if local { "local" } else { "import" },
                 params.join(", "),
                 emit_statements(&body, &cx)?
-            ));
+            );
         }
         let vars = emitter
             .variables

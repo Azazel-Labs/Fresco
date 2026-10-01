@@ -2,6 +2,7 @@
 
 use crate::ast::attr_arg;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 
 use crate::ast::{BinOp, Expr, PassDecl, PipelineDecl, SExpr, Stmt, UnOp};
 use crate::hir::Hir;
@@ -185,7 +186,8 @@ fn {position_helper}(vertex_id: u32) -> vec2<f32> {{
         };
         let vertex_code = emit_statements(&vertex_body, context)?;
         let shade_code = emit_statements(&shade_body, context)?;
-        wgsl.push_str(&format!(
+        let _ = write!(
+            wgsl,
             r#"
 @vertex
 fn {vertex_entry}(@builtin(vertex_index) {vertex_param}: u32) -> {varying} {{
@@ -197,7 +199,7 @@ fn {fragment_entry}({shade_param}: {varying}) -> @location(0) vec4<f32> {{
 "#,
             vertex_param = vertex_param.name,
             shade_param = shade.params[0].name,
-        ));
+        );
         variants.push(FullscreenVariant {
             key,
             bindings,
@@ -275,10 +277,11 @@ fn emit_statements(statements: &[Stmt], context: EmitContext<'_>) -> Result<Stri
                     Some(ty) => format!(": {}", wgsl_type(ty)),
                     None => String::new(),
                 };
-                output.push_str(&format!(
-                    "  {keyword} {name}{annotation} = {};\n",
+                let _ = writeln!(
+                    output,
+                    "  {keyword} {name}{annotation} = {};",
                     emit_expr(value, context)?
-                ));
+                );
             }
             Stmt::Assign {
                 name,
@@ -290,20 +293,23 @@ fn emit_statements(statements: &[Stmt], context: EmitContext<'_>) -> Result<Stri
                     Some(field) => format!("{name}.{field}"),
                     None => name.clone(),
                 };
-                output.push_str(&format!("  {target} = {};\n", emit_expr(value, context)?));
+                let _ = writeln!(output, "  {target} = {};", emit_expr(value, context)?);
             }
             Stmt::Const {
                 name,
                 ty_name,
                 value,
                 ..
-            } => output.push_str(&format!(
-                "  const {name}: {} = {};\n",
-                wgsl_type(ty_name),
-                emit_expr(value, context)?
-            )),
+            } => {
+                let _ = writeln!(
+                    output,
+                    "  const {name}: {} = {};",
+                    wgsl_type(ty_name),
+                    emit_expr(value, context)?
+                );
+            }
             Stmt::Return { value, .. } => {
-                output.push_str(&format!("  return {};\n", emit_expr(value, context)?));
+                let _ = writeln!(output, "  return {};", emit_expr(value, context)?);
             }
             Stmt::If {
                 cond,
@@ -319,7 +325,7 @@ fn emit_statements(statements: &[Stmt], context: EmitContext<'_>) -> Result<Stri
                     };
                     output.push_str(&emit_statements(body, context)?);
                 } else {
-                    output.push_str(&format!("  if ({}) {{\n", emit_expr(cond, context)?));
+                    let _ = writeln!(output, "  if ({}) {{", emit_expr(cond, context)?);
                     output.push_str(&indent(&emit_statements(then_body, context)?));
                     output.push_str("  }");
                     if let Some(else_body) = else_body {
