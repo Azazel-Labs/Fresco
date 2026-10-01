@@ -3633,14 +3633,6 @@ impl Checker {
         let helper_span_bytes = def.span.end.saturating_sub(def.span.start);
         let semantic_validation_skipped =
             helper_span_bytes > HELPER_SEMANTIC_VALIDATE_MAX_SPAN_BYTES;
-        if name == "raycast" {
-            tracing::info!(
-                helper_name = %name,
-                helper_span_bytes = helper_span_bytes,
-                skipped = semantic_validation_skipped,
-                "checker helper semantic validation check"
-            );
-        }
         let semantic_ok = if out.is_some() {
             // Keep helper lowering aligned with function semantics for small helpers, but avoid
             // expensive duplicate evaluation on large helper bodies.
@@ -4259,20 +4251,10 @@ impl Checker {
         if self.emit_user_helper_calls
             && let Some(helper_id) = self.register_pending_user_helper(name, &def)
             && let Some(v) =
-                self.make_helper_call_value(&def, name, call_span, helper_id.clone(), &bound_values)
+                self.make_helper_call_value(&def, name, call_span, helper_id, &bound_values)
         {
-            if name == "map" || name == "raycast" {
-                tracing::info!(name = %name, helper_id = %helper_id, "user_fn_call helper path");
-            }
             self.record_check_profile_timing("user_fn_call", t0.elapsed());
             return Some(v);
-        }
-        if name == "map" || name == "raycast" {
-            tracing::info!(
-                name = %name,
-                emit = self.emit_user_helper_calls,
-                "user_fn_call INLINE path"
-            );
         }
 
         let cache_key = {

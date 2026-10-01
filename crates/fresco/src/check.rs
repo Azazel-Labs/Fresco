@@ -1543,11 +1543,6 @@ pub(super) fn validate_interface_conformance_methods(
     for conform in conformances {
         let Some(interface_decl) = interface_map.get(conform.interface_name.as_str()).copied()
         else {
-            eprintln!(
-                "[debug validate_interface_conformance_methods] interfaces={:?}, looking for {:?}",
-                interface_map.keys().collect::<Vec<_>>(),
-                conform.interface_name
-            );
             prep_diags.push(
                 Diag::error(
                     conform.interface_name_span.clone(),
