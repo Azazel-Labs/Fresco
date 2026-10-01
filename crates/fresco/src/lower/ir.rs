@@ -327,17 +327,14 @@ impl FunctionBuilder {
         let h = self.function.expressions.append(e, SP);
         if needs_emit {
             self.emitted_instructions += 1;
-            if let Some(tag) = &self.active_feature_tag {
-                *self
-                    .feature_instruction_counts
-                    .entry(tag.clone())
-                    .or_insert(0) += 1;
+            if let Some(tag) = self.active_feature_tag {
+                *self.feature_instruction_counts.entry(tag).or_insert(0) += 1;
                 if let Some(locality) = self.active_locality {
                     let by_feature = self
                         .feature_instruction_counts_by_locality
-                        .entry(locality.as_str().to_string())
+                        .entry(locality)
                         .or_default();
-                    *by_feature.entry(tag.clone()).or_insert(0) += 1;
+                    *by_feature.entry(tag).or_insert(0) += 1;
                 }
             }
             self.push_statement(naga::Statement::Emit(
@@ -347,13 +344,11 @@ impl FunctionBuilder {
         h
     }
 
-    pub(super) fn set_feature_tag(&mut self, next: Option<&str>) -> Option<String> {
-        let prev = self.active_feature_tag.clone();
-        self.active_feature_tag = next.map(ToOwned::to_owned);
-        prev
+    pub(super) fn set_feature_tag(&mut self, next: Option<&'static str>) -> Option<&'static str> {
+        std::mem::replace(&mut self.active_feature_tag, next)
     }
 
-    pub(super) fn restore_feature_tag(&mut self, prev: Option<String>) {
+    pub(super) fn restore_feature_tag(&mut self, prev: Option<&'static str>) {
         self.active_feature_tag = prev;
     }
 
@@ -848,11 +843,11 @@ impl IrBuilder {
             .collect()
     }
 
-    pub(super) fn set_feature_tag(&mut self, tag: Option<&str>) -> Option<String> {
+    pub(super) fn set_feature_tag(&mut self, tag: Option<&'static str>) -> Option<&'static str> {
         self.function.set_feature_tag(tag)
     }
 
-    pub(super) fn restore_feature_tag(&mut self, prev: Option<String>) {
+    pub(super) fn restore_feature_tag(&mut self, prev: Option<&'static str>) {
         self.function.restore_feature_tag(prev);
     }
 
@@ -860,14 +855,32 @@ impl IrBuilder {
         self.function.emitted_instructions
     }
 
+    /// Emitted instruction counts per feature tag, keyed for [`Stats`].
     pub(super) fn feature_instruction_counts(&self) -> BTreeMap<String, usize> {
-        self.function.feature_instruction_counts.clone()
+        Self::owned_feature_counts(&self.function.feature_instruction_counts)
     }
 
+    /// Emitted instruction counts per locality and feature tag, keyed for [`Stats`].
     pub(super) fn feature_instruction_counts_by_locality(
         &self,
     ) -> BTreeMap<String, BTreeMap<String, usize>> {
-        self.function.feature_instruction_counts_by_locality.clone()
+        self.function
+            .feature_instruction_counts_by_locality
+            .iter()
+            .map(|(locality, counts)| {
+                (
+                    locality.as_str().to_string(),
+                    Self::owned_feature_counts(counts),
+                )
+            })
+            .collect()
+    }
+
+    fn owned_feature_counts(counts: &BTreeMap<&'static str, usize>) -> BTreeMap<String, usize> {
+        counts
+            .iter()
+            .map(|(&tag, &count)| (tag.to_string(), count))
+            .collect()
     }
 
     pub(super) fn set_locality(&mut self, locality: Option<Locality>) -> Option<Locality> {

@@ -230,9 +230,9 @@ struct FunctionBuilder {
     block_stack: Vec<naga::Block>,
     policy: LoweringPolicy,
     emitted_instructions: usize,
-    feature_instruction_counts: BTreeMap<String, usize>,
-    feature_instruction_counts_by_locality: BTreeMap<String, BTreeMap<String, usize>>,
-    active_feature_tag: Option<String>,
+    feature_instruction_counts: BTreeMap<&'static str, usize>,
+    feature_instruction_counts_by_locality: BTreeMap<Locality, BTreeMap<&'static str, usize>>,
+    active_feature_tag: Option<&'static str>,
     active_locality: Option<Locality>,
 }
 
