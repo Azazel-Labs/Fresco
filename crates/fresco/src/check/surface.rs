@@ -1497,7 +1497,7 @@ pub(crate) fn check_surface(
                 if compose_entries.is_some() {
                     checker.diags.push(
                         Diag::error(
-                            stmt_span(stmt),
+                            stmt.span(),
                             "surface body may only have one `compose` block",
                         )
                         .with_help("keep one `compose { ... }` block in the surface body"),
@@ -1509,7 +1509,7 @@ pub(crate) fn check_surface(
             Stmt::ComposePiped { entries, pipes, .. } => {
                 if !pipes.is_empty() {
                     checker.diags.push(
-                        Diag::error(stmt_span(stmt), "surface compose pipes are not yet supported")
+                        Diag::error(stmt.span(), "surface compose pipes are not yet supported")
                             .with_help(
                                 "surface compose blocks currently support only the engine-declared initializer and layer operations",
                             ),
@@ -1518,7 +1518,7 @@ pub(crate) fn check_surface(
                 if compose_entries.is_some() {
                     checker.diags.push(
                         Diag::error(
-                            stmt_span(stmt),
+                            stmt.span(),
                             "surface body may only have one `compose` block",
                         )
                         .with_help("keep one `compose { ... }` block in the surface body"),
@@ -1543,7 +1543,7 @@ pub(crate) fn check_surface(
             }
             _ => checker.diags.push(
                 Diag::error(
-                    stmt_span(stmt),
+                    stmt.span(),
                     "statement not yet supported in surface body",
                 )
                 .with_help(
@@ -2173,7 +2173,7 @@ fn process_compose_entry(
         _ => {
             checker.diags.push(
                 Diag::error(
-                    compose_entry_span(entry),
+                    entry.span(),
                     "compose entry not yet supported in surface body",
                 )
                 .with_help(format!(
@@ -2465,46 +2465,6 @@ fn value_to_scalar_sx(v: Value, span: &Span, checker: &mut Checker) -> Option<Sx
             );
             None
         }
-    }
-}
-
-fn stmt_span(stmt: &Stmt) -> Span {
-    match stmt {
-        Stmt::TextureBinding { span, .. }
-        | Stmt::Param { span, .. }
-        | Stmt::Assign { span, .. }
-        | Stmt::Store { span, .. }
-        | Stmt::For { span, .. }
-        | Stmt::If { span, .. }
-        | Stmt::Match { span, .. }
-        | Stmt::SpaceDecl { span, .. }
-        | Stmt::StyleDecl { span, .. }
-        | Stmt::CanvasSpace { span, .. }
-        | Stmt::InSpace { span, .. }
-        | Stmt::InContext { span, .. }
-        | Stmt::Block { span, .. }
-        | Stmt::Seq { span, .. }
-        | Stmt::Compose { span, .. }
-        | Stmt::ComposePiped { span, .. }
-        | Stmt::SurfaceVertex { span, .. }
-        | Stmt::ReturnVoid { span }
-        | Stmt::Return { span, .. }
-        | Stmt::Break { span } => span.clone(),
-        Stmt::Let { name_span, .. }
-        | Stmt::Const { name_span, .. }
-        | Stmt::LetScatter { name_span, .. } => name_span.clone(),
-        Stmt::LocalFnDecl(f) => f.span.clone(),
-        Stmt::Expr(expr) => expr.span.clone(),
-    }
-}
-
-fn compose_entry_span(entry: &ComposeEntry) -> Span {
-    match entry {
-        ComposeEntry::Expr { expr, .. } => expr.span.clone(),
-        ComposeEntry::Block { span, .. }
-        | ComposeEntry::If { span, .. }
-        | ComposeEntry::InSpace { span, .. }
-        | ComposeEntry::For { span, .. } => span.clone(),
     }
 }
 

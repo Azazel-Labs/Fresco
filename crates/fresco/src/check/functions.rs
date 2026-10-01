@@ -4587,32 +4587,16 @@ impl Checker {
     }
 }
 
+/// The diagnostic anchor and label for a statement inside a helper fn body.
+/// Assignments and local fns point at their names, scatter bindings at the
+/// scatter call, and indexed stores are labeled separately from assignments.
 fn fn_stmt_span_kind(stmt: &Stmt) -> (Span, &'static str) {
     match stmt {
-        Stmt::Param { span, .. } => (span.clone(), "param"),
-        Stmt::TextureBinding { span, .. } => (span.clone(), "uniform texture binding"),
-        Stmt::Let { name_span, .. } => (name_span.clone(), "let"),
-        Stmt::Const { name_span, .. } => (name_span.clone(), "const"),
-        Stmt::Assign { name_span, .. } => (name_span.clone(), "assignment"),
+        Stmt::Assign { name_span, .. } => (name_span.clone(), stmt.kind()),
         Stmt::Store { span, .. } => (span.clone(), "indexed assignment"),
-        Stmt::For { span, .. } => (span.clone(), "for-loop"),
-        Stmt::If { span, .. } => (span.clone(), "if"),
-        Stmt::Match { span, .. } => (span.clone(), "match"),
-        Stmt::LetScatter { scatter, .. } => (scatter.span.clone(), "scatter"),
-        Stmt::SpaceDecl { span, .. } => (span.clone(), "space declaration"),
-        Stmt::StyleDecl { span, .. } => (span.clone(), "style declaration"),
-        Stmt::CanvasSpace { span, .. } => (span.clone(), "canvas_space declaration"),
-        Stmt::Compose { span, .. } => (span.clone(), "compose"),
-        Stmt::ComposePiped { span, .. } => (span.clone(), "compose with pipes"),
-        Stmt::SurfaceVertex { span, .. } => (span.clone(), "surface vertex"),
-        Stmt::Return { span, .. } | Stmt::ReturnVoid { span } => (span.clone(), "return"),
-        Stmt::Break { span } => (span.clone(), "break"),
-        Stmt::InSpace { span, .. } => (span.clone(), "in-space block"),
-        Stmt::InContext { span, .. } => (span.clone(), "in-context block"),
-        Stmt::Block { span, .. } => (span.clone(), "grouped block"),
-        Stmt::Seq { span, .. } => (span.clone(), "statement sequence"),
-        Stmt::LocalFnDecl(fn_decl) => (fn_decl.name_span.clone(), "local fn declaration"),
-        Stmt::Expr(e) => (e.span.clone(), "expression"),
+        Stmt::LetScatter { scatter, .. } => (scatter.span.clone(), stmt.kind()),
+        Stmt::LocalFnDecl(fn_decl) => (fn_decl.name_span.clone(), stmt.kind()),
+        other => (other.span(), other.kind()),
     }
 }
 

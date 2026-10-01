@@ -129,44 +129,6 @@ impl Checker {
         }
     }
 
-    fn stmt_kind(stmt: &Stmt) -> &'static str {
-        match stmt {
-            Stmt::Param { .. } => "param",
-            Stmt::TextureBinding { .. } => "uniform texture binding",
-            Stmt::Let { .. } => "let",
-            Stmt::Const { .. } => "const",
-            Stmt::Assign { .. } | Stmt::Store { .. } => "assignment",
-            Stmt::For { .. } => "for-loop",
-            Stmt::If { .. } => "if",
-            Stmt::Match { .. } => "match",
-            Stmt::LetScatter { .. } => "scatter",
-            Stmt::SpaceDecl { .. } => "space declaration",
-            Stmt::StyleDecl { .. } => "style declaration",
-            Stmt::CanvasSpace { .. } => "canvas_space declaration",
-            Stmt::Compose { .. } => "compose",
-            Stmt::ComposePiped { .. } => "compose with pipes",
-            Stmt::SurfaceVertex { .. } => "surface vertex",
-            Stmt::Return { .. } | Stmt::ReturnVoid { .. } => "return",
-            Stmt::Break { .. } => "break",
-            Stmt::InSpace { .. } => "in-space block",
-            Stmt::InContext { .. } => "in-context block",
-            Stmt::Block { .. } => "grouped block",
-            Stmt::Seq { .. } => "statement sequence",
-            Stmt::LocalFnDecl(_) => "local fn declaration",
-            Stmt::Expr(_) => "expression",
-        }
-    }
-
-    fn compose_entry_kind(entry: &ComposeEntry) -> &'static str {
-        match entry {
-            ComposeEntry::Expr { .. } => "compose expr",
-            ComposeEntry::Block { .. } => "compose block",
-            ComposeEntry::If { .. } => "compose if",
-            ComposeEntry::InSpace { .. } => "compose in-space",
-            ComposeEntry::For { .. } => "compose for-loop",
-        }
-    }
-
     fn is_circle_like_shape_call(name: &str) -> bool {
         matches!(name, "circle" | "capsule")
     }
@@ -1121,7 +1083,7 @@ impl Checker {
         }
 
         for (stmt_idx, stmt) in stmts.iter().enumerate() {
-            let stmt_kind = Self::stmt_kind(stmt);
+            let stmt_kind = stmt.kind();
             if is_canvas_root {
                 info!(idx = stmt_idx, kind = stmt_kind, "checker stmt start");
             } else {
@@ -2169,7 +2131,7 @@ impl Checker {
             };
 
         for (entry_idx, e) in entries.iter().enumerate() {
-            let entry_kind = Self::compose_entry_kind(e);
+            let entry_kind = e.kind();
             info!(
                 idx = entry_idx,
                 kind = entry_kind,

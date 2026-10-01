@@ -222,6 +222,30 @@ pub enum ComposeEntry {
     },
 }
 
+impl ComposeEntry {
+    /// The entry's source span; expression entries use the expression span.
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            ComposeEntry::Expr { expr, .. } => expr.span.clone(),
+            ComposeEntry::Block { span, .. }
+            | ComposeEntry::If { span, .. }
+            | ComposeEntry::InSpace { span, .. }
+            | ComposeEntry::For { span, .. } => span.clone(),
+        }
+    }
+
+    /// A short human-readable compose entry kind for diagnostics.
+    pub(crate) fn kind(&self) -> &'static str {
+        match self {
+            ComposeEntry::Expr { .. } => "compose expr",
+            ComposeEntry::Block { .. } => "compose block",
+            ComposeEntry::If { .. } => "compose if",
+            ComposeEntry::InSpace { .. } => "compose in-space",
+            ComposeEntry::For { .. } => "compose for-loop",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ScatterLifecycle {
     pub instance_name: Spanned<String>,
@@ -418,6 +442,69 @@ pub enum Stmt {
     /// `fn name(params) -> ty { body }` declared inside a canvas or fn body.
     LocalFnDecl(FnDecl),
     Expr(SExpr),
+}
+
+impl Stmt {
+    /// The statement's source span; declarations that only record a name span
+    /// (`let`, `const`, `let scatter`) report that instead.
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            Stmt::TextureBinding { span, .. }
+            | Stmt::Param { span, .. }
+            | Stmt::Assign { span, .. }
+            | Stmt::Store { span, .. }
+            | Stmt::For { span, .. }
+            | Stmt::If { span, .. }
+            | Stmt::Match { span, .. }
+            | Stmt::SpaceDecl { span, .. }
+            | Stmt::StyleDecl { span, .. }
+            | Stmt::CanvasSpace { span, .. }
+            | Stmt::InSpace { span, .. }
+            | Stmt::InContext { span, .. }
+            | Stmt::Block { span, .. }
+            | Stmt::Seq { span, .. }
+            | Stmt::Compose { span, .. }
+            | Stmt::ComposePiped { span, .. }
+            | Stmt::SurfaceVertex { span, .. }
+            | Stmt::ReturnVoid { span }
+            | Stmt::Return { span, .. }
+            | Stmt::Break { span } => span.clone(),
+            Stmt::Let { name_span, .. }
+            | Stmt::Const { name_span, .. }
+            | Stmt::LetScatter { name_span, .. } => name_span.clone(),
+            Stmt::LocalFnDecl(f) => f.span.clone(),
+            Stmt::Expr(expr) => expr.span.clone(),
+        }
+    }
+
+    /// A short human-readable statement kind for diagnostics.
+    pub(crate) fn kind(&self) -> &'static str {
+        match self {
+            Stmt::Param { .. } => "param",
+            Stmt::TextureBinding { .. } => "uniform texture binding",
+            Stmt::Let { .. } => "let",
+            Stmt::Const { .. } => "const",
+            Stmt::Assign { .. } | Stmt::Store { .. } => "assignment",
+            Stmt::For { .. } => "for-loop",
+            Stmt::If { .. } => "if",
+            Stmt::Match { .. } => "match",
+            Stmt::LetScatter { .. } => "scatter",
+            Stmt::SpaceDecl { .. } => "space declaration",
+            Stmt::StyleDecl { .. } => "style declaration",
+            Stmt::CanvasSpace { .. } => "canvas_space declaration",
+            Stmt::Compose { .. } => "compose",
+            Stmt::ComposePiped { .. } => "compose with pipes",
+            Stmt::SurfaceVertex { .. } => "surface vertex",
+            Stmt::Return { .. } | Stmt::ReturnVoid { .. } => "return",
+            Stmt::Break { .. } => "break",
+            Stmt::InSpace { .. } => "in-space block",
+            Stmt::InContext { .. } => "in-context block",
+            Stmt::Block { .. } => "grouped block",
+            Stmt::Seq { .. } => "statement sequence",
+            Stmt::LocalFnDecl(_) => "local fn declaration",
+            Stmt::Expr(_) => "expression",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
