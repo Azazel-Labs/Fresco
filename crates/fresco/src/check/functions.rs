@@ -2329,14 +2329,8 @@ impl Checker {
             return;
         }
 
-        let helper_timeout_ms = std::env::var("FRESCO_CHECK_HELPER_TIMEOUT_MS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(2000);
-        let max_passes = std::env::var("FRESCO_CHECK_HELPER_MATERIALIZE_MAX_PASSES")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(512);
+        let helper_timeout_ms = env_or::<u64>("FRESCO_CHECK_HELPER_TIMEOUT_MS", 2000);
+        let max_passes = env_or::<usize>("FRESCO_CHECK_HELPER_MATERIALIZE_MAX_PASSES", 512);
 
         let prior_timeout_reported = self.expr_timeout_reported;
         let prior_timeout = self.expr_timeout;

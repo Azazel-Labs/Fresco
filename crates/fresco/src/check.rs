@@ -3019,12 +3019,19 @@ impl CheckProfileTiming {
     }
 }
 
+/// Parses environment variable `name` as `T`, ignoring unset or malformed values.
+fn env_parse<T: std::str::FromStr>(name: &str) -> Option<T> {
+    std::env::var(name).ok().and_then(|v| v.parse().ok())
+}
+
+/// Parses environment variable `name` as `T`, falling back to `default`.
+fn env_or<T: std::str::FromStr>(name: &str, default: T) -> T {
+    env_parse(name).unwrap_or(default)
+}
+
 impl Checker {
     pub(super) fn expr_watchdog_every_default() -> u64 {
-        std::env::var("FRESCO_CHECK_EXPR_WATCHDOG_EVERY")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(10_000)
+        env_or::<u64>("FRESCO_CHECK_EXPR_WATCHDOG_EVERY", 10_000)
     }
 
     /// Fallback timeout applied when neither `--expr-timeout-ms` nor
@@ -3045,11 +3052,7 @@ impl Checker {
     pub(super) fn expr_timeout_default(options: &CheckOptions) -> Option<Duration> {
         options
             .expr_timeout_ms
-            .or_else(|| {
-                std::env::var("FRESCO_CHECK_EXPR_TIMEOUT_MS")
-                    .ok()
-                    .and_then(|v| v.parse::<u64>().ok())
-            })
+            .or_else(|| env_parse::<u64>("FRESCO_CHECK_EXPR_TIMEOUT_MS"))
             .or(Some(Self::DEFAULT_EXPR_TIMEOUT_MS))
             .map(Duration::from_millis)
     }
@@ -3262,18 +3265,12 @@ impl Checker {
             return;
         }
 
-        let top_n = std::env::var("FRESCO_CHECK_EXPR_HOTSPOT_TOP")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(8);
+        let top_n = env_or::<usize>("FRESCO_CHECK_EXPR_HOTSPOT_TOP", 8);
         if top_n == 0 {
             return;
         }
 
-        let min_ms = std::env::var("FRESCO_CHECK_EXPR_HOTSPOT_MIN_MS")
-            .ok()
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(0.5);
+        let min_ms = env_or::<f64>("FRESCO_CHECK_EXPR_HOTSPOT_MIN_MS", 0.5);
 
         let mut ranked = self
             .expr_hotspots
