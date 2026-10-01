@@ -3903,6 +3903,26 @@ pub(super) fn value_to_type_key(value: &Value) -> &'static str {
     }
 }
 
+/// Resolves a viewport-relative unit (`vw`, `vmin`, `vmax`) to `v`% scaled by
+/// the viewport aspect `ratio` (width / height). Returns `None` for every other
+/// unit without evaluating `ratio`.
+fn viewport_unit_sx(v: f64, unit: Unit, ratio: impl FnOnce() -> Sx) -> Option<Sx> {
+    let axis_factor = match unit {
+        Unit::Vw => ratio(),
+        Unit::Vmin => Sx::Min(Box::new(ratio()), Box::new(Sx::Lit(1.0))),
+        Unit::Vmax => Sx::Max(Box::new(ratio()), Box::new(Sx::Lit(1.0))),
+        Unit::Deg
+        | Unit::Turn
+        | Unit::Px
+        | Unit::MilliSec
+        | Unit::Vh
+        | Unit::Uv
+        | Unit::None
+        | Unit::Sec => return None,
+    };
+    Some(Sx::Lit((v * 0.01) as f32) * axis_factor)
+}
+
 /// Unit resolution (§7):
 /// - deg -> radians (constant-folded)
 /// - px -> runtime pixel-scaled literal (via `PxLit`)
@@ -3914,8 +3934,9 @@ fn scalar_lit(v: f64, unit: Unit) -> Sx {
     // channel (see `Checker::scalar_lit_runtime`, which intercepts `vw`/
     // `vmin`/`vmax` before falling back to this function) — treat the
     // viewport as square for this const-only path.
-    let viewport_ratio = || Sx::Lit(1.0);
-    let viewport_scale = |percent: f32, axis_factor: Sx| lit(percent) * axis_factor;
+    if let Some(sx) = viewport_unit_sx(v, unit, || lit(1.0)) {
+        return sx;
+    }
 
     match unit {
         Unit::Deg => lit((v * PI / 180.0) as f32),
@@ -3923,15 +3944,7 @@ fn scalar_lit(v: f64, unit: Unit) -> Sx {
         Unit::Px => Sx::PxLit(v as f32),
         Unit::MilliSec => lit((v * 0.001) as f32),
         Unit::Vh => lit((v * 0.01) as f32),
-        Unit::Vw => viewport_scale((v * 0.01) as f32, viewport_ratio()),
-        Unit::Vmin => viewport_scale(
-            (v * 0.01) as f32,
-            Sx::Min(Box::new(viewport_ratio()), Box::new(lit(1.0))),
-        ),
-        Unit::Vmax => viewport_scale(
-            (v * 0.01) as f32,
-            Sx::Max(Box::new(viewport_ratio()), Box::new(lit(1.0))),
-        ),
+        Unit::Vw | Unit::Vmin | Unit::Vmax => unreachable!("resolved by viewport_unit_sx"),
         Unit::Uv | Unit::None | Unit::Sec => lit(v as f32),
     }
 }
@@ -3942,27 +3955,11 @@ impl Checker {
     /// [`Checker::runtime_resolution`] — instead of the legacy `Sx::ResX` /
     /// `Sx::ResY` leaves directly.
     pub(super) fn scalar_lit_runtime(&mut self, v: f64, unit: Unit) -> Sx {
-        if !matches!(unit, Unit::Vw | Unit::Vmin | Unit::Vmax) {
-            return scalar_lit(v, unit);
-        }
-
-        let lit = |x: f32| Sx::Lit(x);
-        let (res_x, res_y) = self.runtime_resolution();
-        let viewport_ratio = res_x / res_y;
-        let viewport_scale = |percent: f32, axis_factor: Sx| lit(percent) * axis_factor;
-
-        match unit {
-            Unit::Vw => viewport_scale((v * 0.01) as f32, viewport_ratio),
-            Unit::Vmin => viewport_scale(
-                (v * 0.01) as f32,
-                Sx::Min(Box::new(viewport_ratio), Box::new(lit(1.0))),
-            ),
-            Unit::Vmax => viewport_scale(
-                (v * 0.01) as f32,
-                Sx::Max(Box::new(viewport_ratio), Box::new(lit(1.0))),
-            ),
-            _ => unreachable!("guarded above"),
-        }
+        viewport_unit_sx(v, unit, || {
+            let (res_x, res_y) = self.runtime_resolution();
+            res_x / res_y
+        })
+        .unwrap_or_else(|| scalar_lit(v, unit))
     }
 }
 
