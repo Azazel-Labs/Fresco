@@ -1,40 +1,6 @@
-use std::{fs, path::PathBuf, process::Command};
-
-fn normalize(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).replace("\r\n", "\n")
-}
-
 #[path = "support/common.rs"]
 mod common;
-use common::unique_temp_path;
-
-fn run_fresco(input_path: &PathBuf) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .arg("--emit")
-        .arg("wgsl")
-        .output()
-        .expect("failed to run fresco binary")
-}
-
-fn compile_to_wgsl(suffix: &str, input: &str) -> String {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    normalize(&output.stdout)
-}
+use common::compile_to_wgsl;
 
 #[test]
 fn pipe_first_arg_builtin_color_transforms_compile() {

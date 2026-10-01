@@ -1,24 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
-
-fn normalize(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).replace("\r\n", "\n")
-}
+use std::fs;
 
 #[path = "support/common.rs"]
 mod common;
-use common::unique_temp_path;
-
-fn run_fresco(input_path: &PathBuf) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .arg("--emit")
-        .arg("wgsl")
-        .output()
-        .expect("failed to run fresco binary")
-}
+use common::{normalize, run_fresco, run_source, unique_temp_path};
 
 #[test]
 fn top_level_fn_decl_parses_when_unused() {
@@ -33,10 +17,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_decl_unused");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_decl_unused", input, &[]);
 
     assert!(
         output.status.success(),
@@ -56,10 +37,7 @@ fn compose_block_allows_newline_before_open_brace() {
 }
 "#;
 
-    let path = unique_temp_path("compose_newline_before_brace");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_newline_before_brace", input, &[]);
 
     assert!(
         output.status.success(),
@@ -83,10 +61,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_call_stub");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_call_stub", input, &[]);
 
     assert!(
         output.status.success(),
@@ -110,10 +85,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_call_vec2");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_call_vec2", input, &[]);
 
     assert!(
         output.status.success(),
@@ -137,10 +109,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_keyword_only_named");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_keyword_only_named", input, &[]);
 
     assert!(
         output.status.success(),
@@ -164,10 +133,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_keyword_only_positional_reject");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_keyword_only_positional_reject", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -201,10 +167,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_keyword_only_trailing_star");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_keyword_only_trailing_star", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -234,10 +197,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_keyword_only_duplicate_star");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_keyword_only_duplicate_star", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -267,10 +227,7 @@ fn local_fn_decl_rejects_trailing_keyword_only_separator() {
 }
 "#;
 
-    let path = unique_temp_path("local_fn_keyword_only_trailing_star");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("local_fn_keyword_only_trailing_star", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -300,10 +257,7 @@ fn local_fn_decl_rejects_duplicate_keyword_only_separator() {
 }
 "#;
 
-    let path = unique_temp_path("local_fn_keyword_only_duplicate_star");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("local_fn_keyword_only_duplicate_star", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -333,10 +287,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_return_mismatch");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_return_mismatch", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -369,10 +320,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_body_compose_unsupported");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_body_compose_unsupported", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -402,10 +350,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_return_stmt_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_return_stmt_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -431,10 +376,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_unreachable_after_return");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_unreachable_after_return", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -501,10 +443,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_if_else_returns_scalar");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_if_else_returns_scalar", input, &[]);
 
     assert!(
         output.status.success(),
@@ -532,10 +471,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_if_else_value_mismatch");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_if_else_value_mismatch", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -569,10 +505,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_for_loop_body_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_for_loop_body_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -599,10 +532,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_for_loop_return_unsupported");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_for_loop_return_unsupported", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -633,10 +563,7 @@ canvas t(uv: coord, time: signal, res: resolution) -> color {
 }
 "#;
 
-    let path = unique_temp_path("canvas_resolution_param_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("canvas_resolution_param_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -655,10 +582,7 @@ fn duplicate_canvas_resolution_param_reports_error() {
 }
 "#;
 
-    let path = unique_temp_path("canvas_resolution_param_duplicate");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("canvas_resolution_param_duplicate", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -691,10 +615,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_vec3_ops_swizzle_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_vec3_ops_swizzle_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -714,10 +635,7 @@ fn canvas_delta_param_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("canvas_delta_param_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("canvas_delta_param_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -758,10 +676,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_vec34_geometric_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_vec34_geometric_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -792,10 +707,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_matrix_ctor_mul_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_matrix_ctor_mul_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -834,10 +746,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_vector_step_smoothstep_swizzle_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_vector_step_smoothstep_swizzle_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -865,10 +774,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_component_wise_vec_mul_div_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_component_wise_vec_mul_div_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -895,10 +801,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("fn_vec_scalar_add_sub_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("fn_vec_scalar_add_sub_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -928,10 +831,7 @@ canvas t(uv: coord, time: signal, res: resolution) -> color {
 }
 "#;
 
-    let path = unique_temp_path("compose_postprocess_compile");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_postprocess_compile", input, &[]);
 
     assert!(
         output.status.success(),
@@ -955,10 +855,7 @@ canvas t(uv: coord, time: signal, res: resolution) -> color {
 }
 "#;
 
-    let path = unique_temp_path("compose_postprocess_bad_sig");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_postprocess_bad_sig", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -992,10 +889,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("compose_color_promotes_to_layer");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_color_promotes_to_layer", input, &[]);
 
     assert!(
         output.status.success(),

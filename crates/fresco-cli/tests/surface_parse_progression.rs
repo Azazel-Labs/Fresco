@@ -1,7 +1,7 @@
 #[path = "support/common.rs"]
 mod common;
 
-use common::{run_fresco, unique_temp_path};
+use common::{run_fresco, run_fresco_with_args, unique_temp_path};
 use serde_json::Value;
 use std::fs;
 
@@ -88,16 +88,7 @@ fn write_temp(src: &str) -> std::path::PathBuf {
 
 fn compile_manifest(src: &str) -> (bool, String) {
     let path = write_temp(src);
-    // Use run_fresco_with_args but override the default --emit wgsl by passing
-    // the input path ourselves via a raw invocation.
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-    let out = std::process::Command::new(bin)
-        .arg(&path)
-        .arg("--emit")
-        .arg("manifest")
-        .output()
-        .expect("failed to run fresco binary");
+    let out = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
     let combined = format!("{stdout}{stderr}");
@@ -1937,14 +1928,7 @@ surface piped_surface(sp: surf) -> material(standard) {
 }
 "#,
     );
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-    let out = std::process::Command::new(bin)
-        .arg(&path)
-        .arg("--emit")
-        .arg("manifest")
-        .output()
-        .expect("failed to run fresco binary");
+    let out = run_fresco_with_args(&path, &["--emit", "manifest"]);
 
     let success = out.status.success();
     let manifest_stdout = String::from_utf8_lossy(&out.stdout).into_owned();
@@ -2024,14 +2008,7 @@ surface semantic_surface(sp: surf) -> material(standard) {
 }
 "#,
     );
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-    let out = std::process::Command::new(&bin)
-        .arg(&path)
-        .arg("--emit")
-        .arg("manifest")
-        .output()
-        .expect("failed to run fresco binary");
+    let out = run_fresco_with_args(&path, &["--emit", "manifest"]);
 
     let success = out.status.success();
     let manifest_stdout = String::from_utf8_lossy(&out.stdout).into_owned();
@@ -2060,11 +2037,7 @@ surface semantic_surface(sp: surf) -> material(standard) {
             .contains("schema_program:authored_standard"),
         "expected authored shader provenance:\n{manifest_stdout}\n---\nstderr:\n{manifest_stderr}"
     );
-    let wgsl_output = std::process::Command::new(&bin)
-        .arg(&path)
-        .args(["--emit", "wgsl"])
-        .output()
-        .expect("compile authored lighting");
+    let wgsl_output = run_fresco(&path);
     let wgsl = String::from_utf8(wgsl_output.stdout).expect("WGSL text");
     assert!(
         wgsl_output.status.success(),
@@ -2116,14 +2089,7 @@ surface semantic_surface(sp: surf) -> material(standard) {
 "#,
     );
 
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-    let out = std::process::Command::new(bin)
-        .arg(&path)
-        .arg("--emit")
-        .arg("manifest")
-        .output()
-        .expect("failed to run fresco binary");
+    let out = run_fresco_with_args(&path, &["--emit", "manifest"]);
 
     let success = out.status.success();
     let manifest_stdout = String::from_utf8_lossy(&out.stdout).into_owned();

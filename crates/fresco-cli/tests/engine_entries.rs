@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+#[path = "support/wgsl.rs"]
+mod wgsl;
+use wgsl::{Capabilities, assert_valid_wgsl};
+
 fn files(kind: &str, method: &str, body: &str) -> HashMap<String, String> {
     let policy = include_str!("../../../tests/render-policy/engine/engine.fr");
     HashMap::from([
@@ -43,13 +47,7 @@ fn engine_vocabulary_can_rename_entries_and_blocks() {
         let output =
             fresco::driver::compile_bundle_virtual(&files(kind, method, &source), "main.fr", false)
                 .unwrap_or_else(|errors| panic!("{kind}: {errors:?}"));
-        let module = naga::front::wgsl::parse_str(&output.wgsl).expect("WGSL parses");
-        naga::valid::Validator::new(
-            naga::valid::ValidationFlags::all(),
-            naga::valid::Capabilities::all(),
-        )
-        .validate(&module)
-        .expect("executable engine pass");
+        assert_valid_wgsl(&output.wgsl, Capabilities::all());
         let manifest: serde_json::Value = serde_json::from_str(&output.manifest).unwrap();
         assert_eq!(manifest["canvases"][0]["name"], "demo");
         assert!(output.wgsl.contains("fresco_demo"));
@@ -364,13 +362,7 @@ picture demo {
         composed.wgsl, explicit.wgsl,
         "stack threads the complete record exactly like typed function calls"
     );
-    let module = naga::front::wgsl::parse_str(&composed.wgsl).expect("WGSL parses");
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::all(),
-    )
-    .validate(&module)
-    .expect("valid composed shader");
+    assert_valid_wgsl(&composed.wgsl, Capabilities::all());
 }
 
 #[test]
@@ -392,13 +384,7 @@ fn fullscreen_pass_local_mutation_emits_valid_wgsl() {
             );
         } else {
             let output = result.expect("mutable pass local");
-            let module = naga::front::wgsl::parse_str(&output.wgsl).expect("WGSL parses");
-            naga::valid::Validator::new(
-                naga::valid::ValidationFlags::all(),
-                naga::valid::Capabilities::all(),
-            )
-            .validate(&module)
-            .expect("mutable pass WGSL validates");
+            assert_valid_wgsl(&output.wgsl, Capabilities::all());
         }
     }
 }

@@ -1,17 +1,7 @@
-use std::fs;
-
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn run_source(suffix: &str, input: &str) -> std::process::Output {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-    output
-}
+use common::{normalize, run_source};
 
 #[test]
 fn shape_aa_pragmas_tune_emitted_band_limits() {
@@ -31,7 +21,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let output = run_source("shape_aa_pragmas_tune", input);
+    let output = run_source("shape_aa_pragmas_tune", input, &[]);
     assert!(
         output.status.success(),
         "expected compile success\nstdout:\n{}\nstderr:\n{}",
@@ -65,7 +55,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let output = run_source("shape_aa_style_level", input);
+    let output = run_source("shape_aa_style_level", input, &[]);
     assert!(
         output.status.success(),
         "expected compile success\nstdout:\n{}\nstderr:\n{}",
@@ -96,7 +86,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let output = run_source("shape_aa_style_invalid", input);
+    let output = run_source("shape_aa_style_invalid", input, &[]);
     assert!(
         !output.status.success(),
         "expected compile failure\nstdout:\n{}\nstderr:\n{}",
@@ -123,7 +113,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let output = run_source("shape_aa_pragmas_invalid", input);
+    let output = run_source("shape_aa_pragmas_invalid", input, &[]);
     assert!(
         !output.status.success(),
         "expected compile failure\nstdout:\n{}\nstderr:\n{}",
@@ -155,7 +145,7 @@ fn shape_aa_polar_space_avoids_derivative_span_regression() {
 }
 "#;
 
-    let output = run_source("shape_aa_polar_span_regression", input);
+    let output = run_source("shape_aa_polar_span_regression", input, &[]);
     assert!(
         output.status.success(),
         "expected compile success\nstdout:\n{}\nstderr:\n{}",

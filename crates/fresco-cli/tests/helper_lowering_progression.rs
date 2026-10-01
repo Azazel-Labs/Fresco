@@ -3,48 +3,10 @@ use std::fs;
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn assert_compiles_and_validates_wgsl(suffix: &str, input: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected helper-lowering compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let wgsl = String::from_utf8(output.stdout).expect("expected utf-8 WGSL output");
-    let module = naga::front::wgsl::parse_str(&wgsl)
-        .unwrap_or_else(|e| panic!("expected WGSL parse to succeed\nerror:\n{e}\nwgsl:\n{wgsl}"));
-    let mut validator = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    );
-    validator.validate(&module).unwrap_or_else(|e| {
-        panic!("expected WGSL validation to succeed\nerror:\n{e:#?}\nwgsl:\n{wgsl}")
-    });
-}
-
-fn compile_to_wgsl(suffix: &str, input: &str) -> String {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected helper-lowering compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    String::from_utf8(output.stdout).expect("expected utf-8 WGSL output")
-}
+use common::wgsl::{Capabilities, assert_valid_wgsl};
+use common::{
+    assert_compiles_valid_wgsl, compile_to_wgsl, normalize, run_fresco_with_args, unique_temp_path,
+};
 
 fn assert_intrinsic_call_count_at_most(wgsl: &str, needle: &str, max_count: usize, label: &str) {
     let count = wgsl.matches(needle).count();
@@ -85,13 +47,7 @@ fn assert_compile_fails_with_code(
 }
 
 fn assert_called_helper(wgsl: &str, prefix: &str, matrix_first: bool) {
-    let module = naga::front::wgsl::parse_str(wgsl).expect("helper WGSL must parse");
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    )
-    .validate(&module)
-    .expect("helper WGSL must validate");
+    let module = assert_valid_wgsl(wgsl, Capabilities::default());
     let (handle, helper) = module
         .functions
         .iter()
@@ -645,7 +601,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    assert_compiles_and_validates_wgsl("helper_stmt_ir_if_for_break", input);
+    assert_compiles_valid_wgsl("helper_stmt_ir_if_for_break", input);
 }
 
 #[test]
@@ -674,7 +630,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    assert_compiles_and_validates_wgsl("helper_scope_cache_branch_calls", input);
+    assert_compiles_valid_wgsl("helper_scope_cache_branch_calls", input);
 }
 
 #[test]
@@ -725,7 +681,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    assert_compiles_and_validates_wgsl("helper_stress_raycast_map_ibox", input);
+    assert_compiles_valid_wgsl("helper_stress_raycast_map_ibox", input);
 }
 
 #[test]

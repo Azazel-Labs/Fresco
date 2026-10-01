@@ -1,8 +1,8 @@
 #[path = "support/common.rs"]
 mod common;
 
-use common::{ExampleCompilePolicy, normalize, repo_root};
-use libtest_mimic::{Arguments, Failed, Trial};
+use common::{normalize, repo_root};
+use libtest_mimic::Failed;
 use std::{ffi::OsString, fs, path::Path, process::Command};
 
 fn validator() -> OsString {
@@ -102,31 +102,8 @@ fn validate_example(file: &Path) -> Result<(), Failed> {
 }
 
 fn main() {
-    let mut args = Arguments::from_args();
-    if args.test_threads.is_none() {
-        args.test_threads = Some(common::test_threads());
-    }
-    let root = repo_root();
-    let mut all_files = Vec::new();
-    let mut policies = Vec::new();
-    common::collect_example_files_with_policies(
-        &root.join("examples"),
-        &mut all_files,
-        &mut policies,
-    );
-    policies.sort_by(|left, right| left.0.cmp(&right.0));
-    let trials: Vec<_> = policies
-        .into_iter()
-        .filter(|(_, policy)| *policy == ExampleCompilePolicy::MustCompile)
-        .map(|(file, _)| {
-            let name = file
-                .strip_prefix(&root)
-                .expect("example inside workspace")
-                .to_string_lossy()
-                .replace('\\', "/");
-            Trial::test(name, move || validate_example(&file))
-        })
-        .collect();
+    let args = common::harness_args();
+    let trials = common::must_compile_example_trials(&repo_root(), validate_example);
     assert!(
         !trials.is_empty(),
         "expected supported examples to validate"

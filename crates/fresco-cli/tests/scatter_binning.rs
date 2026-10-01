@@ -1,42 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
-
-fn normalize(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).replace("\r\n", "\n")
-}
+use std::fs;
 
 #[path = "support/common.rs"]
 mod common;
-use common::unique_temp_path;
-
-fn run_fresco(input_path: &PathBuf, extra: &[&str]) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .args(extra)
-        .output()
-        .expect("failed to run fresco binary")
-}
-
-fn parse_scatter_lowering_value(explain: &str, key: &str) -> usize {
-    let line = explain
-        .lines()
-        .find(|line| line.contains("scatter lowering:"))
-        .expect("missing scatter lowering line in explain output");
-    let needle = format!("{key}=");
-    let value_text = line
-        .split(&needle)
-        .nth(1)
-        .expect("missing metric key in scatter lowering line")
-        .split(',')
-        .next()
-        .expect("missing metric value after key")
-        .trim();
-    value_text
-        .parse::<usize>()
-        .expect("scatter lowering metric must parse as usize")
-}
+use common::{normalize, parse_scatter_lowering_value, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn scatter_binning_note_and_caps_are_reported() {
@@ -53,7 +19,7 @@ fn scatter_binning_note_and_caps_are_reported() {
 
     let path = unique_temp_path("scatter_binning_explain");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl", "--explain"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -91,8 +57,8 @@ fn scatter_output_is_deterministic_for_same_seed() {
     let path = unique_temp_path("scatter_determinism");
     fs::write(&path, input).expect("failed to write temporary test source");
 
-    let run1 = run_fresco(&path, &["--emit", "wgsl"]);
-    let run2 = run_fresco(&path, &["--emit", "wgsl"]);
+    let run1 = run_fresco_with_args(&path, &["--emit", "wgsl"]);
+    let run2 = run_fresco_with_args(&path, &["--emit", "wgsl"]);
 
     let _ = fs::remove_file(&path);
 
@@ -130,7 +96,7 @@ fn scatter_region_reports_invalid_bounds() {
 
     let path = unique_temp_path("scatter_bad_region");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -167,7 +133,7 @@ fn scatter_body_is_extracted_as_helper_function() {
 
     let path = unique_temp_path("scatter_extraction");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -220,7 +186,7 @@ fn scatter_footprint_support_combines_shape_and_effect_extent() {
 
     let path = unique_temp_path("scatter_footprint_support");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl", "--explain"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -252,7 +218,7 @@ fn scatter_rand_uses_instance_id_in_generated_wgsl() {
 
     let path = unique_temp_path("scatter_rand_inst_id");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -300,7 +266,7 @@ fn scatter_procedural_emitted_instances_scale_with_count_and_exceed_base_cap() {
 
     let low_path = unique_temp_path("scatter_procedural_low");
     fs::write(&low_path, screen_input(18000)).expect("failed to write low-count source");
-    let low_output = run_fresco(&low_path, &["--emit", "wgsl", "--explain"]);
+    let low_output = run_fresco_with_args(&low_path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&low_path);
 
     assert!(
@@ -312,7 +278,7 @@ fn scatter_procedural_emitted_instances_scale_with_count_and_exceed_base_cap() {
 
     let high_path = unique_temp_path("scatter_procedural_high");
     fs::write(&high_path, screen_input(60000)).expect("failed to write high-count source");
-    let high_output = run_fresco(&high_path, &["--emit", "wgsl", "--explain"]);
+    let high_output = run_fresco_with_args(&high_path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&high_path);
 
     assert!(
@@ -346,7 +312,7 @@ fn scatter_procedural_emitted_instances_scale_with_count_and_exceed_base_cap() {
     let bounded_path = unique_temp_path("scatter_procedural_bounded_footprint");
     fs::write(&bounded_path, bounded_footprint_input)
         .expect("failed to write bounded-footprint source");
-    let bounded_output = run_fresco(&bounded_path, &["--emit", "wgsl", "--explain"]);
+    let bounded_output = run_fresco_with_args(&bounded_path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&bounded_path);
 
     assert!(
@@ -384,7 +350,7 @@ fn scatter_procedural_hard_max_clamps_near_extreme_counts() {
 
     let path = unique_temp_path("scatter_procedural_hard_max");
     fs::write(&path, input).expect("failed to write hard-max source");
-    let output = run_fresco(&path, &["--emit", "wgsl", "--explain"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -439,7 +405,7 @@ fn scatter_explain_reports_per_layer_metrics_for_multiple_scatter_layers() {
 
     let path = unique_temp_path("scatter_per_layer_metrics");
     fs::write(&path, input).expect("failed to write per-layer metrics source");
-    let output = run_fresco(&path, &["--emit", "wgsl", "--explain"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl", "--explain"]);
     let _ = fs::remove_file(&path);
 
     assert!(

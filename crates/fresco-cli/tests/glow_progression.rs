@@ -1,23 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
-
-fn normalize(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).replace("\r\n", "\n")
-}
+use std::fs;
 
 #[path = "support/common.rs"]
 mod common;
-use common::unique_temp_path;
-
-fn run_fresco(input_path: &PathBuf, extra: &[&str]) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .args(extra)
-        .output()
-        .expect("failed to run fresco binary")
-}
+use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn anisotropic_glow_with_gradient_and_gaussian_falloff_compiles() {
@@ -46,7 +31,7 @@ fn anisotropic_glow_with_gradient_and_gaussian_falloff_compiles() {
 
     let path = unique_temp_path("glow_progression");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -83,7 +68,7 @@ fn layer_glow_with_gradient_and_linear_falloff_compiles() {
 
     let path = unique_temp_path("layer_glow_progression");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path, &["--emit", "wgsl"]);
+    let output = run_fresco_with_args(&path, &["--emit", "wgsl"]);
     let _ = fs::remove_file(&path);
 
     assert!(

@@ -399,10 +399,6 @@ fn expand_inline_gradient_stops(normalized: &str) -> String {
     out.join("\n")
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 fn find_top_level_equal(input: &str) -> Option<usize> {
     let mut paren = 0usize;
     let mut bracket = 0usize;
@@ -440,10 +436,6 @@ fn find_top_level_equal(input: &str) -> Option<usize> {
     None
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 fn split_top_level_shape_chain(input: &str) -> Option<(Vec<String>, Vec<char>)> {
     let mut parts = Vec::new();
     let mut ops = Vec::new();

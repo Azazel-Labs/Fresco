@@ -1,29 +1,19 @@
 use std::path::PathBuf;
-use std::process::Command;
 use std::{fs, time::Duration};
 
 #[path = "support/common.rs"]
 mod common;
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .canonicalize()
-        .expect("failed to resolve workspace root")
-}
+use common::{fresco_command, repo_root};
 
 fn compile_wgsl(input_path: &PathBuf) -> String {
     compile_wgsl_with_policy(input_path, None)
 }
 
 fn compile_wgsl_with_policy(input_path: &PathBuf, policy: Option<&str>) -> String {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    let mut cmd = Command::new(bin);
-    cmd.arg(input_path).arg("--emit").arg("wgsl");
-    cmd.arg("--engine-dir")
+    let mut cmd = fresco_command();
+    cmd.arg(input_path)
+        .arg("--engine-dir")
         .arg(repo_root().join("integrations/example-engine/engine"));
     if let Some(policy) = policy {
         cmd.env("FRESCO_LOWERING_POLICY", policy);

@@ -1,9 +1,7 @@
-use std::fs;
-
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco, unique_temp_path};
+use common::{normalize, run_source};
 
 #[test]
 fn shape_minus_array_comprehension_compiles() {
@@ -19,10 +17,7 @@ fn shape_minus_array_comprehension_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_shape_minus_array_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_shape_minus_array_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -48,10 +43,7 @@ fn reduce_builtin_with_shape_array_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_reduce_shape_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_reduce_shape_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -73,10 +65,7 @@ fn reduce_builtin_with_scalar_array_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_reduce_scalar_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_reduce_scalar_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -98,10 +87,7 @@ fn reduce_builtin_with_lambda_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_reduce_lambda_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_reduce_lambda_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -123,10 +109,7 @@ fn reduce_builtin_with_block_lambda_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_reduce_block_lambda_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_reduce_block_lambda_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -152,10 +135,7 @@ fn compose_for_loop_over_array_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_compose_for_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_compose_for_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -176,10 +156,7 @@ fn for_loop_rejects_non_iterable_value() {
 }
 "#;
 
-    let path = unique_temp_path("phase1_for_bad_iterable");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_for_bad_iterable", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -211,10 +188,7 @@ fn shape_subtraction_across_newlines_compiles() {
 }
 "##;
 
-    let path = unique_temp_path("phase1_shape_sub_newline_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("phase1_shape_sub_newline_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -241,10 +215,7 @@ fn each_loop_with_index_in_compose_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("each_loop_index_compose_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("each_loop_index_compose_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -274,10 +245,7 @@ fn each_loop_single_binding_in_compose_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("each_loop_single_compose_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("each_loop_single_compose_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -304,10 +272,7 @@ fn each_loop_index_used_for_position_offset() {
 }
 "#;
 
-    let path = unique_temp_path("each_loop_index_position_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("each_loop_index_position_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -332,10 +297,7 @@ fn array_literal_indexing_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("array_literal_index_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("array_literal_index_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -358,10 +320,7 @@ fn array_param_indexing_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("array_param_index_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("array_param_index_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -384,10 +343,7 @@ fn array_out_of_bounds_index_is_rejected() {
 }
 "#;
 
-    let path = unique_temp_path("array_oob_index_err");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("array_oob_index_err", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -410,10 +366,7 @@ fn array_vec2_element_indexing_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("array_vec2_index_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("array_vec2_index_ok", input, &[]);
 
     assert!(
         output.status.success(),

@@ -1,10 +1,9 @@
 use std::fs;
-use std::process::Command;
 
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
+use common::{fresco_command, normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn verbose_mode_emits_pipeline_progress_logs() {
@@ -66,15 +65,9 @@ fn verbose_mode_emits_expression_watchdog_heartbeat() {
     let path = unique_temp_path("logging_progression_watchdog");
     fs::write(&path, input).expect("failed to write temporary test source");
 
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-    let output = Command::new(bin)
+    let output = fresco_command()
         .arg(&path)
-        .arg("--emit")
-        .arg("wgsl")
-        .arg("--verbose")
-        .arg("--trace-level")
-        .arg("info")
+        .args(["--verbose", "--trace-level", "info"])
         .env("RUST_LOG", "off")
         .env("FRESCO_CHECK_EXPR_WATCHDOG_EVERY", "1")
         .env("FRESCO_CHECK_EXPR_HOTSPOT_TOP", "3")

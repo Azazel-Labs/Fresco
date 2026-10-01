@@ -1,17 +1,7 @@
-use std::fs;
-
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn run_source(suffix: &str, input: &str) -> std::process::Output {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-    output
-}
+use common::{normalize, run_source};
 
 #[test]
 fn filtered_patterns_in_transformed_space_do_not_use_local_px_derivatives() {
@@ -27,7 +17,7 @@ fn filtered_patterns_in_transformed_space_do_not_use_local_px_derivatives() {
 }
 "#;
 
-    let output = run_source("pattern_filter_width_regression", input);
+    let output = run_source("pattern_filter_width_regression", input, &[]);
     assert!(
         output.status.success(),
         "expected compile success\nstdout:\n{}\nstderr:\n{}",

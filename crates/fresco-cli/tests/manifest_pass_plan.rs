@@ -1,35 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
-
-fn normalize(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).replace("\r\n", "\n")
-}
+use std::fs;
 
 #[path = "support/common.rs"]
 mod common;
-use common::unique_temp_path;
-
-fn run_fresco_manifest(input_path: &PathBuf) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .arg("--emit")
-        .arg("manifest")
-        .output()
-        .expect("failed to run fresco binary")
-}
-
-fn run_fresco_explain(input_path: &PathBuf) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .arg("--explain")
-        .output()
-        .expect("failed to run fresco binary")
-}
+use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn manifest_includes_pass_plan_schedule() {
@@ -42,7 +15,7 @@ fn manifest_includes_pass_plan_schedule() {
 
     let path = unique_temp_path("manifest_pass_plan");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -72,7 +45,7 @@ fn manifest_emit_stdout_is_valid_json_object() {
 
     let path = unique_temp_path("manifest_json_stdout");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -105,7 +78,7 @@ fn manifest_single_pass_has_fused_strategy_and_no_targets() {
 
     let path = unique_temp_path("manifest_fused");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -144,7 +117,7 @@ fn blur_on_arbitrary_layer_compiles_and_manifest_shows_kernel_strategy() {
 
     let path = unique_temp_path("manifest_blur_arbitrary");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -176,7 +149,7 @@ fn blur_on_fill_rewrites_analytically_manifest_stays_single_pass() {
 
     let path = unique_temp_path("manifest_blur_fill");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -206,7 +179,7 @@ fn explain_shows_kernel_strategy_annotation() {
 
     let path = unique_temp_path("explain_kernel");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_explain(&path);
+    let output = run_fresco_with_args(&path, &["--explain"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -244,7 +217,7 @@ canvas t(uv: coord) -> color {
 
     let path = unique_temp_path("explain_user_effect_radius");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_explain(&path);
+    let output = run_fresco_with_args(&path, &["--explain"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -277,7 +250,7 @@ fn manifest_multi_pass_program_has_intermediate_targets() {
 
     let path = unique_temp_path("manifest_multi_pass");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -324,7 +297,7 @@ fn manifest_includes_path_buffers_for_threshold_paths() {
 
     let path = unique_temp_path("manifest_path_buffers");
     fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(&path);
 
     assert!(
@@ -372,7 +345,7 @@ pipeline output { render }
 "#,
     )
     .expect("write source");
-    let output = run_fresco_manifest(&path);
+    let output = run_fresco_with_args(&path, &["--emit", "manifest"]);
     let _ = fs::remove_file(path);
     assert!(output.status.success(), "{}", normalize(&output.stderr));
     let manifest: serde_json::Value =

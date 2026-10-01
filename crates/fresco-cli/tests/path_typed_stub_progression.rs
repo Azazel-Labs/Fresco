@@ -1,43 +1,7 @@
-use std::fs;
-
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn assert_compile_fails_with(suffix: &str, input: &str, expected_in_stderr: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        !output.status.success(),
-        "expected compile to fail\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let stderr = normalize(&output.stderr);
-    assert!(
-        stderr.contains(expected_in_stderr),
-        "expected stderr to contain `{expected_in_stderr}`\nstderr:\n{stderr}"
-    );
-}
-
-fn assert_compiles(suffix: &str, input: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-}
+use common::{assert_compile_fails_with, assert_compiles};
 
 #[test]
 fn path_length_property_is_typed_as_scalar() {

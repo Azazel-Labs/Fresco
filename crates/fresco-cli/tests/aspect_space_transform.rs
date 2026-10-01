@@ -3,7 +3,7 @@ use std::fs;
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco, run_fresco_with_args, unique_temp_path};
+use common::{normalize, run_fresco, run_source, unique_temp_path};
 
 #[test]
 fn arbitrary_grouped_brace_blocks_compile() {
@@ -25,10 +25,7 @@ fn arbitrary_grouped_brace_blocks_compile() {
 }
 "#;
 
-    let path = unique_temp_path("grouped_brace_block_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("grouped_brace_block_ok", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -56,10 +53,7 @@ fn grouped_brace_block_bindings_do_not_leak() {
 }
 "#;
 
-    let path = unique_temp_path("grouped_brace_scope_no_leak");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("grouped_brace_scope_no_leak", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -88,10 +82,7 @@ fn viewport_units_vw_vh_vmax_compile() {
 }
 "#;
 
-    let path = unique_temp_path("viewport_units_vw_vh_vmax_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("viewport_units_vw_vh_vmax_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -112,10 +103,7 @@ fn in_space_empty_block_is_allowed() {
 }
 "#;
 
-    let path = unique_temp_path("in_space_empty_block_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("in_space_empty_block_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -171,10 +159,7 @@ fn scatter_add_blend_does_not_force_opaque_alpha() {
 }
 "#;
 
-    let path = unique_temp_path("scatter_add_non_opaque_alpha");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("scatter_add_non_opaque_alpha", input, &[]);
 
     assert!(
         output.status.success(),
@@ -209,10 +194,7 @@ fn nested_in_space_block_preserves_multiple_layers() {
 }
 "#;
 
-    let path = unique_temp_path("nested_in_space_layers");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("nested_in_space_layers", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -245,10 +227,7 @@ fn aspect_space_transform_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("aspect_space_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("aspect_space_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -269,10 +248,7 @@ fn aspect_space_transform_rejects_non_positive_ratio() {
 }
 "#;
 
-    let path = unique_temp_path("aspect_space_bad_ratio");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("aspect_space_bad_ratio", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -299,10 +275,7 @@ fn repeat_y_space_transform_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_y_space_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_y_space_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -326,10 +299,7 @@ fn repeat_space_named_cell_binding_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_space_named_cell_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_space_named_cell_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -359,10 +329,7 @@ fn repeat_space_id_cell_binding_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_space_id_cell_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_space_id_cell_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -393,10 +360,7 @@ fn repeat_space_as_cell_binding_compiles_with_warning() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_space_as_cell_binding_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_space_as_cell_binding_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -426,10 +390,7 @@ fn repeat_space_rejects_duplicate_binding_aliases() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_space_duplicate_binding_aliases");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_space_duplicate_binding_aliases", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -463,10 +424,7 @@ fn repeat_space_named_cell_binding_nests_cleanly() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_space_named_cell_nested_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_space_named_cell_nested_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -501,15 +459,9 @@ fn repeat_space_hash_cell_matches_hash_cell_id() {
 }
 "#;
 
-    let direct_path = unique_temp_path("repeat_space_hash_cell_direct");
-    fs::write(&direct_path, direct).expect("failed to write direct hash test source");
-    let direct_output = run_fresco(&direct_path);
-    let _ = fs::remove_file(&direct_path);
+    let direct_output = run_source("repeat_space_hash_cell_direct", direct, &[]);
 
-    let via_id_path = unique_temp_path("repeat_space_hash_cell_id");
-    fs::write(&via_id_path, via_id).expect("failed to write cell-id hash test source");
-    let via_id_output = run_fresco(&via_id_path);
-    let _ = fs::remove_file(&via_id_path);
+    let via_id_output = run_source("repeat_space_hash_cell_id", via_id, &[]);
 
     assert!(
         direct_output.status.success(),
@@ -542,10 +494,7 @@ fn repeat_y_space_transform_rejects_non_positive_period() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_y_space_bad_period");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_y_space_bad_period", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -572,10 +521,7 @@ fn repeat_radial_space_transform_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_radial_space_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_radial_space_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -596,10 +542,7 @@ fn repeat_radial_space_transform_rejects_invalid_count() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_radial_space_bad_count");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_radial_space_bad_count", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -627,10 +570,7 @@ fn repeat_radial_space_transform_accepts_explicit_angle_list() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_radial_space_angles_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_radial_space_angles_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -652,10 +592,7 @@ fn repeat_radial_space_transform_accepts_non_uniform_angle_list() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_radial_space_angles_non_uniform");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_radial_space_angles_non_uniform", input, &[]);
 
     assert!(
         output.status.success(),
@@ -677,10 +614,7 @@ fn repeat_radial_space_transform_rejects_non_ascending_angle_list() {
 }
 "#;
 
-    let path = unique_temp_path("repeat_radial_space_angles_non_ascending");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("repeat_radial_space_angles_non_ascending", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -709,10 +643,7 @@ fn perspective_space_transform_compiles_flat_v1() {
 }
 "#;
 
-    let path = unique_temp_path("perspective_space_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("perspective_space_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -733,10 +664,7 @@ fn perspective_space_transform_rejects_invalid_planes() {
 }
 "#;
 
-    let path = unique_temp_path("perspective_space_bad_planes");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("perspective_space_bad_planes", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -763,10 +691,7 @@ fn perspective_space_supports_translate3_and_rotate_y() {
 }
 "#;
 
-    let path = unique_temp_path("perspective_space_rotate_y_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("perspective_space_rotate_y_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -790,10 +715,7 @@ fn in_space_transform_chain_allows_newline_before_dot() {
 }
 "##;
 
-    let path = unique_temp_path("aspect_in_space_dot_newline_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("aspect_in_space_dot_newline_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -814,10 +736,7 @@ fn perspective_space_supports_rotate_x_and_rotate_z() {
 }
 "#;
 
-    let path = unique_temp_path("perspective_space_rotate_xz_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("perspective_space_rotate_xz_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -842,10 +761,7 @@ fn orientation_space_transform_compiles_for_y_down() {
 }
 "#;
 
-    let path = unique_temp_path("orientation_space_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("orientation_space_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -866,10 +782,7 @@ fn orientation_space_transform_rejects_unknown_axis_direction() {
 }
 "#;
 
-    let path = unique_temp_path("orientation_space_bad_axis");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("orientation_space_bad_axis", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -896,10 +809,7 @@ fn orientation_space_sets_default_orientation_with_explicit_wrapper() {
 }
 "#;
 
-    let path = unique_temp_path("orientation_space_wrapper_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("orientation_space_wrapper_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -919,10 +829,7 @@ fn canvas_space_is_rejected() {
 }
 "#;
 
-    let path = unique_temp_path("canvas_space_removed_reject");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("canvas_space_removed_reject", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -954,10 +861,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("enum_orientation_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("enum_orientation_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -986,10 +890,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("enum_orientation_ambiguous");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("enum_orientation_ambiguous", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1014,10 +915,7 @@ fn anchor_literal_compiles_in_coord_like_builtin_param() {
 }
 "#;
 
-    let path = unique_temp_path("anchor_literal_coord_like_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("anchor_literal_coord_like_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1036,10 +934,7 @@ fn qualified_anchor_literal_compiles_in_coord_like_builtin_param() {
 }
 "#;
 
-    let path = unique_temp_path("qualified_anchor_literal_coord_like_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("qualified_anchor_literal_coord_like_ok", input, &[]);
 
     assert!(
         output.status.success(),

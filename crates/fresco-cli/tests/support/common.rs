@@ -1,14 +1,17 @@
 #![allow(
     dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
+    reason = "Shared integration-test support: each test crate includes this module but uses only a subset of its helpers."
 )]
 
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
     time::{SystemTime, UNIX_EPOCH},
 };
+
+#[path = "wgsl.rs"]
+pub mod wgsl;
 
 const EXAMPLE_POLICY_FILE: &str = "example-test-policy.txt";
 
@@ -30,6 +33,39 @@ pub fn test_threads() -> usize {
         }
         Err(error) => panic!("cannot read RUST_TEST_THREADS: {error}"),
     }
+}
+
+/// libtest-mimic arguments with the shared default test thread count applied.
+pub fn harness_args() -> libtest_mimic::Arguments {
+    let mut args = libtest_mimic::Arguments::from_args();
+    if args.test_threads.is_none() {
+        args.test_threads = Some(test_threads());
+    }
+    args
+}
+
+/// Repo-relative, `/`-separated path of an example file, used for trial names
+/// and failure messages.
+pub fn example_rel_path(root: &Path, file: &Path) -> String {
+    file.strip_prefix(root)
+        .unwrap_or(file)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// One libtest-mimic trial per `must-compile` example under `root/examples`,
+/// named by its repo-relative path.
+pub fn must_compile_example_trials(
+    root: &Path,
+    check: fn(&Path) -> Result<(), libtest_mimic::Failed>,
+) -> Vec<libtest_mimic::Trial> {
+    collect_example_files_with_policies(&root.join("examples"))
+        .into_iter()
+        .filter(|(_, policy)| *policy == ExampleCompilePolicy::MustCompile)
+        .map(|(file, _)| {
+            libtest_mimic::Trial::test(example_rel_path(root, &file), move || check(&file))
+        })
+        .collect()
 }
 
 pub const TEST_SOURCE_PATH: &str = concat!(
@@ -90,14 +126,11 @@ fn next_temp_id() -> usize {
 }
 
 /// Repository examples exercise the selected sample integration explicitly.
-pub fn run_example(input_path: impl AsRef<Path>) -> std::process::Output {
+pub fn run_example(input_path: impl AsRef<Path>) -> Output {
     run_example_with_args(input_path, &[])
 }
 
-pub fn run_example_with_args(
-    input_path: impl AsRef<Path>,
-    extra_args: &[&str],
-) -> std::process::Output {
+pub fn run_example_with_args(input_path: impl AsRef<Path>, extra_args: &[&str]) -> Output {
     let engine = repo_root().join("integrations/example-engine/engine");
     let engine = engine.to_string_lossy();
     let mut args = vec!["--engine-dir", &engine];
@@ -119,45 +152,131 @@ pub fn compile_example(
     )
 }
 
-pub fn run_fresco(input_path: impl AsRef<Path>) -> std::process::Output {
+pub fn run_fresco(input_path: impl AsRef<Path>) -> Output {
     run_fresco_with_args(input_path, &[])
 }
 
-pub fn run_fresco_with_args(
-    input_path: impl AsRef<Path>,
-    extra_args: &[&str],
-) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    let mut cmd = Command::new(bin);
-    cmd.arg(input_path.as_ref()).arg("--emit").arg("wgsl");
-    cmd.args(extra_args);
-    cmd.output().expect("failed to run fresco binary")
+/// A `fresco` CLI invocation with no arguments yet, for tests that need to set
+/// environment variables or otherwise customize the process.
+pub fn fresco_command() -> Command {
+    Command::new(env!("CARGO_BIN_EXE_fresco"))
 }
 
-pub fn collect_example_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    collect_example_files_with_policies(dir, out, &mut Vec::new());
+/// Runs the CLI on `input_path`. The CLI emits WGSL unless `extra_args`
+/// selects another `--emit` target.
+pub fn run_fresco_with_args(input_path: impl AsRef<Path>, extra_args: &[&str]) -> Output {
+    fresco_command()
+        .arg(input_path.as_ref())
+        .args(extra_args)
+        .output()
+        .expect("failed to run fresco binary")
 }
 
-pub fn collect_example_files_with_policies(
-    dir: &Path,
-    files_out: &mut Vec<PathBuf>,
-    files_with_policy_out: &mut Vec<(PathBuf, ExampleCompilePolicy)>,
-) {
-    collect_example_files_with_policy_recursive(
-        dir,
-        ExampleCompilePolicy::MustCompile,
-        files_out,
-        files_with_policy_out,
+/// Writes `source` to a unique temporary `.fr` file, runs the CLI on it with
+/// `extra_args`, and removes the file again.
+pub fn run_source(suffix: &str, source: &str, extra_args: &[&str]) -> Output {
+    let path = unique_temp_path(suffix);
+    fs::write(&path, source).expect("failed to write temporary test source");
+    let output = run_fresco_with_args(&path, extra_args);
+    let _ = fs::remove_file(&path);
+    output
+}
+
+/// Asserts that the CLI succeeded and returns its normalized stdout.
+pub fn assert_success(output: &Output) -> String {
+    assert!(
+        output.status.success(),
+        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
+        normalize(&output.stdout),
+        normalize(&output.stderr)
     );
+    normalize(&output.stdout)
+}
+
+/// Asserts that the CLI failed with `needle` in stderr and returns the
+/// normalized stderr.
+pub fn assert_fails_with(output: &Output, needle: &str) -> String {
+    assert!(
+        !output.status.success(),
+        "expected compile to fail\nstdout:\n{}\nstderr:\n{}",
+        normalize(&output.stdout),
+        normalize(&output.stderr)
+    );
+    let stderr = normalize(&output.stderr);
+    assert!(
+        stderr.contains(needle),
+        "expected stderr to contain `{needle}`\nstderr:\n{stderr}"
+    );
+    stderr
+}
+
+/// Compiles `source` to WGSL, panicking with the compiler output on failure.
+pub fn compile_to_wgsl(suffix: &str, source: &str) -> String {
+    assert_success(&run_source(suffix, source, &[]))
+}
+
+/// Compiles `source` to WGSL and asserts naga validates it under the default
+/// capabilities.
+pub fn assert_compiles_valid_wgsl(suffix: &str, source: &str) {
+    wgsl::assert_valid_wgsl(
+        &compile_to_wgsl(suffix, source),
+        wgsl::Capabilities::default(),
+    );
+}
+
+pub fn assert_compiles(suffix: &str, source: &str) {
+    assert_success(&run_source(suffix, source, &[]));
+}
+
+pub fn assert_compile_fails_with(suffix: &str, source: &str, needle: &str) {
+    assert_fails_with(&run_source(suffix, source, &[]), needle);
+}
+
+/// Compiles `source` with `--explain` and asserts the receipt (stderr)
+/// contains `needle`.
+pub fn assert_explain_contains(suffix: &str, source: &str, needle: &str) {
+    let output = run_source(suffix, source, &["--explain"]);
+    assert_success(&output);
+    let explain = normalize(&output.stderr);
+    assert!(
+        explain.contains(needle),
+        "expected explain output to contain `{needle}`\nexplain:\n{explain}"
+    );
+}
+
+/// Reads `key=<usize>` from the `scatter lowering:` line of an explain receipt.
+pub fn parse_scatter_lowering_value(explain: &str, key: &str) -> usize {
+    let line = explain
+        .lines()
+        .find(|line| line.contains("scatter lowering:"))
+        .expect("missing scatter lowering line in explain output");
+    let needle = format!("{key}=");
+    let value_text = line
+        .split(&needle)
+        .nth(1)
+        .expect("missing metric key in scatter lowering line")
+        .split(',')
+        .next()
+        .expect("missing metric value after key")
+        .trim();
+    value_text
+        .parse::<usize>()
+        .expect("scatter lowering metric must parse as usize")
+}
+
+/// Collects every standalone example entrypoint under `dir`, sorted by path,
+/// with the compile policy inherited from the nearest policy file.
+pub fn collect_example_files_with_policies(dir: &Path) -> Vec<(PathBuf, ExampleCompilePolicy)> {
+    let mut files = Vec::new();
+    collect_example_files_with_policy_recursive(dir, ExampleCompilePolicy::MustCompile, &mut files);
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    files
 }
 
 fn collect_example_files_with_policy_recursive(
     dir: &Path,
     inherited_policy: ExampleCompilePolicy,
-    files_out: &mut Vec<PathBuf>,
-    files_with_policy_out: &mut Vec<(PathBuf, ExampleCompilePolicy)>,
+    files_out: &mut Vec<(PathBuf, ExampleCompilePolicy)>,
 ) {
     let active_policy = if dir.join(EXAMPLE_POLICY_FILE).exists() {
         load_example_policy(dir)
@@ -174,7 +293,7 @@ fn collect_example_files_with_policy_recursive(
         let path = entry.path();
         if path.is_dir() {
             subdirs.push(path);
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("fr") {
+        } else if path.extension().is_some_and(|ext| ext == "fr") {
             fr_files.push(path);
         }
     }
@@ -182,30 +301,15 @@ fn collect_example_files_with_policy_recursive(
     // If this directory has a `main.fr` alongside other `.fr` files it is a
     // multi-file example bundle.  Only add `main.fr` so library sibling files
     // are not compiled standalone (they have no canvas block).
-    let has_main = fr_files
-        .iter()
-        .any(|p| p.file_name().and_then(|n| n.to_str()) == Some("main.fr"));
+    let is_main = |path: &PathBuf| path.file_name().is_some_and(|name| name == "main.fr");
+    let has_main = fr_files.iter().any(is_main);
     if has_main && fr_files.len() > 1 {
-        for path in fr_files {
-            if path.file_name().and_then(|n| n.to_str()) == Some("main.fr") {
-                files_out.push(path.clone());
-                files_with_policy_out.push((path, active_policy));
-            }
-        }
-    } else {
-        for path in fr_files {
-            files_out.push(path.clone());
-            files_with_policy_out.push((path, active_policy));
-        }
+        fr_files.retain(is_main);
     }
+    files_out.extend(fr_files.into_iter().map(|path| (path, active_policy)));
 
     for subdir in subdirs {
-        collect_example_files_with_policy_recursive(
-            &subdir,
-            active_policy,
-            files_out,
-            files_with_policy_out,
-        );
+        collect_example_files_with_policy_recursive(&subdir, active_policy, files_out);
     }
 }
 

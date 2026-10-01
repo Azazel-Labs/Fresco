@@ -6,6 +6,7 @@ use naga::{BinaryOperator as B, Expression as E, Literal as L, MathFunction as M
 
 #[path = "support/common.rs"]
 mod common;
+use common::wgsl::{Capabilities, assert_valid_wgsl};
 
 fn compile(body: &str, prelude: &str) -> naga::Module {
     let source = format!(
@@ -22,14 +23,7 @@ fn compile(body: &str, prelude: &str) -> naga::Module {
         common::normalize(&output.stderr)
     );
     let wgsl = String::from_utf8(output.stdout).unwrap();
-    let module = naga::front::wgsl::parse_str(&wgsl).unwrap();
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    )
-    .validate(&module)
-    .unwrap();
-    module
+    assert_valid_wgsl(&wgsl, Capabilities::default())
 }
 
 // A deliberately small, strict evaluator for the pure expressions these tests

@@ -1,70 +1,7 @@
-use std::fs;
-
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn assert_compiles_and_validates_wgsl(suffix: &str, input: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let wgsl = String::from_utf8(output.stdout).expect("expected utf-8 WGSL output");
-    let module = naga::front::wgsl::parse_str(&wgsl)
-        .unwrap_or_else(|e| panic!("expected WGSL parse to succeed\nerror:\n{e}\nwgsl:\n{wgsl}"));
-    let mut validator = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    );
-    validator.validate(&module).unwrap_or_else(|e| {
-        panic!("expected WGSL validation to succeed\nerror:\n{e:#?}\nwgsl:\n{wgsl}")
-    });
-}
-
-fn compile_to_wgsl(suffix: &str, input: &str) -> String {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    String::from_utf8(output.stdout).expect("expected utf-8 WGSL output")
-}
-
-fn assert_compile_fails_with(suffix: &str, input: &str, expected_in_stderr: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        !output.status.success(),
-        "expected compile to fail\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let stderr = normalize(&output.stderr);
-    assert!(
-        stderr.contains(expected_in_stderr),
-        "expected stderr to contain `{expected_in_stderr}`\nstderr:\n{stderr}"
-    );
-}
+use common::{assert_compile_fails_with, assert_compiles_valid_wgsl, compile_to_wgsl};
 
 // ─── Local fn declarations inside canvas bodies ───────────────────────────────
 
@@ -81,7 +18,7 @@ fn local_fn_decl_scalar_return_inside_canvas() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("local_fn_scalar", input);
+    assert_compiles_valid_wgsl("local_fn_scalar", input);
 }
 
 #[test]
@@ -96,7 +33,7 @@ fn local_fn_decl_vec2_return_inside_canvas() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("local_fn_vec2", input);
+    assert_compiles_valid_wgsl("local_fn_vec2", input);
 }
 
 #[test]
@@ -111,7 +48,7 @@ fn local_fn_decl_shape_return_inside_canvas() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("local_fn_shape", input);
+    assert_compiles_valid_wgsl("local_fn_shape", input);
 }
 
 #[test]
@@ -125,7 +62,7 @@ fn local_fn_decl_layer_return_inside_canvas() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("local_fn_layer", input);
+    assert_compiles_valid_wgsl("local_fn_layer", input);
 }
 
 #[test]
@@ -143,7 +80,7 @@ fn local_fn_decl_multiple_inside_canvas() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("local_fn_multiple", input);
+    assert_compiles_valid_wgsl("local_fn_multiple", input);
 }
 
 #[test]
@@ -163,7 +100,7 @@ canvas t(uv: coord) -> color {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("local_fn_in_fn", input);
+    assert_compiles_valid_wgsl("local_fn_in_fn", input);
 }
 
 #[test]
@@ -218,7 +155,7 @@ canvas t(uv: coord) -> color {
         wgsl.contains("_choose_") || wgsl.contains("__choose_"),
         "expected enum-typed helper `choose` to lower via helper path\nwgsl:\n{wgsl}"
     );
-    assert_compiles_and_validates_wgsl("enum_helper_signature_validate", input);
+    assert_compiles_valid_wgsl("enum_helper_signature_validate", input);
 }
 
 // ─── Callable fn parameters (§16.5) ──────────────────────────────────────────
@@ -241,7 +178,7 @@ canvas t(uv: coord) -> color {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("callable_param_scalar", input);
+    assert_compiles_valid_wgsl("callable_param_scalar", input);
 }
 
 #[test]
@@ -261,7 +198,7 @@ canvas t(uv: coord) -> color {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("callable_param_shape", input);
+    assert_compiles_valid_wgsl("callable_param_shape", input);
 }
 
 #[test]
@@ -281,7 +218,7 @@ canvas t(uv: coord) -> color {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("callable_param_local", input);
+    assert_compiles_valid_wgsl("callable_param_local", input);
 }
 
 #[test]
@@ -302,7 +239,7 @@ canvas t(uv: coord) -> color {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("callable_param_no_args", input);
+    assert_compiles_valid_wgsl("callable_param_no_args", input);
 }
 
 #[test]
@@ -323,7 +260,7 @@ canvas t(uv: coord) -> color {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("callable_param_toplevel_type", input);
+    assert_compiles_valid_wgsl("callable_param_toplevel_type", input);
 }
 
 // ─── Negative tests ──────────────────────────────────────────────────────────
@@ -369,7 +306,7 @@ fn field_at_type_matches_field() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("field_at_type_matches_field", input);
+    assert_compiles_valid_wgsl("field_at_type_matches_field", input);
 }
 
 /// `field X at Y` produces correct WGSL: the offset coordinate appears in the
@@ -411,7 +348,7 @@ fn field_at_variable_reference_form() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("field_at_var_ref", input);
+    assert_compiles_valid_wgsl("field_at_var_ref", input);
 }
 
 /// The binary `at` operator on a bound variable must emit correct WGSL —
@@ -475,7 +412,7 @@ fn field_at_on_arithmetic_expression() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("field_at_arith_expr", input);
+    assert_compiles_valid_wgsl("field_at_arith_expr", input);
 }
 
 /// fn returning layer + field…at: the canonical rung-1 cloudscape idiom.
@@ -499,5 +436,5 @@ fn fn_layer_return_with_field_at() {
   }
 }
 "#;
-    assert_compiles_and_validates_wgsl("fn_layer_field_at", input);
+    assert_compiles_valid_wgsl("fn_layer_field_at", input);
 }

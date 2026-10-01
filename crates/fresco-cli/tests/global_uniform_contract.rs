@@ -1,6 +1,8 @@
 #[path = "support/common.rs"]
 mod common;
 
+use common::wgsl::{Capabilities, assert_valid_wgsl};
+
 use fresco::driver::compile_source_bundle;
 use serde_json::{Value, json};
 
@@ -39,13 +41,7 @@ canvas sample(uv: coord) -> color {
         ]
     );
 
-    let module = naga::front::wgsl::parse_str(&output.wgsl).unwrap();
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::all(),
-    )
-    .validate(&module)
-    .unwrap();
+    let module = assert_valid_wgsl(&output.wgsl, Capabilities::all());
     let (_, global) = module
         .global_variables
         .iter()

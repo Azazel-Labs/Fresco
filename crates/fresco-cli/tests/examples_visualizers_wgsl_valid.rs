@@ -1,6 +1,7 @@
 #[path = "support/common.rs"]
 mod common;
 
+use common::wgsl::{Capabilities, validate_wgsl};
 use common::{ExampleCompilePolicy, collect_example_files_with_policies, repo_root};
 use fresco::driver::{self, VisualizerKind};
 
@@ -409,16 +410,9 @@ fn resolve_visualizer_kind_and_domain(
 }
 
 fn validate_wgsl_module(label: &str, wgsl: &str) -> Result<(), String> {
-    let module =
-        naga::front::wgsl::parse_str(wgsl).map_err(|err| format!("{label} parse failed: {err}"))?;
-    let mut validator = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    );
-    validator
-        .validate(&module)
-        .map_err(|err| format!("{label} validation failed: {err:#?}"))?;
-    Ok(())
+    validate_wgsl(wgsl, Capabilities::default())
+        .map(drop)
+        .map_err(|error| format!("{label}: {error}"))
 }
 
 #[test]
@@ -446,11 +440,7 @@ fn referenced_example_visualizers_compile_to_valid_wgsl() {
         }
     }
 
-    let mut all_files = Vec::new();
-    let mut files_with_policy = Vec::new();
-    collect_example_files_with_policies(&examples_dir, &mut all_files, &mut files_with_policy);
-
-    let example_files: Vec<_> = files_with_policy
+    let example_files: Vec<_> = collect_example_files_with_policies(&examples_dir)
         .into_iter()
         .filter(|(_, policy)| *policy == ExampleCompilePolicy::MustCompile)
         .map(|(path, _)| path)

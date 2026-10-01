@@ -1,26 +1,10 @@
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, repo_root, run_example_with_args as run_fresco_with_args};
-
-fn parse_scatter_lowering_value(explain: &str, key: &str) -> usize {
-    let line = explain
-        .lines()
-        .find(|line| line.contains("scatter lowering:"))
-        .expect("missing scatter lowering line in explain output");
-    let needle = format!("{key}=");
-    let value_text = line
-        .split(&needle)
-        .nth(1)
-        .expect("missing metric key in scatter lowering line")
-        .split(',')
-        .next()
-        .expect("missing metric value after key")
-        .trim();
-    value_text
-        .parse::<usize>()
-        .expect("scatter lowering metric must parse as usize")
-}
+use common::{
+    normalize, parse_scatter_lowering_value, repo_root,
+    run_example_with_args as run_fresco_with_args,
+};
 
 #[test]
 fn scatter_index_phase_keeps_all_instances_in_wgsl() {

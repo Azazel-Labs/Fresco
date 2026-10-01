@@ -3,41 +3,9 @@ use std::fs;
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn assert_compiles(suffix: &str, input: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-}
-
-fn assert_explain_contains(suffix: &str, input: &str, needle: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let stderr = normalize(&output.stderr);
-    assert!(
-        stderr.contains(needle),
-        "expected explain receipt to contain `{needle}`\nstderr:\n{stderr}"
-    );
-}
+use common::{
+    assert_compiles, assert_explain_contains, normalize, run_fresco_with_args, unique_temp_path,
+};
 
 fn assert_compile_fails_contains(suffix: &str, input: &str, needle: &str) {
     let path = unique_temp_path(suffix);

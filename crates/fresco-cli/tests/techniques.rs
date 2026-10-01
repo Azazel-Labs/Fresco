@@ -1,6 +1,10 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
+#[path = "support/wgsl.rs"]
+mod wgsl;
+use wgsl::{Capabilities, assert_valid_wgsl};
+
 const GRAPH: &str = r#"
 @shader pass positions {
     stage: compute
@@ -62,13 +66,7 @@ fn compile(
 #[test]
 fn two_independent_compute_outputs_join_at_a_draw_without_a_material() {
     let output = compile(GRAPH).unwrap();
-    let module = naga::front::wgsl::parse_str(&output.wgsl).unwrap();
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::all(),
-    )
-    .validate(&module)
-    .unwrap();
+    assert_valid_wgsl(&output.wgsl, Capabilities::all());
     let root: Value = serde_json::from_str(&output.manifest).unwrap();
     let graph = &root["techniques"][0];
     assert_eq!(graph["name"], "prepared_mesh");
@@ -120,13 +118,7 @@ pipeline(postprocess) integer_image {
             .replace("3u, 5u", "3u, 5u, 0u, 1u"),
     ] {
         let output = compile(&source).unwrap();
-        let module = naga::front::wgsl::parse_str(&output.wgsl).unwrap();
-        naga::valid::Validator::new(
-            naga::valid::ValidationFlags::all(),
-            naga::valid::Capabilities::all(),
-        )
-        .validate(&module)
-        .unwrap();
+        assert_valid_wgsl(&output.wgsl, Capabilities::all());
         let errors = compile(&source.replace("uint)", "float)")).unwrap_err();
         assert!(
             format!("{errors:?}")
@@ -501,13 +493,7 @@ pipeline(compute) depth_pass {
     assert!(matches!(&root.techniques[0].steps[0].operation,
         fresco_artifact::ManifestTechniqueOperation::Draw { fragment: None, depth: Some(depth), colors, .. }
         if depth == "z" && colors.is_empty()));
-    let module = naga::front::wgsl::parse_str(&output.wgsl).unwrap();
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::all(),
-    )
-    .validate(&module)
-    .unwrap();
+    assert_valid_wgsl(&output.wgsl, Capabilities::all());
     for invalid in [
         source.replace("@depth(z)", ""),
         source.replace("@depth(z)", "@depth(z) @color(0, z)"),

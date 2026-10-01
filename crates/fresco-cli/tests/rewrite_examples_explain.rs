@@ -1,12 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
+#[path = "support/common.rs"]
+mod common;
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .canonicalize()
-        .expect("failed to resolve workspace root")
-}
+use common::{repo_root, run_example_with_args};
+use std::fs;
 
 fn normalize(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes)
@@ -16,17 +12,7 @@ fn normalize(bytes: &[u8]) -> String {
 }
 
 fn run_explain(input_rel: &str) -> String {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-    let output = Command::new(bin)
-        .arg(repo_root().join(input_rel))
-        .arg("--engine-dir")
-        .arg(repo_root().join("integrations/example-engine/engine"))
-        .arg("--emit")
-        .arg("wgsl")
-        .arg("--explain")
-        .output()
-        .expect("failed to run fresco binary");
+    let output = run_example_with_args(repo_root().join(input_rel), &["--explain"]);
     assert!(
         output.status.success(),
         "fresco failed for {input_rel}\nstdout:\n{}\nstderr:\n{}",

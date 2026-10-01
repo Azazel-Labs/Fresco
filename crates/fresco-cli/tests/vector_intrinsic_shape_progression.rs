@@ -1,25 +1,7 @@
-use std::fs;
-
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
-
-fn compile_to_wgsl(suffix: &str, input: &str) -> String {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected non-helper intrinsic compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    String::from_utf8(output.stdout).expect("expected utf-8 WGSL output")
-}
+use common::compile_to_wgsl;
 
 fn assert_intrinsic_call_count_at_most(wgsl: &str, needle: &str, max_count: usize, label: &str) {
     let count = wgsl.matches(needle).count();

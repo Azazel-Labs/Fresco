@@ -7,7 +7,7 @@ use serde_json::Value;
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, repo_root, run_fresco, run_fresco_with_args, unique_temp_path};
+use common::{normalize, repo_root, run_fresco, run_source, unique_temp_path};
 
 #[test]
 fn showcase_neon_sign_example_compiles() {
@@ -113,10 +113,7 @@ fn compose_if_keeps_derivative_work_uniform_and_selects_one_face() {
 }
 "#;
 
-    let path = unique_temp_path("compose_if_dynamic_branch");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_if_dynamic_branch", input, &[]);
 
     assert!(
         output.status.success(),
@@ -185,10 +182,7 @@ fn compose_else_if_chain_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("compose_else_if_chain");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_else_if_chain", input, &[]);
 
     assert!(
         output.status.success(),
@@ -220,10 +214,7 @@ fn compose_for_body_supports_if_else_statements() {
 }
 "#;
 
-    let path = unique_temp_path("compose_for_if_stmt");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_for_if_stmt", input, &[]);
 
     assert!(
         output.status.success(),
@@ -250,10 +241,7 @@ fn compose_for_if_branches_accept_blend_pipe_syntax() {
 }
 "#;
 
-    let path = unique_temp_path("compose_for_if_blend_pipe");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_for_if_blend_pipe", input, &[]);
 
     assert!(
         output.status.success(),
@@ -282,10 +270,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("compose_fn_dynamic_color");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_fn_dynamic_color", input, &[]);
 
     assert!(
         output.status.success(),
@@ -315,10 +300,7 @@ fn warp_and_closed_form_signals_compile_with_coord_ambient() {
 }
 "#;
 
-    let path = unique_temp_path("warp_pulse_ramp_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("warp_pulse_ramp_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -341,10 +323,7 @@ fn millisecond_units_compile_for_signal_windows() {
 }
 "#;
 
-    let path = unique_temp_path("ms_units_signals_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("ms_units_signals_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -367,10 +346,7 @@ fn turn_units_compile_for_angle_math() {
 }
 "#;
 
-    let path = unique_temp_path("turn_units_angles_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("turn_units_angles_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -393,10 +369,7 @@ fn pulse_and_ramp_support_transition_and_mode_args() {
 }
 "#;
 
-    let path = unique_temp_path("signal_transition_mode_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("signal_transition_mode_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -416,10 +389,7 @@ fn pulse_rejects_mixing_ease_with_transition_mode() {
 }
 "#;
 
-    let path = unique_temp_path("signal_mixed_ease_mode_error");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("signal_mixed_ease_mode_error", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -458,10 +428,7 @@ fn nested_warp_chains_with_coord_driven_shape_params_compile() {
 }
 "#;
 
-    let path = unique_temp_path("warp_nested_coord_shape_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("warp_nested_coord_shape_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -482,10 +449,7 @@ fn warp_rejects_non_vec2_displacement_with_clear_diagnostic() {
 }
 "#;
 
-    let path = unique_temp_path("warp_bad_by_scalar");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("warp_bad_by_scalar", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -577,10 +541,7 @@ fn field_layer_forms_compile_with_grey_bridge() {
 }
 "#;
 
-    let path = unique_temp_path("field_layer_grey_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("field_layer_grey_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -667,10 +628,7 @@ fn glow_and_shadow_accept_dynamic_color_expressions() {
 }
 "#;
 
-    let path = unique_temp_path("dynamic_effect_color_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("dynamic_effect_color_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -956,10 +914,7 @@ fn layer_form_rejects_scalar_without_bridge() {
 }
 "#;
 
-    let path = unique_temp_path("layer_scalar_reject");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("layer_scalar_reject", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -985,10 +940,7 @@ fn wave_saw_with_reversed_range_compiles_with_normalization_warning() {
 }
 "#;
 
-    let path = unique_temp_path("wave_saw_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wave_saw_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1014,10 +966,7 @@ fn rand_with_reversed_range_is_rejected_outside_scatter() {
 }
 "#;
 
-    let path = unique_temp_path("rand_reversed_range_warn");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("rand_reversed_range_warn", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1043,10 +992,7 @@ fn wrap_with_reversed_range_compiles_with_normalization_warning() {
 }
 "#;
 
-    let path = unique_temp_path("wrap_reversed_range_warn");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wrap_reversed_range_warn", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1074,10 +1020,7 @@ fn cross_kind_distance_and_coverage_arithmetic_is_rejected() {
 }
 "#;
 
-    let path = unique_temp_path("cross_kind_distance_coverage_reject");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("cross_kind_distance_coverage_reject", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1106,10 +1049,7 @@ fn scalar_kind_promotion_allows_scalar_with_mask_arithmetic() {
 }
 "#;
 
-    let path = unique_temp_path("scalar_kind_promotion_mask_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("scalar_kind_promotion_mask_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1131,10 +1071,7 @@ fn rand_dynamic_range_is_rejected_outside_scatter() {
 }
 "#;
 
-    let path = unique_temp_path("rand_dynamic_range_preserve");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("rand_dynamic_range_preserve", input, &["--explain"]);
 
     assert!(
         !output.status.success(),
@@ -1162,10 +1099,7 @@ fn wave_dynamic_range_endpoints_are_preserved() {
 }
 "#;
 
-    let path = unique_temp_path("wave_dynamic_range_preserve");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wave_dynamic_range_preserve", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -1199,10 +1133,7 @@ fn wrap_dynamic_range_endpoints_are_preserved() {
 }
 "#;
 
-    let path = unique_temp_path("wrap_dynamic_range_preserve");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wrap_dynamic_range_preserve", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -1232,10 +1163,7 @@ fn wave_accepts_explicit_numeric_list_argument() {
 }
 "#;
 
-    let path = unique_temp_path("wave_range_list_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wave_range_list_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1256,10 +1184,7 @@ fn compose_unknown_names_do_not_emit_block_level_fallback_error() {
 }
 "#;
 
-    let path = unique_temp_path("compose_unknown_name_span");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_unknown_name_span", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1333,10 +1258,7 @@ fn scatter_region_lifecycle_and_instance_index01_compile() {
 }
 "#;
 
-    let path = unique_temp_path("scatter_index01_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("scatter_index01_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1360,10 +1282,7 @@ fn centered_space_and_rotate_around_compile() {
 }
 "#;
 
-    let path = unique_temp_path("centered_rotate_around_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("centered_rotate_around_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1388,10 +1307,7 @@ fn field_stdlib_noise_fbm_wrap_compile() {
 }
 "#;
 
-    let path = unique_temp_path("field_stdlib_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("field_stdlib_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1413,10 +1329,7 @@ fn layer_color_expression_math_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("layer_color_expr_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("layer_color_expr_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1444,10 +1357,7 @@ fn gradient_supports_vector_direction() {
 }
 "#;
 
-    let path = unique_temp_path("gradient_vector_direction_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("gradient_vector_direction_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1477,10 +1387,7 @@ fn gradient_supports_multiple_stops() {
 }
 "#;
 
-    let path = unique_temp_path("gradient_multi_stop_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("gradient_multi_stop_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1510,10 +1417,7 @@ fn gradient_supports_radial_kind() {
 }
 "#;
 
-    let path = unique_temp_path("gradient_radial_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("gradient_radial_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1545,10 +1449,7 @@ fn gradient_supports_paramized_stops_and_colors() {
 }
 "#;
 
-    let path = unique_temp_path("gradient_param_stops_colors_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("gradient_param_stops_colors_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1569,10 +1470,7 @@ fn gradient_supports_legacy_start_end_syntax() {
 }
 "#;
 
-    let path = unique_temp_path("gradient_legacy_start_end_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("gradient_legacy_start_end_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1592,10 +1490,7 @@ fn dynamic_shape_fill_color_expression_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("dynamic_fill_expr_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("dynamic_fill_expr_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1619,10 +1514,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("shadow_stdlib_noise2_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("shadow_stdlib_noise2_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1651,10 +1543,7 @@ canvas t(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("overload_arity_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("overload_arity_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1676,10 +1565,7 @@ fn wave_triangle_and_square_shapes_compile() {
 }
 "#;
 
-    let path = unique_temp_path("wave_triangle_square_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wave_triangle_square_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1701,10 +1587,7 @@ fn wave_supports_transition_and_mode_phase_shaping() {
 }
 "#;
 
-    let path = unique_temp_path("wave_transition_mode_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wave_transition_mode_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1724,10 +1607,7 @@ fn wave_rejects_mixing_ease_with_transition_mode() {
 }
 "#;
 
-    let path = unique_temp_path("wave_mixed_ease_mode_error");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wave_mixed_ease_mode_error", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1761,10 +1641,7 @@ fn centered_fit_and_fill_modes_compile() {
 }
 "#;
 
-    let path = unique_temp_path("centered_modes_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("centered_modes_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1790,10 +1667,7 @@ fn color_component_selectors_compile() {
 }
 "#;
 
-    let path = unique_temp_path("color_component_selectors_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("color_component_selectors_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1816,10 +1690,7 @@ fn noise2_and_fbm_value_noise_paths_compile() {
 }
 "#;
 
-    let path = unique_temp_path("value_noise_paths_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("value_noise_paths_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1841,10 +1712,7 @@ fn selector_chain_reports_scalar_terminal_diagnostic() {
     }
     "#;
 
-    let path = unique_temp_path("selector_chain_bad");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("selector_chain_bad", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1872,10 +1740,7 @@ fn selector_unknown_component_reports_diagnostic() {
     }
     "#;
 
-    let path = unique_temp_path("selector_unknown_component_bad");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("selector_unknown_component_bad", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1903,10 +1768,7 @@ fn unknown_name_short_circuits_dependent_diagnostics() {
 }
 "#;
 
-    let path = unique_temp_path("unknown_name_short_circuit");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("unknown_name_short_circuit", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1940,10 +1802,7 @@ fn compose_pipe_blend_syntax_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("compose_pipe_blend_syntax");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_pipe_blend_syntax", input, &[]);
 
     assert!(
         output.status.success(),
@@ -1965,10 +1824,7 @@ fn compose_legacy_blend_suffix_is_rejected() {
 }
 "#;
 
-    let path = unique_temp_path("compose_legacy_blend_suffix");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("compose_legacy_blend_suffix", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -1996,10 +1852,7 @@ fn color_arithmetic_invalid_operand_mix_reports_diagnostic() {
 }
 "#;
 
-    let path = unique_temp_path("color_arithmetic_bad_mix");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("color_arithmetic_bad_mix", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -2030,10 +1883,7 @@ fn explain_includes_centered_and_noise_receipts() {
 }
 "#;
 
-    let path = unique_temp_path("explain_centered_noise_receipts");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("explain_centered_noise_receipts", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -2067,10 +1917,7 @@ fn ambient_selector_reports_component_diagnostic() {
 }
 "#;
 
-    let path = unique_temp_path("ambient_selector_bad_component");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("ambient_selector_bad_component", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -2097,10 +1944,7 @@ fn ambient_selector_chain_reports_scalar_terminal_diagnostic() {
 }
 "#;
 
-    let path = unique_temp_path("ambient_selector_chain_bad");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("ambient_selector_chain_bad", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -2154,10 +1998,7 @@ fn new_effects_soften_dilate_erode_inner_glow_bevel_compile() {
 }
 "#;
 
-    let path = unique_temp_path("new_effects_compile_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("new_effects_compile_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2181,10 +2022,7 @@ fn blur_merge_explain_reports_exact_sqrt_radius() {
 }
 "#;
 
-    let path = unique_temp_path("blur_merge_exact_explain");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("blur_merge_exact_explain", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -2215,10 +2053,7 @@ fn wide_effects_emit_non_fatal_warnings() {
 }
 "#;
 
-    let path = unique_temp_path("wide_effect_warning_ok");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("wide_effect_warning_ok", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2269,10 +2104,7 @@ canvas math_builtins(uv: coord, time: signal) -> color {
 }
 "#;
 
-    let path = unique_temp_path("math_builtins");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("math_builtins", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2318,10 +2150,7 @@ fn angle_constructor_supports_turn_units() {
 }
 "#;
 
-    let path = unique_temp_path("showcase_angle_turn_constructor");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("showcase_angle_turn_constructor", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2342,10 +2171,7 @@ fn param_defaults_accept_px_literals() {
 }
 "#;
 
-    let path = unique_temp_path("showcase_param_px_default");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("showcase_param_px_default", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2367,10 +2193,7 @@ fn layer_mask_receiver_compiles() {
 }
 "#;
 
-    let path = unique_temp_path("showcase_layer_mask_receiver");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("showcase_layer_mask_receiver", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2391,10 +2214,7 @@ fn ramp_accepts_in_out_ease_alias() {
 }
 "#;
 
-    let path = unique_temp_path("showcase_ramp_in_out_alias");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("showcase_ramp_in_out_alias", input, &[]);
 
     assert!(
         output.status.success(),
@@ -2415,10 +2235,7 @@ fn motion_blur_rejects_velocity_and_accepts_shutter_only() {
 }
 "#;
 
-    let path = unique_temp_path("showcase_motion_blur_velocity_shutter");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco(&path);
-    let _ = fs::remove_file(&path);
+    let output = run_source("showcase_motion_blur_velocity_shutter", input, &[]);
 
     assert!(
         !output.status.success(),
@@ -2443,10 +2260,7 @@ fn motion_blur_rejects_velocity_and_accepts_shutter_only() {
 }
 "#;
 
-    let ok_path = unique_temp_path("showcase_motion_blur_shutter_only");
-    fs::write(&ok_path, ok_input).expect("failed to write temporary test source");
-    let ok_output = run_fresco(&ok_path);
-    let _ = fs::remove_file(&ok_path);
+    let ok_output = run_source("showcase_motion_blur_shutter_only", ok_input, &[]);
 
     assert!(
         ok_output.status.success(),
@@ -2469,10 +2283,7 @@ fn explain_reports_instruction_attribution_for_features() {
     }
     "#;
 
-    let path = unique_temp_path("explain_instruction_attribution");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("explain_instruction_attribution", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -2505,10 +2316,7 @@ fn explain_feature_label_pragma_renames_attribution_rows() {
     }
     "#;
 
-    let path = unique_temp_path("explain_feature_label_pragma");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source("explain_feature_label_pragma", input, &["--explain"]);
 
     assert!(
         output.status.success(),
@@ -2542,10 +2350,11 @@ fn explain_reports_scatter_and_pattern_filtering_attribution() {
 }
 "#;
 
-    let path = unique_temp_path("explain_scatter_pattern_filtering_attribution");
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
+    let output = run_source(
+        "explain_scatter_pattern_filtering_attribution",
+        input,
+        &["--explain"],
+    );
 
     assert!(
         output.status.success(),

@@ -1,24 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
-
-fn normalize(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).replace("\r\n", "\n")
-}
+use std::fs;
 
 #[path = "support/common.rs"]
 mod common;
-use common::unique_temp_path;
-
-fn run_fresco(input_path: &PathBuf) -> std::process::Output {
-    let bin = std::env::var("CARGO_BIN_EXE_fresco")
-        .expect("CARGO_BIN_EXE_fresco is not set; run as an integration test");
-
-    Command::new(bin)
-        .arg(input_path)
-        .arg("--emit")
-        .arg("wgsl")
-        .output()
-        .expect("failed to run fresco binary")
-}
+use common::{normalize, run_fresco, unique_temp_path};
 
 #[test]
 fn rejects_legacy_postfix_round_syntax() {

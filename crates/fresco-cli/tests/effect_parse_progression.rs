@@ -18,84 +18,12 @@ use std::fs;
 #[path = "support/common.rs"]
 mod common;
 
-use common::{normalize, run_fresco_with_args, unique_temp_path};
+use common::{
+    assert_compile_fails_with, assert_compiles, assert_compiles_valid_wgsl,
+    assert_explain_contains, compile_to_wgsl, normalize, run_fresco_with_args, unique_temp_path,
+};
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-fn assert_compiles(suffix: &str, input: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-}
-
-fn assert_compiles_valid_wgsl(suffix: &str, input: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let wgsl = String::from_utf8(output.stdout).expect("expected utf-8 WGSL output");
-    let module = naga::front::wgsl::parse_str(&wgsl)
-        .unwrap_or_else(|e| panic!("expected WGSL parse to succeed\nerror:\n{e}\nwgsl:\n{wgsl}"));
-    let mut validator = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    );
-    validator.validate(&module).unwrap_or_else(|e| {
-        panic!("expected WGSL validation to succeed\nerror:\n{e:#?}\nwgsl:\n{wgsl}")
-    });
-}
-
-fn compile_to_wgsl(suffix: &str, input: &str) -> String {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    String::from_utf8(output.stdout).expect("expected utf-8 WGSL output")
-}
-
-fn assert_compile_fails_with(suffix: &str, input: &str, expected_in_stderr: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &[]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        !output.status.success(),
-        "expected compile to fail\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let stderr = normalize(&output.stderr);
-    assert!(
-        stderr.contains(expected_in_stderr),
-        "expected stderr to contain `{expected_in_stderr}`\nstderr:\n{stderr}"
-    );
-}
 
 // ─── Phase 1: Parser — locality keyword variants ──────────────────────────────
 
@@ -561,26 +489,6 @@ canvas t(uv: coord) -> color {
 }
 
 // ─── Phase 5: Rewrite rule engine — rules fire at compile time ────────────────
-
-fn assert_explain_contains(suffix: &str, input: &str, expected_note: &str) {
-    let path = unique_temp_path(suffix);
-    fs::write(&path, input).expect("failed to write temporary test source");
-    let output = run_fresco_with_args(&path, &["--explain"]);
-    let _ = fs::remove_file(&path);
-
-    assert!(
-        output.status.success(),
-        "expected compile to succeed\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let explain = normalize(&output.stderr);
-    assert!(
-        explain.contains(expected_note),
-        "expected explain output to contain `{expected_note}`\nexplain:\n{explain}"
-    );
-}
 
 fn assert_explain_does_not_contain(suffix: &str, input: &str, absent_note: &str) {
     let path = unique_temp_path(suffix);
