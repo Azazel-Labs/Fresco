@@ -110,6 +110,23 @@ pub(crate) use surface::{
     validate_surface_model_bindings,
 };
 
+impl SpanCapture {
+    /// The value kind recorded for this capture.
+    pub fn kind(&self) -> SpanValueKind {
+        match self {
+            SpanCapture::Layer(_) => SpanValueKind::Layer,
+            SpanCapture::Shape(_) => SpanValueKind::Shape,
+            SpanCapture::Color(_) => SpanValueKind::Color,
+            SpanCapture::ColorField(_) => SpanValueKind::ColorField,
+            SpanCapture::Scalar(_) => SpanValueKind::Scalar,
+            SpanCapture::Vec2(_) => SpanValueKind::Vec2,
+            SpanCapture::Vec3(_) => SpanValueKind::Vec3,
+            SpanCapture::Vec4(_) => SpanValueKind::Vec4,
+            SpanCapture::Space(_) => SpanValueKind::Space,
+        }
+    }
+}
+
 pub(crate) fn space_transform_names() -> &'static [&'static str] {
     blocks::SPACE_TRANSFORM_NAMES
 }

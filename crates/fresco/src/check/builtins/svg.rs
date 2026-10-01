@@ -1,9 +1,10 @@
 //! SVG import builtins.
 
+use super::shapes::parse_fill_rule;
 use crate::builtin;
 use crate::check::Value;
 use crate::diag::Diag;
-use crate::hir::{FillRule, Shape, Sx};
+use crate::hir::{Shape, Sx};
 use crate::registry::{
     BuiltinArgDecl, BuiltinDecl, BuiltinId, BuiltinLowering, BuiltinSignature, PrimitiveType,
     TypeRef,
@@ -16,33 +17,6 @@ enum PathNormalizeMode {
     Auto,
     Off,
     On,
-}
-
-fn parse_fill_rule(
-    ctx: &mut crate::check::Checker,
-    expr: Option<&crate::ast::SExpr>,
-) -> Option<FillRule> {
-    let Some(expr) = expr else {
-        return Some(FillRule::NonZero);
-    };
-    match &expr.node {
-        crate::ast::Expr::Var(v) if v == "non_zero" || v == "FillRule.non_zero" => {
-            Some(FillRule::NonZero)
-        }
-        crate::ast::Expr::Var(v) if v == "even_odd" || v == "FillRule.even_odd" => {
-            Some(FillRule::EvenOdd)
-        }
-        _ => {
-            ctx.diags.push(
-                Diag::error(
-                    expr.span.clone(),
-                    "polygon fill_rule expects `non_zero` or `even_odd`",
-                )
-                .with_help("use `fill_rule: non_zero` or `fill_rule: even_odd`"),
-            );
-            None
-        }
-    }
 }
 
 fn require_string_literal(

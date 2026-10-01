@@ -30,7 +30,7 @@ fn union_many(ctx: &mut crate::check::Checker, ids: Vec<ShapeId>) -> Option<Shap
     Some(iter.fold(first, |acc, id| ctx.hir.shape(Shape::Union(acc, id))))
 }
 
-fn parse_fill_rule(
+pub(super) fn parse_fill_rule(
     ctx: &mut crate::check::Checker,
     expr: Option<&crate::ast::SExpr>,
 ) -> Option<FillRule> {

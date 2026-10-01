@@ -747,17 +747,7 @@ pub fn query_span_info_with_files(
     .ok()?;
 
     let cap = wb.captured?;
-    let kind = match &cap {
-        crate::check::SpanCapture::Layer(_) => crate::check::SpanValueKind::Layer,
-        crate::check::SpanCapture::Shape(_) => crate::check::SpanValueKind::Shape,
-        crate::check::SpanCapture::Color(_) => crate::check::SpanValueKind::Color,
-        crate::check::SpanCapture::ColorField(_) => crate::check::SpanValueKind::ColorField,
-        crate::check::SpanCapture::Scalar(_) => crate::check::SpanValueKind::Scalar,
-        crate::check::SpanCapture::Vec2(_) => crate::check::SpanValueKind::Vec2,
-        crate::check::SpanCapture::Vec3(_) => crate::check::SpanValueKind::Vec3,
-        crate::check::SpanCapture::Vec4(_) => crate::check::SpanValueKind::Vec4,
-        crate::check::SpanCapture::Space(_) => crate::check::SpanValueKind::Space,
-    };
+    let kind = cap.kind();
     // Find the tightest-fitting span from the log that contains the query range
     // and matches the captured kind.
     let matched_span = wb
