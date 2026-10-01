@@ -109,10 +109,7 @@ impl<'h> FnCtx<'h> {
     ) -> Handle<Ex> {
         let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
         let coord = if axis == 0 { Sx::CoordX } else { Sx::CoordY };
-        let rel = Sx::Add(
-            Box::new(Sx::Div(Box::new(coord), Box::new(spacing.clone()))),
-            Box::new(offset),
-        );
+        let rel = coord / spacing.clone() + offset;
 
         let (j11, j12, j21, j22) = (
             Sx::FootprintJ11,
@@ -122,10 +119,10 @@ impl<'h> FnCtx<'h> {
         );
         let (span_x, span_y) = crate::deriv::footprint_spans(&j11, &j12, &j21, &j22);
         let span = if axis == 0 { span_x } else { span_y };
-        let pixel_span = Sx::Mul(Box::new(span), Box::new(Sx::PxLit(1.0)));
-        let filter_width_cells = Sx::Div(Box::new(pixel_span), Box::new(spacing.clone()));
+        let pixel_span = span * Sx::PxLit(1.0);
+        let filter_width_cells = pixel_span / spacing.clone();
 
-        let duty = Sx::Div(Box::new(Sx::Abs(Box::new(width))), Box::new(spacing));
+        let duty = Sx::Abs(Box::new(width)) / spacing;
         let cov_sx = crate::deriv::filtered_pulse_train(rel, filter_width_cells, duty);
         let out = self.sx_at(&cov_sx, p);
         self.ir.restore_feature_tag(prev_feature_tag);

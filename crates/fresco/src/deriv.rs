@@ -73,87 +73,48 @@ fn d(expr: &Sx, axis: Axis) -> Sx {
             Axis::X => Sx::Lit(0.0),
             Axis::Y => Sx::Lit(1.0),
         },
-        Sx::Neg(a) => Sx::Neg(Box::new(d(a, axis))),
-        Sx::Add(a, b) => Sx::Add(Box::new(d(a, axis)), Box::new(d(b, axis))),
-        Sx::Sub(a, b) => Sx::Sub(Box::new(d(a, axis)), Box::new(d(b, axis))),
+        Sx::Neg(a) => -d(a, axis),
+        Sx::Add(a, b) => d(a, axis) + d(b, axis),
+        Sx::Sub(a, b) => d(a, axis) - d(b, axis),
         Sx::Mul(a, b) => {
             let da = d(a, axis);
             let db = d(b, axis);
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(da), Box::new((**b).clone()))),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new(db))),
-            )
+            da * (**b).clone() + (**a).clone() * db
         }
         Sx::Div(a, b) => {
             let da = d(a, axis);
             let db = d(b, axis);
-            let numerator = Sx::Sub(
-                Box::new(Sx::Mul(Box::new(da), Box::new((**b).clone()))),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new(db))),
-            );
-            let denominator = Sx::Mul(Box::new((**b).clone()), Box::new((**b).clone()));
-            Sx::Div(Box::new(numerator), Box::new(denominator))
+            let numerator = da * (**b).clone() - (**a).clone() * db;
+            let denominator = (**b).clone() * (**b).clone();
+            numerator / denominator
         }
-        Sx::Sin(a) => Sx::Mul(
-            Box::new(Sx::Cos(Box::new((**a).clone()))),
-            Box::new(d(a, axis)),
-        ),
-        Sx::Cos(a) => Sx::Neg(Box::new(Sx::Mul(
-            Box::new(Sx::Sin(Box::new((**a).clone()))),
-            Box::new(d(a, axis)),
-        ))),
+        Sx::Sin(a) => Sx::Cos(Box::new((**a).clone())) * d(a, axis),
+        Sx::Cos(a) => -(Sx::Sin(Box::new((**a).clone())) * d(a, axis)),
         Sx::Tan(a) => {
             let cos_a = Sx::Cos(Box::new((**a).clone()));
-            let cos_sq = Sx::Mul(Box::new(cos_a.clone()), Box::new(cos_a));
-            Sx::Div(Box::new(d(a, axis)), Box::new(cos_sq))
+            let cos_sq = cos_a.clone() * cos_a;
+            d(a, axis) / cos_sq
         }
         Sx::Asin(a) => {
-            let one_minus = Sx::Sub(
-                Box::new(Sx::Lit(1.0)),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new((**a).clone()))),
-            );
-            Sx::Div(
-                Box::new(d(a, axis)),
-                Box::new(Sx::Sqrt(Box::new(one_minus))),
-            )
+            let one_minus = Sx::Lit(1.0) - (**a).clone() * (**a).clone();
+            d(a, axis) / Sx::Sqrt(Box::new(one_minus))
         }
         Sx::Acos(a) => {
-            let one_minus = Sx::Sub(
-                Box::new(Sx::Lit(1.0)),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new((**a).clone()))),
-            );
-            Sx::Neg(Box::new(Sx::Div(
-                Box::new(d(a, axis)),
-                Box::new(Sx::Sqrt(Box::new(one_minus))),
-            )))
+            let one_minus = Sx::Lit(1.0) - (**a).clone() * (**a).clone();
+            -(d(a, axis) / Sx::Sqrt(Box::new(one_minus)))
         }
         Sx::Atan(a) => {
-            let denom = Sx::Add(
-                Box::new(Sx::Lit(1.0)),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new((**a).clone()))),
-            );
-            Sx::Div(Box::new(d(a, axis)), Box::new(denom))
+            let denom = Sx::Lit(1.0) + (**a).clone() * (**a).clone();
+            d(a, axis) / denom
         }
-        Sx::Sqrt(a) => Sx::Div(
-            Box::new(d(a, axis)),
-            Box::new(Sx::Mul(
-                Box::new(Sx::Lit(2.0)),
-                Box::new(Sx::Sqrt(Box::new((**a).clone()))),
-            )),
-        ),
+        Sx::Sqrt(a) => d(a, axis) / (Sx::Lit(2.0) * Sx::Sqrt(Box::new((**a).clone()))),
         Sx::InverseSqrt(a) => {
             let sqrt_a = Sx::Sqrt(Box::new((**a).clone()));
-            let denom = Sx::Mul(
-                Box::new(Sx::Lit(2.0)),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new(sqrt_a))),
-            );
-            Sx::Neg(Box::new(Sx::Div(Box::new(d(a, axis)), Box::new(denom))))
+            let denom = Sx::Lit(2.0) * ((**a).clone() * sqrt_a);
+            -(d(a, axis) / denom)
         }
         Sx::Fract(a) => d(a, axis),
-        Sx::Abs(a) => Sx::Mul(
-            Box::new(Sx::Sign(Box::new((**a).clone()))),
-            Box::new(d(a, axis)),
-        ),
+        Sx::Abs(a) => Sx::Sign(Box::new((**a).clone())) * d(a, axis),
         Sx::Sign(_)
         | Sx::Floor(_)
         | Sx::Ceil(_)
@@ -169,40 +130,22 @@ fn d(expr: &Sx, axis: Axis) -> Sx {
         | Sx::Ddx(_)
         | Sx::Ddy(_)
         | Sx::Fwidth(_) => Sx::Lit(0.0),
-        Sx::Exp(a) => Sx::Mul(
-            Box::new(Sx::Exp(Box::new((**a).clone()))),
-            Box::new(d(a, axis)),
-        ),
-        Sx::Exp2(a) => Sx::Mul(
-            Box::new(Sx::Mul(
-                Box::new(Sx::Lit(std::f32::consts::LN_2)),
-                Box::new(Sx::Exp2(Box::new((**a).clone()))),
-            )),
-            Box::new(d(a, axis)),
-        ),
-        Sx::Log(a) => Sx::Div(Box::new(d(a, axis)), Box::new((**a).clone())),
+        Sx::Exp(a) => Sx::Exp(Box::new((**a).clone())) * d(a, axis),
+        Sx::Exp2(a) => Sx::Lit(std::f32::consts::LN_2) * Sx::Exp2(Box::new((**a).clone())) * d(a, axis),
+        Sx::Log(a) => d(a, axis) / (**a).clone(),
         Sx::Log2(a) => {
-            let denom = Sx::Mul(
-                Box::new((**a).clone()),
-                Box::new(Sx::Lit(std::f32::consts::LN_2)),
-            );
-            Sx::Div(Box::new(d(a, axis)), Box::new(denom))
+            let denom = (**a).clone() * Sx::Lit(std::f32::consts::LN_2);
+            d(a, axis) / denom
         }
         Sx::Atan2(a, b) => {
             let da = d(a, axis);
             let db = d(b, axis);
-            let numerator = Sx::Sub(
-                Box::new(Sx::Mul(Box::new((**b).clone()), Box::new(da))),
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new(db))),
-            );
-            let denominator = Sx::Add(
-                Box::new(Sx::Mul(Box::new((**a).clone()), Box::new((**a).clone()))),
-                Box::new(Sx::Mul(Box::new((**b).clone()), Box::new((**b).clone()))),
-            );
+            let numerator = (**b).clone() * da - (**a).clone() * db;
+            let denominator = (**a).clone() * (**a).clone() + (**b).clone() * (**b).clone();
             // atan2 has no derivative at the origin. Bound its denominator so
             // callers can handle the singular footprint without NaNs.
             let denominator = Sx::Max(Box::new(denominator), Box::new(Sx::Lit(1.0e-12)));
-            Sx::Div(Box::new(numerator), Box::new(denominator))
+            numerator / denominator
         }
         Sx::Pow(a, b) | Sx::Min(a, b) | Sx::Max(a, b) => {
             let da = d(a, axis);
@@ -218,16 +161,10 @@ fn d(expr: &Sx, axis: Axis) -> Sx {
         Sx::Clamp(a, _, _) => d(a, axis),
         Sx::Select(a, b, cond) => Sx::Select(Box::new(d(a, axis)), Box::new(d(b, axis)), cond.clone()),
         Sx::Mix(a, b, t) => {
-            let one_minus_t = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new((**t).clone()));
-            let lerp_deriv = Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(a, axis)), Box::new(one_minus_t))),
-                Box::new(Sx::Mul(Box::new(d(b, axis)), Box::new((**t).clone()))),
-            );
-            let dt_term = Sx::Mul(
-                Box::new(Sx::Sub(Box::new((**b).clone()), Box::new((**a).clone()))),
-                Box::new(d(t, axis)),
-            );
-            Sx::Add(Box::new(lerp_deriv), Box::new(dt_term))
+            let one_minus_t = Sx::Lit(1.0) - (**t).clone();
+            let lerp_deriv = d(a, axis) * one_minus_t + d(b, axis) * (**t).clone();
+            let dt_term = ((**b).clone() - (**a).clone()) * d(t, axis);
+            lerp_deriv + dt_term
         }
         Sx::SmoothStep(edge0, edge1, x) => d_smoothstep(edge0, edge1, x, axis),
         Sx::SrgbToLinear(_)
@@ -278,77 +215,37 @@ fn d_minmax_component(a: &SxVec, b: &SxVec, index: u8, axis: Axis) -> Sx {
 fn d_smoothstep(edge0: &Sx, edge1: &Sx, x: &Sx, axis: Axis) -> Sx {
     // smoothstep(e0, e1, x) = t*t*(3 - 2*t), where t = clamp((x-e0)/(e1-e0), 0, 1)
     let t = Sx::Clamp(
-        Box::new(Sx::Div(
-            Box::new(Sx::Sub(Box::new(x.clone()), Box::new(edge0.clone()))),
-            Box::new(Sx::Sub(Box::new(edge1.clone()), Box::new(edge0.clone()))),
-        )),
+        Box::new((x.clone() - edge0.clone()) / (edge1.clone() - edge0.clone())),
         Box::new(Sx::Lit(0.0)),
         Box::new(Sx::Lit(1.0)),
     );
-    let smoothstep_poly = Sx::Mul(
-        Box::new(Sx::Mul(Box::new(t.clone()), Box::new(t.clone()))),
-        Box::new(Sx::Sub(
-            Box::new(Sx::Lit(3.0)),
-            Box::new(Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(t))),
-        )),
-    );
+    let smoothstep_poly = t.clone() * t.clone() * (Sx::Lit(3.0) - Sx::Lit(2.0) * t);
     d(&smoothstep_poly, axis)
 }
 
-fn add_terms(mut terms: Vec<Sx>) -> Sx {
-    if terms.is_empty() {
-        return Sx::Lit(0.0);
-    }
-    let mut acc = terms.remove(0);
-    for term in terms {
-        acc = Sx::Add(Box::new(acc), Box::new(term));
-    }
-    acc
+fn add_terms(terms: Vec<Sx>) -> Sx {
+    terms
+        .into_iter()
+        .reduce(|acc, term| acc + term)
+        .unwrap_or(Sx::Lit(0.0))
 }
 
 fn d_dot(a: &SxVec, b: &SxVec, axis: Axis) -> Sx {
     match (a, b) {
         (SxVec::V2(va), SxVec::V2(vb)) => add_terms(vec![
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.0, axis)), Box::new(vb.0.clone()))),
-                Box::new(Sx::Mul(Box::new(va.0.clone()), Box::new(d(&vb.0, axis)))),
-            ),
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.1, axis)), Box::new(vb.1.clone()))),
-                Box::new(Sx::Mul(Box::new(va.1.clone()), Box::new(d(&vb.1, axis)))),
-            ),
+            d(&va.0, axis) * vb.0.clone() + va.0.clone() * d(&vb.0, axis),
+            d(&va.1, axis) * vb.1.clone() + va.1.clone() * d(&vb.1, axis),
         ]),
         (SxVec::V3(va), SxVec::V3(vb)) => add_terms(vec![
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.0, axis)), Box::new(vb.0.clone()))),
-                Box::new(Sx::Mul(Box::new(va.0.clone()), Box::new(d(&vb.0, axis)))),
-            ),
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.1, axis)), Box::new(vb.1.clone()))),
-                Box::new(Sx::Mul(Box::new(va.1.clone()), Box::new(d(&vb.1, axis)))),
-            ),
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.2, axis)), Box::new(vb.2.clone()))),
-                Box::new(Sx::Mul(Box::new(va.2.clone()), Box::new(d(&vb.2, axis)))),
-            ),
+            d(&va.0, axis) * vb.0.clone() + va.0.clone() * d(&vb.0, axis),
+            d(&va.1, axis) * vb.1.clone() + va.1.clone() * d(&vb.1, axis),
+            d(&va.2, axis) * vb.2.clone() + va.2.clone() * d(&vb.2, axis),
         ]),
         (SxVec::V4(va), SxVec::V4(vb)) => add_terms(vec![
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.0, axis)), Box::new(vb.0.clone()))),
-                Box::new(Sx::Mul(Box::new(va.0.clone()), Box::new(d(&vb.0, axis)))),
-            ),
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.1, axis)), Box::new(vb.1.clone()))),
-                Box::new(Sx::Mul(Box::new(va.1.clone()), Box::new(d(&vb.1, axis)))),
-            ),
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.2, axis)), Box::new(vb.2.clone()))),
-                Box::new(Sx::Mul(Box::new(va.2.clone()), Box::new(d(&vb.2, axis)))),
-            ),
-            Sx::Add(
-                Box::new(Sx::Mul(Box::new(d(&va.3, axis)), Box::new(vb.3.clone()))),
-                Box::new(Sx::Mul(Box::new(va.3.clone()), Box::new(d(&vb.3, axis)))),
-            ),
+            d(&va.0, axis) * vb.0.clone() + va.0.clone() * d(&vb.0, axis),
+            d(&va.1, axis) * vb.1.clone() + va.1.clone() * d(&vb.1, axis),
+            d(&va.2, axis) * vb.2.clone() + va.2.clone() * d(&vb.2, axis),
+            d(&va.3, axis) * vb.3.clone() + va.3.clone() * d(&vb.3, axis),
         ]),
         _ => Sx::Lit(0.0),
     }
@@ -360,23 +257,23 @@ fn d_length(v: &SxVec, axis: Axis) -> Sx {
 
     let numerator = match v {
         SxVec::V2(v) => add_terms(vec![
-            Sx::Mul(Box::new(v.0.clone()), Box::new(d(&v.0, axis))),
-            Sx::Mul(Box::new(v.1.clone()), Box::new(d(&v.1, axis))),
+            v.0.clone() * d(&v.0, axis),
+            v.1.clone() * d(&v.1, axis),
         ]),
         SxVec::V3(v) => add_terms(vec![
-            Sx::Mul(Box::new(v.0.clone()), Box::new(d(&v.0, axis))),
-            Sx::Mul(Box::new(v.1.clone()), Box::new(d(&v.1, axis))),
-            Sx::Mul(Box::new(v.2.clone()), Box::new(d(&v.2, axis))),
+            v.0.clone() * d(&v.0, axis),
+            v.1.clone() * d(&v.1, axis),
+            v.2.clone() * d(&v.2, axis),
         ]),
         SxVec::V4(v) => add_terms(vec![
-            Sx::Mul(Box::new(v.0.clone()), Box::new(d(&v.0, axis))),
-            Sx::Mul(Box::new(v.1.clone()), Box::new(d(&v.1, axis))),
-            Sx::Mul(Box::new(v.2.clone()), Box::new(d(&v.2, axis))),
-            Sx::Mul(Box::new(v.3.clone()), Box::new(d(&v.3, axis))),
+            v.0.clone() * d(&v.0, axis),
+            v.1.clone() * d(&v.1, axis),
+            v.2.clone() * d(&v.2, axis),
+            v.3.clone() * d(&v.3, axis),
         ]),
     };
 
-    Sx::Div(Box::new(numerator), Box::new(len_safe))
+    numerator / len_safe
 }
 
 fn d_normalize_component(v: &SxVec, index: u8, axis: Axis) -> Sx {
@@ -388,13 +285,10 @@ fn d_normalize_component(v: &SxVec, index: u8, axis: Axis) -> Sx {
     let len_safe = Sx::Max(Box::new(len), Box::new(Sx::Lit(1.0e-6)));
     let d_len = d_length(v, axis);
 
-    let numerator = Sx::Sub(
-        Box::new(Sx::Mul(Box::new(d_component), Box::new(len_safe.clone()))),
-        Box::new(Sx::Mul(Box::new(component), Box::new(d_len))),
-    );
-    let denom = Sx::Mul(Box::new(len_safe.clone()), Box::new(len_safe));
+    let numerator = d_component * len_safe.clone() - component * d_len;
+    let denom = len_safe.clone() * len_safe;
 
-    Sx::Div(Box::new(numerator), Box::new(denom))
+    numerator / denom
 }
 
 fn transform_point(xform: &Xform, x: &Sx, y: &Sx) -> (Sx, Sx) {
@@ -403,58 +297,28 @@ fn transform_point(xform: &Xform, x: &Sx, y: &Sx) -> (Sx, Sx) {
             let angle = angle.clone().subst_coord(x, y);
             let cx = around.0.clone().subst_coord(x, y);
             let cy = around.1.clone().subst_coord(x, y);
-            let qx = Sx::Sub(Box::new(x.clone()), Box::new(cx.clone()));
-            let qy = Sx::Sub(Box::new(y.clone()), Box::new(cy.clone()));
+            let qx = x.clone() - cx.clone();
+            let qy = y.clone() - cy.clone();
             let c = Sx::Cos(Box::new(angle.clone()));
             let s = Sx::Sin(Box::new(angle));
-            let nx = Sx::Add(
-                Box::new(cx),
-                Box::new(Sx::Add(
-                    Box::new(Sx::Mul(Box::new(c.clone()), Box::new(qx.clone()))),
-                    Box::new(Sx::Mul(Box::new(s.clone()), Box::new(qy.clone()))),
-                )),
-            );
-            let ny = Sx::Add(
-                Box::new(cy),
-                Box::new(Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(c), Box::new(qy))),
-                    Box::new(Sx::Mul(Box::new(s), Box::new(qx))),
-                )),
-            );
+            let nx = cx + (c.clone() * qx.clone() + s.clone() * qy.clone());
+            let ny = cy + (c * qy - s * qx);
             (nx, ny)
         }
         Xform::Translate((tx, ty)) => (
-            Sx::Sub(Box::new(x.clone()), Box::new(tx.clone().subst_coord(x, y))),
-            Sx::Sub(Box::new(y.clone()), Box::new(ty.clone().subst_coord(x, y))),
+            x.clone() - tx.clone().subst_coord(x, y),
+            y.clone() - ty.clone().subst_coord(x, y),
         ),
         Xform::Translate3 { by, .. } => (
-            Sx::Sub(
-                Box::new(x.clone()),
-                Box::new(by.0.clone().subst_coord(x, y)),
-            ),
-            Sx::Sub(
-                Box::new(y.clone()),
-                Box::new(by.1.clone().subst_coord(x, y)),
-            ),
+            x.clone() - by.0.clone().subst_coord(x, y),
+            y.clone() - by.1.clone().subst_coord(x, y),
         ),
         Xform::Scale { factor, around } => {
             let k = factor.clone().subst_coord(x, y);
             let cx = around.0.clone().subst_coord(x, y);
             let cy = around.1.clone().subst_coord(x, y);
-            let nx = Sx::Add(
-                Box::new(cx.clone()),
-                Box::new(Sx::Div(
-                    Box::new(Sx::Sub(Box::new(x.clone()), Box::new(cx))),
-                    Box::new(k.clone()),
-                )),
-            );
-            let ny = Sx::Add(
-                Box::new(cy.clone()),
-                Box::new(Sx::Div(
-                    Box::new(Sx::Sub(Box::new(y.clone()), Box::new(cy))),
-                    Box::new(k),
-                )),
-            );
+            let nx = cx.clone() + (x.clone() - cx) / k.clone();
+            let ny = cy.clone() + (y.clone() - cy) / k;
             (nx, ny)
         }
         Xform::Orientation {
@@ -462,30 +326,27 @@ fn transform_point(xform: &Xform, x: &Sx, y: &Sx) -> (Sx, Sx) {
         } => (x.clone(), y.clone()),
         Xform::Orientation {
             y: crate::hir::VerticalAxis::Down,
-        } => (
-            x.clone(),
-            Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(y.clone())),
-        ),
+        } => (x.clone(), Sx::Lit(1.0) - y.clone()),
         Xform::RepeatX(every) => {
             let every = every.clone().subst_coord(x, y);
-            let turns = Sx::Div(Box::new(x.clone()), Box::new(every.clone()));
-            let x_wrapped = Sx::Mul(Box::new(Sx::Fract(Box::new(turns))), Box::new(every));
+            let turns = x.clone() / every.clone();
+            let x_wrapped = Sx::Fract(Box::new(turns)) * every;
             (x_wrapped, y.clone())
         }
         Xform::RepeatY(every) => {
             let every = every.clone().subst_coord(x, y);
-            let turns = Sx::Div(Box::new(y.clone()), Box::new(every.clone()));
-            let y_wrapped = Sx::Mul(Box::new(Sx::Fract(Box::new(turns))), Box::new(every));
+            let turns = y.clone() / every.clone();
+            let y_wrapped = Sx::Fract(Box::new(turns)) * every;
             (x.clone(), y_wrapped)
         }
         Xform::Repeat2D { every, .. } => {
             let ex = every.0.clone().subst_coord(x, y);
             let ey = every.1.clone().subst_coord(x, y);
-            let turns_x = Sx::Div(Box::new(x.clone()), Box::new(ex.clone()));
-            let turns_y = Sx::Div(Box::new(y.clone()), Box::new(ey.clone()));
+            let turns_x = x.clone() / ex.clone();
+            let turns_y = y.clone() / ey.clone();
             (
-                Sx::Mul(Box::new(Sx::Fract(Box::new(turns_x))), Box::new(ex)),
-                Sx::Mul(Box::new(Sx::Fract(Box::new(turns_y))), Box::new(ey)),
+                Sx::Fract(Box::new(turns_x)) * ex,
+                Sx::Fract(Box::new(turns_y)) * ey,
             )
         }
         Xform::Polar {
@@ -493,22 +354,16 @@ fn transform_point(xform: &Xform, x: &Sx, y: &Sx) -> (Sx, Sx) {
             from,
             clockwise,
         } => {
-            let qx = Sx::Sub(
-                Box::new(x.clone()),
-                Box::new(center.0.clone().subst_coord(x, y)),
-            );
-            let qy = Sx::Sub(
-                Box::new(y.clone()),
-                Box::new(center.1.clone().subst_coord(x, y)),
-            );
+            let qx = x.clone() - center.0.clone().subst_coord(x, y);
+            let qy = y.clone() - center.1.clone().subst_coord(x, y);
             let theta = Sx::Atan2(Box::new(qy.clone()), Box::new(qx.clone()));
             let from = from.clone().subst_coord(x, y);
             let phase = if *clockwise {
-                Sx::Sub(Box::new(theta), Box::new(from))
+                theta - from
             } else {
-                Sx::Sub(Box::new(from), Box::new(theta))
+                from - theta
             };
-            let turns = Sx::Div(Box::new(phase), Box::new(Sx::Lit(std::f32::consts::TAU)));
+            let turns = phase / Sx::Lit(std::f32::consts::TAU);
             (
                 Sx::Fract(Box::new(turns)),
                 Sx::Length(SxVec::V2(Box::new((qx, qy)))),
@@ -540,7 +395,7 @@ fn jacobian_single_at(xform: &Xform, x: &Sx, y: &Sx) -> (Sx, Sx, Sx, Sx) {
             let angle = angle.clone().subst_coord(x, y);
             let c = Sx::Cos(Box::new(angle.clone()));
             let s = Sx::Sin(Box::new(angle));
-            let neg_s = Sx::Neg(Box::new(s.clone()));
+            let neg_s = -s.clone();
             (c.clone(), s, neg_s, c)
         }
         Xform::Translate(_) | Xform::Translate3 { .. } => {
@@ -643,22 +498,10 @@ pub fn jacobian(space_chain: &[Xform]) -> (Sx, Sx, Sx, Sx) {
         // Matrix multiply: J' = A · J
         // [a11 a12] · [j11 j12] = [a11*j11 + a12*j21,  a11*j12 + a12*j22]
         // [a21 a22]   [j21 j22]   [a21*j11 + a22*j21,  a21*j12 + a22*j22]
-        let new_j11 = Sx::Add(
-            Box::new(Sx::Mul(Box::new(a11.clone()), Box::new(j11.clone()))),
-            Box::new(Sx::Mul(Box::new(a12.clone()), Box::new(j21.clone()))),
-        );
-        let new_j12 = Sx::Add(
-            Box::new(Sx::Mul(Box::new(a11), Box::new(j12.clone()))),
-            Box::new(Sx::Mul(Box::new(a12), Box::new(j22.clone()))),
-        );
-        let new_j21 = Sx::Add(
-            Box::new(Sx::Mul(Box::new(a21.clone()), Box::new(j11.clone()))),
-            Box::new(Sx::Mul(Box::new(a22.clone()), Box::new(j21.clone()))),
-        );
-        let new_j22 = Sx::Add(
-            Box::new(Sx::Mul(Box::new(a21), Box::new(j12))),
-            Box::new(Sx::Mul(Box::new(a22), Box::new(j22))),
-        );
+        let new_j11 = a11.clone() * j11.clone() + a12.clone() * j21.clone();
+        let new_j12 = a11 * j12.clone() + a12 * j22.clone();
+        let new_j21 = a21.clone() * j11.clone() + a22.clone() * j21.clone();
+        let new_j22 = a21 * j12 + a22 * j22;
 
         j11 = new_j11;
         j12 = new_j12;
@@ -760,8 +603,8 @@ pub fn footprint_spans(j11: &Sx, j12: &Sx, j21: &Sx, j22: &Sx) -> (Sx, Sx) {
     let abs_j21 = Sx::Abs(Box::new(j21.clone()));
     let abs_j22 = Sx::Abs(Box::new(j22.clone()));
 
-    let span_x = Sx::Add(Box::new(abs_j11), Box::new(abs_j12));
-    let span_y = Sx::Add(Box::new(abs_j21), Box::new(abs_j22));
+    let span_x = abs_j11 + abs_j12;
+    let span_y = abs_j21 + abs_j22;
 
     (span_x, span_y)
 }
@@ -782,9 +625,9 @@ pub fn footprint_spans(j11: &Sx, j12: &Sx, j21: &Sx, j22: &Sx) -> (Sx, Sx) {
 pub fn triangle_wave_antiderivative(x: Sx) -> Sx {
     // S(x) = 0.5 - |fract(x) - 0.5|
     let fract_x = Sx::Fract(Box::new(x));
-    let offset = Sx::Sub(Box::new(fract_x), Box::new(Sx::Lit(0.5)));
+    let offset = fract_x - Sx::Lit(0.5);
     let abs_offset = Sx::Abs(Box::new(offset));
-    Sx::Sub(Box::new(Sx::Lit(0.5)), Box::new(abs_offset))
+    Sx::Lit(0.5) - abs_offset
 }
 
 /// Compute the box-filtered square wave s̄(x, w) using the antiderivative method.
@@ -803,19 +646,19 @@ pub fn filtered_square_wave(x: Sx, width: Sx) -> Sx {
     let width_clamped = Sx::Max(Box::new(width), Box::new(Sx::Lit(1e-5)));
 
     // Compute half-width
-    let half_width = Sx::Mul(Box::new(width_clamped.clone()), Box::new(Sx::Lit(0.5)));
+    let half_width = width_clamped.clone() * Sx::Lit(0.5);
 
     // S(x + w/2)
-    let x_plus_hw = Sx::Add(Box::new(x.clone()), Box::new(half_width.clone()));
+    let x_plus_hw = x.clone() + half_width.clone();
     let s_plus = triangle_wave_antiderivative(x_plus_hw);
 
     // S(x - w/2)
-    let x_minus_hw = Sx::Sub(Box::new(x), Box::new(half_width));
+    let x_minus_hw = x - half_width;
     let s_minus = triangle_wave_antiderivative(x_minus_hw);
 
     // (S(x + w/2) - S(x - w/2)) / w
-    let diff = Sx::Sub(Box::new(s_plus), Box::new(s_minus));
-    Sx::Div(Box::new(diff), Box::new(width_clamped))
+    let diff = s_plus - s_minus;
+    diff / width_clamped
 }
 
 /// Compute a 2D filtered checker pattern using separable box filtering.
@@ -834,11 +677,11 @@ pub fn filtered_checker_pattern(x: Sx, y: Sx, width_x: Sx, width_y: Sx) -> Sx {
     let filtered_y = filtered_square_wave(y, width_y);
 
     // Multiply the two filtered waves
-    let product = Sx::Mul(Box::new(filtered_x), Box::new(filtered_y));
+    let product = filtered_x * filtered_y;
 
     // checker = 0.5 * (1 - product)
-    let one_minus_prod = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(product));
-    Sx::Mul(Box::new(Sx::Lit(0.5)), Box::new(one_minus_prod))
+    let one_minus_prod = Sx::Lit(1.0) - product;
+    Sx::Lit(0.5) * one_minus_prod
 }
 
 /// Compute a 1D filtered stripe pattern using box filtering along one axis.
@@ -870,48 +713,33 @@ pub fn filtered_pulse_train(x: Sx, width: Sx, duty: Sx) -> Sx {
 
     // Shift so each pulse is centered on integer lattice points.
     let half = Sx::Lit(0.5);
-    let half_duty = Sx::Mul(Box::new(Sx::Lit(0.5)), Box::new(duty_clamped.clone()));
-    let t = Sx::Sub(
-        Box::new(Sx::Add(Box::new(x), Box::new(half))),
-        Box::new(half_duty),
-    );
+    let half_duty = Sx::Lit(0.5) * duty_clamped.clone();
+    let t = x + half - half_duty;
 
-    let half_width = Sx::Mul(Box::new(Sx::Lit(0.5)), Box::new(width_clamped.clone()));
+    let half_width = Sx::Lit(0.5) * width_clamped.clone();
 
     let pulse_antiderivative = |u: Sx| {
         let whole = Sx::Floor(Box::new(u.clone()));
         let frac = Sx::Fract(Box::new(u));
         let ramp = Sx::Min(Box::new(frac), Box::new(duty_clamped.clone()));
-        Sx::Add(
-            Box::new(Sx::Mul(Box::new(whole), Box::new(duty_clamped.clone()))),
-            Box::new(ramp),
-        )
+        whole * duty_clamped.clone() + ramp
     };
 
-    let s_plus = pulse_antiderivative(Sx::Add(Box::new(t.clone()), Box::new(half_width.clone())));
-    let s_minus = pulse_antiderivative(Sx::Sub(Box::new(t), Box::new(half_width)));
-    let diff = Sx::Sub(Box::new(s_plus), Box::new(s_minus));
-    Sx::Div(Box::new(diff), Box::new(width_clamped))
+    let s_plus = pulse_antiderivative(t.clone() + half_width.clone());
+    let s_minus = pulse_antiderivative(t - half_width);
+    let diff = s_plus - s_minus;
+    diff / width_clamped
 }
 
 /// Box-filter a finite interval. Unlike a single SDF edge ramp, this integrates
 /// both edges and therefore gives zero coverage to a zero-width interval.
 pub(crate) fn filtered_interval(x: Sx, width: Sx, lo: Sx, hi: Sx) -> Sx {
     let width = Sx::Max(Box::new(width), Box::new(Sx::Lit(1.0e-7)));
-    let half = Sx::Mul(Box::new(width.clone()), Box::new(Sx::Lit(0.5)));
-    let right = Sx::Min(
-        Box::new(Sx::Sub(Box::new(hi), Box::new(x.clone()))),
-        Box::new(half.clone()),
-    );
-    let left = Sx::Max(
-        Box::new(Sx::Sub(Box::new(lo), Box::new(x))),
-        Box::new(Sx::Neg(Box::new(half))),
-    );
+    let half = width.clone() * Sx::Lit(0.5);
+    let right = Sx::Min(Box::new(hi - x.clone()), Box::new(half.clone()));
+    let left = Sx::Max(Box::new(lo - x), Box::new(-half));
     Sx::Clamp(
-        Box::new(Sx::Div(
-            Box::new(Sx::Sub(Box::new(right), Box::new(left))),
-            Box::new(width),
-        )),
+        Box::new((right - left) / width),
         Box::new(Sx::Lit(0.0)),
         Box::new(Sx::Lit(1.0)),
     )
@@ -924,35 +752,23 @@ pub(crate) fn filtered_periodic_interval(x: Sx, width: Sx, lo: Sx, hi: Sx) -> Sx
     let clamp01 = |v| Sx::Clamp(Box::new(v), Box::new(Sx::Lit(0.0)), Box::new(Sx::Lit(1.0)));
     let lo = clamp01(lo);
     let hi = clamp01(hi);
-    let duty = Sx::Max(
-        Box::new(Sx::Sub(Box::new(hi), Box::new(lo.clone()))),
-        Box::new(Sx::Lit(0.0)),
-    );
+    let duty = Sx::Max(Box::new(hi - lo.clone()), Box::new(Sx::Lit(0.0)));
     let width = Sx::Max(Box::new(width), Box::new(Sx::Lit(1.0e-7)));
-    let half = Sx::Mul(Box::new(width.clone()), Box::new(Sx::Lit(0.5)));
+    let half = width.clone() * Sx::Lit(0.5);
     // Reducing the sample first limits cancellation for translated domains.
     let x = Sx::Fract(Box::new(x));
     let integral = |t: Sx| {
-        let whole = Sx::Mul(
-            Box::new(Sx::Floor(Box::new(t.clone()))),
-            Box::new(duty.clone()),
-        );
+        let whole = Sx::Floor(Box::new(t.clone())) * duty.clone();
         let tail = Sx::Clamp(
-            Box::new(Sx::Sub(
-                Box::new(Sx::Fract(Box::new(t))),
-                Box::new(lo.clone()),
-            )),
+            Box::new(Sx::Fract(Box::new(t)) - lo.clone()),
             Box::new(Sx::Lit(0.0)),
             Box::new(duty.clone()),
         );
-        Sx::Add(Box::new(whole), Box::new(tail))
+        whole + tail
     };
-    let a = integral(Sx::Sub(Box::new(x.clone()), Box::new(half.clone())));
-    let b = integral(Sx::Add(Box::new(x), Box::new(half)));
-    let coverage = clamp01(Sx::Div(
-        Box::new(Sx::Sub(Box::new(b), Box::new(a))),
-        Box::new(width),
-    ));
+    let a = integral(x.clone() - half.clone());
+    let b = integral(x + half);
+    let coverage = clamp01((b - a) / width);
     // Preserve the full-domain identity exactly, even at very small footprints.
     Sx::Mix(
         Box::new(coverage),
@@ -1191,7 +1007,7 @@ mod tests {
             // A coordinate-dependent scale verifies that transforms AFTER the
             // polar map are evaluated at (turns, radius), not Cartesian input.
             Xform::Scale {
-                factor: Sx::Add(Box::new(Sx::Lit(1.0)), Box::new(Sx::CoordY)),
+                factor: Sx::Lit(1.0) + Sx::CoordY,
                 around: (Sx::Lit(0.0), Sx::Lit(0.0)),
             },
         ];
@@ -1350,7 +1166,7 @@ mod tests {
     #[test]
     fn jacobian_dynamic_scale_includes_scale_gradient_terms() {
         let xforms = vec![Xform::Scale {
-            factor: Sx::Add(Box::new(Sx::Lit(1.0)), Box::new(Sx::CoordY)),
+            factor: Sx::Lit(1.0) + Sx::CoordY,
             around: (Sx::Lit(0.5), Sx::Lit(0.5)),
         }];
         let (_j11, j12, _j21, _j22) = jacobian(&xforms);
@@ -1364,7 +1180,7 @@ mod tests {
         let xforms = vec![
             Xform::Translate((Sx::Lit(0.0), Sx::Lit(0.25))),
             Xform::Scale {
-                factor: Sx::Add(Box::new(Sx::Lit(1.0)), Box::new(Sx::CoordY)),
+                factor: Sx::Lit(1.0) + Sx::CoordY,
                 around: (Sx::Lit(0.5), Sx::Lit(0.5)),
             },
         ];
@@ -1376,10 +1192,7 @@ mod tests {
 
     #[test]
     fn gradient_uses_symbolic_identities_for_polynomial_fields() {
-        let expr = Sx::Add(
-            Box::new(Sx::Mul(Box::new(Sx::CoordX), Box::new(Sx::CoordX))),
-            Box::new(Sx::Mul(Box::new(Sx::Lit(3.0)), Box::new(Sx::CoordY))),
-        );
+        let expr = Sx::CoordX * Sx::CoordX + Sx::Lit(3.0) * Sx::CoordY;
         let mut hir = dummy_hir();
         let (grad_x, grad_y) = gradient(&mut hir, &expr);
 

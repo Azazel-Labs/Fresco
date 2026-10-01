@@ -1695,6 +1695,33 @@ pub enum Sx {
     },
 }
 
+// Structural arithmetic constructors: each operator builds exactly the
+// corresponding binary/unary node (`a + b` is `Sx::Add(Box::new(a),
+// Box::new(b))`) with no constant folding or simplification.
+macro_rules! impl_sx_binary_op {
+    ($($trait:ident :: $method:ident => $variant:ident),* $(,)?) => {
+        $(
+            impl std::ops::$trait for Sx {
+                type Output = Sx;
+
+                fn $method(self, rhs: Sx) -> Sx {
+                    Sx::$variant(Box::new(self), Box::new(rhs))
+                }
+            }
+        )*
+    };
+}
+
+impl_sx_binary_op!(Add::add => Add, Sub::sub => Sub, Mul::mul => Mul, Div::div => Div);
+
+impl std::ops::Neg for Sx {
+    type Output = Sx;
+
+    fn neg(self) -> Sx {
+        Sx::Neg(Box::new(self))
+    }
+}
+
 impl Sx {
     /// Substitute `CoordX` and `CoordY` with arbitrary expressions throughout
     /// this expression tree.  Used to implement `field <expr> at <coord>` (§ext 23.7):

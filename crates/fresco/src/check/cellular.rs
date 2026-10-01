@@ -16,8 +16,8 @@ impl Checker {
             return None;
         }
         let local = (
-            Sx::Sub(Box::new(cell.uv.0.clone()), Box::new(Sx::Lit(0.5))),
-            Sx::Sub(Box::new(cell.uv.1.clone()), Box::new(Sx::Lit(0.5))),
+            cell.uv.0.clone() - Sx::Lit(0.5),
+            cell.uv.1.clone() - Sx::Lit(0.5),
         );
         match field {
             "local" => Some(Value::Vec2(local)),
@@ -85,13 +85,7 @@ impl Checker {
                     inset: Box::new(Sx::Lit(0.0)),
                 };
                 let component = |center: Sx, direction: Sx, scale: f32| {
-                    Sx::Add(
-                        Box::new(center),
-                        Box::new(Sx::Mul(
-                            Box::new(Sx::Mul(Box::new(radius.clone()), Box::new(direction))),
-                            Box::new(Sx::Lit(scale)),
-                        )),
-                    )
+                    center + radius.clone() * direction * Sx::Lit(scale)
                 };
                 Value::Vec2((
                     component(
@@ -260,9 +254,6 @@ impl Checker {
             sx.walk_preorder(&mut |s| found |= matches!(s, Sx::PxLit(_)));
             found
         };
-        let div = |a: Sx, b: Sx| Sx::Div(Box::new(a), Box::new(b));
-        let mul = |a: Sx, b: Sx| Sx::Mul(Box::new(a), Box::new(b));
-        let sub = |a: Sx, b: Sx| Sx::Sub(Box::new(a), Box::new(b));
         let safe = |a: Sx| Sx::Max(Box::new(a), Box::new(Sx::Lit(1.0e-10)));
         match name {
             "point" => {
@@ -293,26 +284,24 @@ impl Checker {
                     && *channel == 0
                 {
                     *channel = 3;
-                    width = div(width, Sx::PxLit(1.0));
+                    width = width / Sx::PxLit(1.0);
                 }
                 let distance = Sx::Abs(Box::new(distance));
                 let mask = if profile == "soft" {
                     let falloff = if let Some(width) = Self::try_eval_static_scalar(&width) {
                         Sx::Lit(2.0 * std::f32::consts::LN_2 / width.max(1.0e-10))
                     } else {
-                        div(Sx::Lit(2.0 * std::f32::consts::LN_2), safe(width))
+                        Sx::Lit(2.0 * std::f32::consts::LN_2) / safe(width)
                     };
-                    Sx::Exp(Box::new(mul(Sx::Neg(Box::new(distance)), falloff)))
+                    Sx::Exp(Box::new(-distance * falloff))
                 } else {
-                    let ratio = div(distance, safe(width));
-                    sub(
-                        Sx::Lit(1.0),
-                        Sx::SmoothStep(
+                    let ratio = distance / safe(width);
+                    Sx::Lit(1.0)
+                        - Sx::SmoothStep(
                             Box::new(Sx::Lit(0.4)),
                             Box::new(Sx::Lit(0.6)),
                             Box::new(ratio),
-                        ),
-                    )
+                        )
                 };
                 Some(Value::Scalar(mask))
             }
@@ -385,17 +374,17 @@ impl Checker {
                         return None;
                     }
                     let travel = if pixel_metric {
-                        div(speed, Sx::PxLit(1.0))
+                        speed / Sx::PxLit(1.0)
                     } else {
                         speed
                     };
-                    div(travel, safe(length.clone()))
+                    travel / safe(length.clone())
                 } else {
                     let lap = lap.expect("one motion mode checked");
                     if !self.contour_positive(&lap, span, "chase lap") {
                         return None;
                     }
-                    div(self.runtime_time(), safe(lap))
+                    self.runtime_time() / safe(lap)
                 };
                 let phase = if let Some(expr) = bag.take("phase") {
                     self.as_scalar(expr)?
@@ -409,39 +398,33 @@ impl Checker {
                     "clockwise",
                 )?;
                 let progress = if angular {
-                    let x = sub(Sx::RepeatCellUvX(scope_id), Sx::Lit(0.5));
-                    let y = sub(Sx::RepeatCellUvY(scope_id), Sx::Lit(0.5));
-                    div(
-                        Sx::Atan2(Box::new(y), Box::new(x)),
-                        Sx::Lit(std::f32::consts::TAU),
-                    )
+                    let x = Sx::RepeatCellUvX(scope_id) - Sx::Lit(0.5);
+                    let y = Sx::RepeatCellUvY(scope_id) - Sx::Lit(0.5);
+                    Sx::Atan2(Box::new(y), Box::new(x)) / Sx::Lit(std::f32::consts::TAU)
                 } else {
                     query(metric + 1)
                 };
                 let gap = if direction == "counterclockwise" {
-                    sub(Sx::Add(Box::new(head), Box::new(phase)), progress)
+                    head + phase - progress
                 } else {
-                    Sx::Add(
-                        Box::new(Sx::Add(Box::new(progress), Box::new(head))),
-                        Box::new(phase),
-                    )
+                    progress + head + phase
                 };
                 let gap = Sx::Fract(Box::new(gap));
                 // Bare tails are a fraction of a lap; pixel tails are an actual screen length.
                 let tail = if pixels(&tail) {
-                    div(div(tail, Sx::PxLit(1.0)), safe(length.clone()))
+                    tail / Sx::PxLit(1.0) / safe(length.clone())
                 } else {
                     tail
                 };
                 let falloff = if let Some(tail) = Self::try_eval_static_scalar(&tail) {
                     Sx::Lit(std::f32::consts::LN_2 / tail.max(1.0e-10))
                 } else {
-                    div(Sx::Lit(std::f32::consts::LN_2), safe(tail))
+                    Sx::Lit(std::f32::consts::LN_2) / safe(tail)
                 };
-                let decay = mul(Sx::Neg(Box::new(gap)), falloff);
+                let decay = -gap * falloff;
                 let mask = Sx::Exp(Box::new(decay));
                 let exists = Sx::Step(Box::new(Sx::Lit(1.0e-9)), Box::new(length));
-                Some(Value::Scalar(mul(mask, exists)))
+                Some(Value::Scalar(mask * exists))
             }
             _ => unreachable!("contour builtin dispatched"),
         }

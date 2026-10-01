@@ -4,22 +4,6 @@ use crate::builtin;
 use crate::check::Value;
 use crate::hir::{FillRule, Shape, ShapeId, Sx};
 
-fn sx_add(a: Sx, b: Sx) -> Sx {
-    Sx::Add(Box::new(a), Box::new(b))
-}
-
-fn sx_sub(a: Sx, b: Sx) -> Sx {
-    Sx::Sub(Box::new(a), Box::new(b))
-}
-
-fn sx_mul(a: Sx, b: Sx) -> Sx {
-    Sx::Mul(Box::new(a), Box::new(b))
-}
-
-fn sx_div(a: Sx, b: Sx) -> Sx {
-    Sx::Div(Box::new(a), Box::new(b))
-}
-
 fn sx_cos(a: Sx) -> Sx {
     Sx::Cos(Box::new(a))
 }
@@ -303,7 +287,7 @@ builtin! {
         caps = PURE,
     },
     check = |ctx, from, to, thickness| {
-        let radius = sx_mul(thickness, Sx::Lit(0.5));
+        let radius = thickness * Sx::Lit(0.5);
         Value::Shape(ctx.hir.shape(Shape::Capsule { from, to, radius }))
     }
 }
@@ -322,7 +306,7 @@ builtin! {
     check = |ctx, points, thickness, closed| {
         let points = collect_polyline_points(ctx, points)?;
         let closed = parse_bool_like(ctx, closed, "closed", false)?;
-        let radius = sx_mul(thickness, Sx::Lit(0.5));
+        let radius = thickness * Sx::Lit(0.5);
 
         let mut parts: Vec<ShapeId> = Vec::new();
         for pair in points.windows(2) {
@@ -371,14 +355,14 @@ builtin! {
     check = |ctx, at, radius, from, to, steps| {
         let steps = parse_steps_literal(ctx, steps, "steps", 48, 8, 256)?;
         let (cx, cy) = at;
-        let delta = sx_sub(to, from.clone());
+        let delta = to - from.clone();
         let mut contour: Vec<(Sx, Sx)> = Vec::with_capacity(steps + 2);
         contour.push((cx.clone(), cy.clone()));
         for i in 0..=steps {
             let t = Sx::Lit(i as f32 / steps as f32);
-            let angle = sx_add(from.clone(), sx_mul(delta.clone(), t));
-            let x = sx_add(cx.clone(), sx_mul(radius.clone(), sx_cos(angle.clone())));
-            let y = sx_add(cy.clone(), sx_mul(radius.clone(), sx_sin(angle)));
+            let angle = from.clone() + delta.clone() * t;
+            let x = cx.clone() + radius.clone() * sx_cos(angle.clone());
+            let y = cy.clone() + radius.clone() * sx_sin(angle);
             contour.push((x, y));
         }
         Value::Shape(ctx.hir.shape(Shape::Polygon {
@@ -405,14 +389,14 @@ builtin! {
     check = |ctx, at, radius, width, from, to, steps| {
         let steps = parse_steps_literal(ctx, steps, "steps", 48, 8, 256)?;
         let (cx, cy) = at;
-        let delta = sx_sub(to, from.clone());
+        let delta = to - from.clone();
         let mut contour: Vec<(Sx, Sx)> = Vec::with_capacity(steps + 2);
         contour.push((cx.clone(), cy.clone()));
         for i in 0..=steps {
             let t = Sx::Lit(i as f32 / steps as f32);
-            let angle = sx_add(from.clone(), sx_mul(delta.clone(), t));
-            let x = sx_add(cx.clone(), sx_mul(radius.clone(), sx_cos(angle.clone())));
-            let y = sx_add(cy.clone(), sx_mul(radius.clone(), sx_sin(angle)));
+            let angle = from.clone() + delta.clone() * t;
+            let x = cx.clone() + radius.clone() * sx_cos(angle.clone());
+            let y = cy.clone() + radius.clone() * sx_sin(angle);
             contour.push((x, y));
         }
         let sector = ctx.hir.shape(Shape::Polygon {
@@ -439,16 +423,16 @@ builtin! {
         let steps = parse_steps_literal(ctx, steps, "steps", 64, 16, 256)?;
         let (cx, cy) = at;
         let (rx, ry) = radii;
-        let inv = sx_div(Sx::Lit(2.0), power);
+        let inv = Sx::Lit(2.0) / power;
         let mut contour: Vec<(Sx, Sx)> = Vec::with_capacity(steps);
         for i in 0..steps {
             let angle = Sx::Lit(std::f32::consts::TAU * (i as f32 / steps as f32));
             let ct = sx_cos(angle.clone());
             let st = sx_sin(angle);
-            let x_norm = sx_mul(sx_sign(ct.clone()), sx_pow(sx_abs(ct), inv.clone()));
-            let y_norm = sx_mul(sx_sign(st.clone()), sx_pow(sx_abs(st), inv.clone()));
-            let x = sx_add(cx.clone(), sx_mul(rx.clone(), x_norm));
-            let y = sx_add(cy.clone(), sx_mul(ry.clone(), y_norm));
+            let x_norm = sx_sign(ct.clone()) * sx_pow(sx_abs(ct), inv.clone());
+            let y_norm = sx_sign(st.clone()) * sx_pow(sx_abs(st), inv.clone());
+            let x = cx.clone() + rx.clone() * x_norm;
+            let y = cy.clone() + ry.clone() * y_norm;
             contour.push((x, y));
         }
         Value::Shape(ctx.hir.shape(Shape::Polygon {
@@ -497,9 +481,9 @@ builtin! {
     check = |ctx, at, size, thickness| {
         let (cx, cy) = at;
         let (sx, sy) = size;
-        let h = sx_mul(thickness, Sx::Lit(0.5));
-        let hx = sx_mul(sx, Sx::Lit(0.5));
-        let hy = sx_mul(sy, Sx::Lit(0.5));
+        let h = thickness * Sx::Lit(0.5);
+        let hx = sx * Sx::Lit(0.5);
+        let hy = sy * Sx::Lit(0.5);
 
         let horiz = ctx.hir.shape(Shape::RBox {
             center: (cx.clone(), cy.clone()),
@@ -529,14 +513,14 @@ builtin! {
     check = |ctx, at, size, thickness| {
         let (cx, cy) = at;
         let (sx, sy) = size;
-        let hx = sx_mul(sx, Sx::Lit(0.5));
-        let hy = sx_mul(sy, Sx::Lit(0.5));
-        let radius = sx_mul(thickness, Sx::Lit(0.5));
+        let hx = sx * Sx::Lit(0.5);
+        let hy = sy * Sx::Lit(0.5);
+        let radius = thickness * Sx::Lit(0.5);
 
-        let a0 = (sx_sub(cx.clone(), hx.clone()), sx_sub(cy.clone(), hy.clone()));
-        let a1 = (sx_add(cx.clone(), hx.clone()), sx_add(cy.clone(), hy.clone()));
-        let b0 = (sx_sub(cx.clone(), hx.clone()), sx_add(cy.clone(), hy.clone()));
-        let b1 = (sx_add(cx, hx), sx_sub(cy, hy));
+        let a0 = (cx.clone() - hx.clone(), cy.clone() - hy.clone());
+        let a1 = (cx.clone() + hx.clone(), cy.clone() + hy.clone());
+        let b0 = (cx.clone() - hx.clone(), cy.clone() + hy.clone());
+        let b1 = (cx + hx, cy - hy);
 
         let d1 = ctx.hir.shape(Shape::Capsule {
             from: a0,
@@ -571,7 +555,7 @@ builtin! {
             radius: radius.clone(),
         });
         let inner = ctx.hir.shape(Shape::Circle {
-            center: (sx_add(cx, ox), sx_add(cy, oy)),
+            center: (cx + ox, cy + oy),
             radius,
         });
         Value::Shape(ctx.hir.shape(Shape::Subtract(outer, inner)))
@@ -591,13 +575,13 @@ builtin! {
     },
     check = |ctx, at, radius, separation| {
         let (cx, cy) = at;
-        let half = sx_mul(separation, Sx::Lit(0.5));
+        let half = separation * Sx::Lit(0.5);
         let a = ctx.hir.shape(Shape::Circle {
-            center: (sx_sub(cx.clone(), half.clone()), cy.clone()),
+            center: (cx.clone() - half.clone(), cy.clone()),
             radius: radius.clone(),
         });
         let b = ctx.hir.shape(Shape::Circle {
-            center: (sx_add(cx, half), cy),
+            center: (cx + half, cy),
             radius,
         });
         Value::Shape(ctx.hir.shape(Shape::Intersect(a, b)))
@@ -618,28 +602,22 @@ builtin! {
     check = |ctx, at, size, steps| {
         let steps = parse_steps_literal(ctx, steps, "steps", 80, 16, 256)?;
         let (cx, cy) = at;
-        let scale = sx_div(size, Sx::Lit(18.0));
+        let scale = size / Sx::Lit(18.0);
         let mut contour = Vec::with_capacity(steps);
         for i in 0..steps {
             let t = Sx::Lit(std::f32::consts::TAU * (i as f32 / steps as f32));
             let st = sx_sin(t.clone());
             let ct = sx_cos(t.clone());
-            let st2 = sx_mul(st.clone(), st.clone());
-            let xshape = sx_mul(Sx::Lit(16.0), sx_mul(st2, st.clone()));
+            let st2 = st.clone() * st.clone();
+            let xshape = Sx::Lit(16.0) * (st2 * st.clone());
 
-            let c2 = sx_cos(sx_mul(Sx::Lit(2.0), t.clone()));
-            let c3 = sx_cos(sx_mul(Sx::Lit(3.0), t.clone()));
-            let c4 = sx_cos(sx_mul(Sx::Lit(4.0), t));
-            let yshape = sx_sub(
-                sx_sub(
-                    sx_sub(sx_mul(Sx::Lit(13.0), ct), sx_mul(Sx::Lit(5.0), c2)),
-                    sx_mul(Sx::Lit(2.0), c3),
-                ),
-                c4,
-            );
+            let c2 = sx_cos(Sx::Lit(2.0) * t.clone());
+            let c3 = sx_cos(Sx::Lit(3.0) * t.clone());
+            let c4 = sx_cos(Sx::Lit(4.0) * t);
+            let yshape = Sx::Lit(13.0) * ct - Sx::Lit(5.0) * c2 - Sx::Lit(2.0) * c3 - c4;
 
-            let x = sx_add(cx.clone(), sx_mul(scale.clone(), xshape));
-            let y = sx_add(cy.clone(), sx_mul(scale.clone(), yshape));
+            let x = cx.clone() + scale.clone() * xshape;
+            let y = cy.clone() + scale.clone() * yshape;
             contour.push((x, y));
         }
         Value::Shape(ctx.hir.shape(Shape::Polygon {
@@ -714,13 +692,13 @@ builtin! {
     check = |ctx, at, size| {
         let (cx, cy) = at;
         let (sx, sy) = size;
-        let hx = sx_mul(sx, Sx::Lit(0.5));
-        let hy = sx_mul(sy, Sx::Lit(0.5));
+        let hx = sx * Sx::Lit(0.5);
+        let hy = sy * Sx::Lit(0.5);
         let points = vec![
-            (cx.clone(), sx_add(cy.clone(), hy.clone())),
-            (sx_add(cx.clone(), hx.clone()), cy.clone()),
-            (cx.clone(), sx_sub(cy.clone(), hy)),
-            (sx_sub(cx, hx), cy),
+            (cx.clone(), cy.clone() + hy.clone()),
+            (cx.clone() + hx.clone(), cy.clone()),
+            (cx.clone(), cy.clone() - hy),
+            (cx - hx, cy),
         ];
         Value::Shape(ctx.hir.shape(Shape::Polygon {
             contours: vec![points],
@@ -743,24 +721,24 @@ builtin! {
     check = |ctx, at, size, skew| {
         let (cx, cy) = at;
         let (sx, sy) = size;
-        let hx = sx_mul(sx, Sx::Lit(0.5));
-        let hy = sx_mul(sy, Sx::Lit(0.5));
+        let hx = sx * Sx::Lit(0.5);
+        let hy = sy * Sx::Lit(0.5);
         let points = vec![
             (
-                sx_sub(sx_sub(cx.clone(), hx.clone()), skew.clone()),
-                sx_add(cy.clone(), hy.clone()),
+                cx.clone() - hx.clone() - skew.clone(),
+                cy.clone() + hy.clone(),
             ),
             (
-                sx_add(sx_add(cx.clone(), hx.clone()), skew.clone()),
-                sx_add(cy.clone(), hy.clone()),
+                cx.clone() + hx.clone() + skew.clone(),
+                cy.clone() + hy.clone(),
             ),
             (
-                sx_add(sx_add(cx.clone(), hx.clone()), sx_mul(skew.clone(), Sx::Lit(-1.0))),
-                sx_sub(cy.clone(), hy.clone()),
+                cx.clone() + hx.clone() + skew.clone() * Sx::Lit(-1.0),
+                cy.clone() - hy.clone(),
             ),
             (
-                sx_sub(sx_sub(cx, hx), sx_mul(skew, Sx::Lit(-1.0))),
-                sx_sub(cy, hy),
+                cx - hx - skew * Sx::Lit(-1.0),
+                cy - hy,
             ),
         ];
         Value::Shape(ctx.hir.shape(Shape::Polygon {
@@ -789,11 +767,11 @@ builtin! {
             let t = Sx::Lit(std::f32::consts::TAU * (i as f32 / steps as f32));
             let st = sx_sin(t.clone());
             let ct = sx_cos(t.clone());
-            let c2 = sx_cos(sx_mul(Sx::Lit(2.0), t));
-            let xshape = sx_mul(Sx::Lit(0.7), st);
-            let yshape = sx_sub(sx_mul(Sx::Lit(0.85), ct), sx_mul(Sx::Lit(0.3), c2));
-            let x = sx_add(cx.clone(), sx_mul(size.clone(), xshape));
-            let y = sx_add(cy.clone(), sx_mul(size.clone(), yshape));
+            let c2 = sx_cos(Sx::Lit(2.0) * t);
+            let xshape = Sx::Lit(0.7) * st;
+            let yshape = Sx::Lit(0.85) * ct - Sx::Lit(0.3) * c2;
+            let x = cx.clone() + size.clone() * xshape;
+            let y = cy.clone() + size.clone() * yshape;
             contour.push((x, y));
         }
         Value::Shape(ctx.hir.shape(Shape::Polygon {
@@ -836,8 +814,8 @@ builtin! {
     check = |ctx, at, size| {
         let (sx, sy) = size;
         let half = (
-            Sx::Mul(Box::new(sx), Box::new(Sx::Lit(0.5))),
-            Sx::Mul(Box::new(sy), Box::new(Sx::Lit(0.5))),
+            sx * Sx::Lit(0.5),
+            sy * Sx::Lit(0.5),
         );
         Value::Shape(ctx.hir.shape(Shape::RBox {
             center: at,
@@ -877,14 +855,8 @@ builtin! {
         let mut points = Vec::with_capacity(sides_u32 as usize);
         for i in 0..sides_u32 {
             let angle = std::f32::consts::TAU * (i as f32) / (sides_u32 as f32);
-            let px = Sx::Add(
-                Box::new(cx.clone()),
-                Box::new(Sx::Mul(Box::new(radius.clone()), Box::new(Sx::Lit(angle.cos())))),
-            );
-            let py = Sx::Add(
-                Box::new(cy.clone()),
-                Box::new(Sx::Mul(Box::new(radius.clone()), Box::new(Sx::Lit(angle.sin())))),
-            );
+            let px = cx.clone() + radius.clone() * Sx::Lit(angle.cos());
+            let py = cy.clone() + radius.clone() * Sx::Lit(angle.sin());
             points.push((px, py));
         }
 
@@ -955,14 +927,8 @@ builtin! {
             } else {
                 inner.clone()
             };
-            let vx = Sx::Add(
-                Box::new(cx.clone()),
-                Box::new(Sx::Mul(Box::new(radius.clone()), Box::new(Sx::Lit(angle.cos())))),
-            );
-            let vy = Sx::Add(
-                Box::new(cy.clone()),
-                Box::new(Sx::Mul(Box::new(radius), Box::new(Sx::Lit(angle.sin())))),
-            );
+            let vx = cx.clone() + radius.clone() * Sx::Lit(angle.cos());
+            let vy = cy.clone() + radius * Sx::Lit(angle.sin());
             contour.push((vx, vy));
         }
 
@@ -1047,23 +1013,23 @@ builtin! {
     },
     check = |ctx, at, top, bottom, height| {
         let (cx, cy) = at;
-        let half = Sx::Mul(Box::new(height), Box::new(Sx::Lit(0.5)));
-        let y_top = Sx::Add(Box::new(cy.clone()), Box::new(half.clone()));
-        let y_bottom = Sx::Sub(Box::new(cy), Box::new(half));
+        let half = height * Sx::Lit(0.5);
+        let y_top = cy.clone() + half.clone();
+        let y_bottom = cy - half;
 
-        let h_top = Sx::Mul(Box::new(top), Box::new(Sx::Lit(0.5)));
-        let h_bottom = Sx::Mul(Box::new(bottom), Box::new(Sx::Lit(0.5)));
+        let h_top = top * Sx::Lit(0.5);
+        let h_bottom = bottom * Sx::Lit(0.5);
 
         let p0 = (
-            Sx::Sub(Box::new(cx.clone()), Box::new(h_top.clone())),
+            cx.clone() - h_top.clone(),
             y_top.clone(),
         );
-        let p1 = (Sx::Add(Box::new(cx.clone()), Box::new(h_top)), y_top);
+        let p1 = (cx.clone() + h_top, y_top);
         let p2 = (
-            Sx::Add(Box::new(cx.clone()), Box::new(h_bottom.clone())),
+            cx.clone() + h_bottom.clone(),
             y_bottom.clone(),
         );
-        let p3 = (Sx::Sub(Box::new(cx), Box::new(h_bottom)), y_bottom);
+        let p3 = (cx - h_bottom, y_bottom);
 
         let points = vec![p0, p1, p2, p3];
         Value::Shape(ctx.hir.shape(Shape::Polygon {
