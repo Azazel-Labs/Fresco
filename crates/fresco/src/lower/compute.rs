@@ -83,7 +83,6 @@ fn lower_hook(
         sx_cache: HashMap::new(),
         contour_cache: HashMap::new(),
         invariant_sx_cache: HashMap::new(),
-        invariant_user_helper_cache: HashMap::new(),
         local_pixel_span_cache: HashMap::new(),
         shape_anchor_cache: HashMap::new(),
         shape_half_extent_cache: HashMap::new(),

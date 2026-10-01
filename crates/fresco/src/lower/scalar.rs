@@ -28,36 +28,17 @@ impl<'h> FnCtx<'h> {
             .unwrap()
     }
 
-    fn sx_vec_is_sample_point_invariant(&mut self, v: &crate::hir::SxVec) -> bool {
+    fn sx_vec_is_sample_point_invariant(&self, v: &crate::hir::SxVec) -> bool {
         v.components()
             .all(|component| self.sx_is_sample_point_invariant(component))
     }
 
-    fn user_helper_is_sample_point_invariant(&mut self, helper_id: &str) -> bool {
-        if let Some(cached) = self.invariant_user_helper_cache.get(helper_id).copied() {
-            return cached;
-        }
-        let invariant = self
-            .hir
-            .user_helpers
-            .get(helper_id)
-            .map(|helper| helper.sample_point_invariant)
-            .unwrap_or(false);
-        self.invariant_user_helper_cache
-            .insert(helper_id.to_string(), invariant);
-        invariant
-    }
-
-    pub(super) fn sx_is_sample_point_invariant(&mut self, s: &Sx) -> bool {
-        self.sx_is_sample_point_invariant_inner(s)
-    }
-
-    fn sx_is_sample_point_invariant_inner(&mut self, s: &Sx) -> bool {
+    pub(super) fn sx_is_sample_point_invariant(&self, s: &Sx) -> bool {
         match s {
             Sx::Typed(value) => value
                 .args
                 .iter()
-                .all(|arg| self.sx_is_sample_point_invariant_inner(arg)),
+                .all(|arg| self.sx_is_sample_point_invariant(arg)),
             Sx::Lit(_) | Sx::EntryInput(_) | Sx::UniformField { .. } => true,
             Sx::Param(_) => self.params_are_immutable,
             Sx::Neg(a)
@@ -81,7 +62,7 @@ impl<'h> FnCtx<'h> {
             | Sx::Log(a)
             | Sx::Log2(a)
             | Sx::SrgbToLinear(a)
-            | Sx::LinearToSrgb(a) => self.sx_is_sample_point_invariant_inner(a),
+            | Sx::LinearToSrgb(a) => self.sx_is_sample_point_invariant(a),
             Sx::Add(a, b)
             | Sx::Sub(a, b)
             | Sx::Mul(a, b)
@@ -97,16 +78,15 @@ impl<'h> FnCtx<'h> {
             | Sx::Min(a, b)
             | Sx::Max(a, b)
             | Sx::Step(a, b) => {
-                self.sx_is_sample_point_invariant_inner(a)
-                    && self.sx_is_sample_point_invariant_inner(b)
+                self.sx_is_sample_point_invariant(a) && self.sx_is_sample_point_invariant(b)
             }
             Sx::Clamp(x, lo, hi)
             | Sx::Mix(x, lo, hi)
             | Sx::Select(x, lo, hi)
             | Sx::SmoothStep(x, lo, hi) => {
-                self.sx_is_sample_point_invariant_inner(x)
-                    && self.sx_is_sample_point_invariant_inner(lo)
-                    && self.sx_is_sample_point_invariant_inner(hi)
+                self.sx_is_sample_point_invariant(x)
+                    && self.sx_is_sample_point_invariant(lo)
+                    && self.sx_is_sample_point_invariant(hi)
             }
             Sx::Dot { a, b } => {
                 self.sx_vec_is_sample_point_invariant(a) && self.sx_vec_is_sample_point_invariant(b)
@@ -125,12 +105,16 @@ impl<'h> FnCtx<'h> {
             Sx::UserCall { call, .. } => {
                 call.args
                     .iter()
-                    .all(|arg| self.sx_is_sample_point_invariant_inner(arg))
-                    && self.user_helper_is_sample_point_invariant(&call.helper_id)
+                    .all(|arg| self.sx_is_sample_point_invariant(arg))
+                    && self
+                        .hir
+                        .user_helpers
+                        .get(&call.helper_id)
+                        .is_some_and(|helper| helper.sample_point_invariant)
             }
             // Dynamic array indexing: invariant if the index expression is invariant
             // (the array data itself lives in a storage buffer and never varies).
-            Sx::DynamicArrayIndex { index, .. } => self.sx_is_sample_point_invariant_inner(index),
+            Sx::DynamicArrayIndex { index, .. } => self.sx_is_sample_point_invariant(index),
             _ => false,
         }
     }

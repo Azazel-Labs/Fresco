@@ -280,8 +280,6 @@ struct FnCtx<'h> {
     contour_cache: HashMap<(u32, Sx, Handle<Ex>), ContourResult>,
     /// Reuse lowered scalar subexpressions that are invariant to the sample point.
     invariant_sx_cache: HashMap<Sx, Handle<Ex>>,
-    /// Memoized sample-point invariance for user helper bodies.
-    invariant_user_helper_cache: HashMap<String, bool>,
     /// Reuse local pixel span computations at the same sample point.
     local_pixel_span_cache: HashMap<Handle<Ex>, Handle<Ex>>,
     /// Reuse shape anchor computations at the same sample point.
