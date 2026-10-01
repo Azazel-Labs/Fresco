@@ -1989,6 +1989,77 @@ pub(crate) enum NumberSource {
 }
 
 impl Value {
+    /// Whether this is a scalar, including the distance/coverage/mask scalar wrappers.
+    pub(crate) fn is_scalar_like(&self) -> bool {
+        self.scalar_sx().is_some()
+    }
+
+    /// The expression of a scalar-like value.
+    pub(crate) fn scalar_sx(&self) -> Option<&Sx> {
+        match self {
+            Self::Scalar(sx) | Self::Distance(sx) | Self::Coverage(sx) | Self::Mask(sx) => Some(sx),
+            _ => None,
+        }
+    }
+
+    /// The expression of a scalar-like value, by value.
+    pub(crate) fn into_scalar_sx(self) -> Option<Sx> {
+        match self {
+            Self::Scalar(sx) | Self::Distance(sx) | Self::Coverage(sx) | Self::Mask(sx) => Some(sx),
+            _ => None,
+        }
+    }
+
+    /// The components of a vec2/vec3/vec4.
+    pub(crate) fn vector_lanes(&self) -> Option<Vec<Sx>> {
+        match self {
+            Self::Vec2((x, y)) => Some(vec![x.clone(), y.clone()]),
+            Self::Vec3((x, y, z)) => Some(vec![x.clone(), y.clone(), z.clone()]),
+            Self::Vec4((x, y, z, w)) => Some(vec![x.clone(), y.clone(), z.clone(), w.clone()]),
+            _ => None,
+        }
+    }
+
+    /// The components of a scalar-like value (one lane) or a vec2/vec3/vec4.
+    pub(crate) fn lanes(&self) -> Option<Vec<Sx>> {
+        match self.scalar_sx() {
+            Some(sx) => Some(vec![sx.clone()]),
+            None => self.vector_lanes(),
+        }
+    }
+
+    /// The component count of a scalar-like value or a vec2/vec3/vec4.
+    pub(crate) fn lane_count(&self) -> Option<u8> {
+        match self {
+            _ if self.is_scalar_like() => Some(1),
+            Self::Vec2(_) => Some(2),
+            Self::Vec3(_) => Some(3),
+            Self::Vec4(_) => Some(4),
+            _ => None,
+        }
+    }
+
+    /// A scalar for one lane, or a vec2/vec3/vec4 for two to four lanes.
+    pub(crate) fn from_lanes(lanes: Vec<Sx>) -> Option<Self> {
+        let lanes = match <[Sx; 1]>::try_from(lanes) {
+            Ok([x]) => return Some(Self::Scalar(x)),
+            Err(lanes) => lanes,
+        };
+        let lanes = match <[Sx; 2]>::try_from(lanes) {
+            Ok([x, y]) => return Some(Self::Vec2((x, y))),
+            Err(lanes) => lanes,
+        };
+        let lanes = match <[Sx; 3]>::try_from(lanes) {
+            Ok([x, y, z]) => return Some(Self::Vec3((x, y, z))),
+            Err(lanes) => lanes,
+        };
+        <[Sx; 4]>::try_from(lanes)
+            .ok()
+            .map(|[x, y, z, w]| Self::Vec4((x, y, z, w)))
+    }
+}
+
+impl Value {
     fn kind(&self) -> &'static str {
         match self {
             Value::Error => "error",
@@ -2052,10 +2123,9 @@ pub(super) fn local_decl_type_matches(
     }
 
     match ty_name {
-        "f32" | "float" | "f64" | "half" | "i32" | "u32" | "bool" | "angle" | "length" => matches!(
-            value,
-            Value::Scalar(_) | Value::Distance(_) | Value::Coverage(_) | Value::Mask(_)
-        ),
+        "f32" | "float" | "f64" | "half" | "i32" | "u32" | "bool" | "angle" | "length" => {
+            value.is_scalar_like()
+        }
         "slot" => matches!(value, Value::Slot { .. }),
         "vec2" | "uvec2" | "ivec2" | "bvec2" | "coord" | "coord_like" | "resolution" => {
             matches!(value, Value::Vec2(_))
@@ -2071,10 +2141,7 @@ pub(super) fn local_decl_type_matches(
         "shape" => matches!(value, Value::Shape(_)),
         "layer" => matches!(value, Value::Layer(_)),
         "space" => matches!(value, Value::Space(_)),
-        "signal" | "delta" => matches!(
-            value,
-            Value::Scalar(_) | Value::Distance(_) | Value::Coverage(_) | Value::Mask(_)
-        ),
+        "signal" | "delta" => value.is_scalar_like(),
         other => {
             // Generic type parameter: any value matches (type is inferred at the call site).
             if type_param_names.contains(&other) {
@@ -2086,10 +2153,7 @@ pub(super) fn local_decl_type_matches(
             }
             // User-defined enum: enum values are represented as scalars in the IR.
             if enum_defs.contains_key(other) {
-                return matches!(
-                    value,
-                    Value::Scalar(_) | Value::Distance(_) | Value::Coverage(_) | Value::Mask(_)
-                );
+                return value.is_scalar_like();
             }
             // Callable type annotation (`fn(T)->R`): value must be a fn reference or lambda.
             if other.starts_with("fn(") {
@@ -2618,24 +2682,6 @@ pub(crate) fn strip_spatial_type_suffix(name: &str) -> &str {
     trimmed
 }
 
-fn scalar_like_to_sx(value: &Value) -> Option<Sx> {
-    match value {
-        Value::Scalar(sx) | Value::Distance(sx) | Value::Coverage(sx) | Value::Mask(sx) => {
-            Some(sx.clone())
-        }
-        _ => None,
-    }
-}
-
-fn swizzle_components(value: &Value) -> Option<(usize, Vec<Sx>)> {
-    match value {
-        Value::Vec2((x, y)) => Some((2, vec![x.clone(), y.clone()])),
-        Value::Vec3((x, y, z)) => Some((3, vec![x.clone(), y.clone(), z.clone()])),
-        Value::Vec4((x, y, z, w)) => Some((4, vec![x.clone(), y.clone(), z.clone(), w.clone()])),
-        _ => None,
-    }
-}
-
 fn value_kind_for_swizzle_len(len: usize) -> &'static str {
     match len {
         1 => "scalar",
@@ -2651,33 +2697,33 @@ pub(super) fn apply_swizzle_assignment(
     swizzle: &str,
     rhs: Value,
 ) -> Result<Value, String> {
-    let (dim, mut base_components) = swizzle_components(&base).ok_or_else(|| {
+    let mut base_components = base.vector_lanes().ok_or_else(|| {
         format!(
             "swizzle assignment base must be vec2/vec3/vec4, got {}",
             base.kind()
         )
     })?;
+    let dim = base_components.len();
 
     if swizzle.is_empty() {
         return Err("empty swizzle in assignment target".to_string());
     }
 
     let rhs_components = if swizzle.len() == 1 {
-        vec![scalar_like_to_sx(&rhs).ok_or_else(|| {
+        vec![rhs.scalar_sx().cloned().ok_or_else(|| {
             format!(
                 "swizzle assignment expects scalar right-hand side for single-component target, got {}",
                 rhs.kind()
             )
         })?]
     } else {
-        let (_, comps) = swizzle_components(&rhs).ok_or_else(|| {
+        rhs.vector_lanes().ok_or_else(|| {
             format!(
                 "swizzle assignment expects {} right-hand side, got {}",
                 value_kind_for_swizzle_len(swizzle.len()),
                 rhs.kind()
             )
-        })?;
-        comps
+        })?
     };
 
     if rhs_components.len() != swizzle.len() {
@@ -2717,24 +2763,7 @@ pub(super) fn apply_swizzle_assignment(
         base_components[target] = rhs_components[idx].clone();
     }
 
-    match dim {
-        2 => Ok(Value::Vec2((
-            base_components[0].clone(),
-            base_components[1].clone(),
-        ))),
-        3 => Ok(Value::Vec3((
-            base_components[0].clone(),
-            base_components[1].clone(),
-            base_components[2].clone(),
-        ))),
-        4 => Ok(Value::Vec4((
-            base_components[0].clone(),
-            base_components[1].clone(),
-            base_components[2].clone(),
-            base_components[3].clone(),
-        ))),
-        _ => unreachable!(),
-    }
+    Ok(Value::from_lanes(base_components).expect("swizzle base is a vector"))
 }
 
 /// Named/positional argument matcher for builtin signatures.

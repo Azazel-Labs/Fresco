@@ -62,10 +62,10 @@ impl Checker {
     }
 
     fn reduce_op_default_for_seed(seed: &Value) -> &'static str {
-        match seed {
-            Value::Shape(_) => "subtract",
-            Value::Scalar(_) | Value::Distance(_) | Value::Coverage(_) | Value::Mask(_) => "add",
-            _ => "add",
+        if matches!(seed, Value::Shape(_)) {
+            "subtract"
+        } else {
+            "add"
         }
     }
 

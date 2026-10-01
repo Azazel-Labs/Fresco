@@ -3040,12 +3040,7 @@ impl Checker {
             fn lanes(value: &Value) -> Option<Vec<Sx>> {
                 match value {
                     Value::Scalar(s) => Some(vec![s.clone()]),
-                    Value::Vec2((x, y)) => Some(vec![x.clone(), y.clone()]),
-                    Value::Vec3((x, y, z)) => Some(vec![x.clone(), y.clone(), z.clone()]),
-                    Value::Vec4((x, y, z, w)) => {
-                        Some(vec![x.clone(), y.clone(), z.clone(), w.clone()])
-                    }
-                    _ => None,
+                    other => other.vector_lanes(),
                 }
             }
             if let (Some(left), Some(right)) = (lanes(&lv), lanes(&rv)) {
@@ -3068,12 +3063,7 @@ impl Checker {
                         };
                         result.push(value);
                     }
-                    return Some(match result.as_slice() {
-                        [x, y] => Value::Vec2((x.clone(), y.clone())),
-                        [x, y, z] => Value::Vec3((x.clone(), y.clone(), z.clone())),
-                        [x, y, z, w] => Value::Vec4((x.clone(), y.clone(), z.clone(), w.clone())),
-                        _ => unreachable!("checked vector width"),
-                    });
+                    return Value::from_lanes(result);
                 }
             }
             self.diags.push(Diag::error(

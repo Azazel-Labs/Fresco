@@ -2775,33 +2775,8 @@ impl Checker {
         }
     }
 
-    fn helper_value_components(value: &Value) -> Option<u8> {
-        match value {
-            Value::Scalar(_) | Value::Distance(_) | Value::Coverage(_) | Value::Mask(_) => Some(1),
-            Value::Vec2(_) => Some(2),
-            Value::Vec3(_) => Some(3),
-            Value::Vec4(_) => Some(4),
-            _ => None,
-        }
-    }
-
     fn helper_placeholder_value(slots: &[String]) -> Option<Value> {
-        match slots {
-            [x] => Some(Value::Scalar(Sx::Param(x.clone()))),
-            [x, y] => Some(Value::Vec2((Sx::Param(x.clone()), Sx::Param(y.clone())))),
-            [x, y, z] => Some(Value::Vec3((
-                Sx::Param(x.clone()),
-                Sx::Param(y.clone()),
-                Sx::Param(z.clone()),
-            ))),
-            [x, y, z, w] => Some(Value::Vec4((
-                Sx::Param(x.clone()),
-                Sx::Param(y.clone()),
-                Sx::Param(z.clone()),
-                Sx::Param(w.clone()),
-            ))),
-            _ => None,
-        }
+        Value::from_lanes(slots.iter().cloned().map(Sx::Param).collect())
     }
 
     fn helper_ir_expr(value: Value) -> Option<hir::UserFnExpr> {
@@ -3265,7 +3240,7 @@ impl Checker {
                             }
                         }
                     } else {
-                        Self::helper_value_components(&init)?
+                        init.lane_count()?
                     };
 
                     let slots = Self::helper_slots(name, components);
@@ -3368,9 +3343,9 @@ impl Checker {
                             _ => 0,
                         }
                     } else {
-                        Self::helper_value_components(&existing).unwrap_or(0)
+                        existing.lane_count().unwrap_or(0)
                     };
-                    let rhs_components = Self::helper_value_components(&rhs).unwrap_or(0);
+                    let rhs_components = rhs.lane_count().unwrap_or(0);
                     if target_components == 0 || target_components != rhs_components {
                         self.diags.push(
                             Diag::error(
@@ -3783,48 +3758,14 @@ impl Checker {
                 },
                 def.ret_kind,
             ))),
-            2 => Some(Value::Vec2((
-                Sx::UserCall {
-                    call: call.clone(),
-                    component: Some(0),
-                },
-                Sx::UserCall {
-                    call,
-                    component: Some(1),
-                },
-            ))),
-            3 => Some(Value::Vec3((
-                Sx::UserCall {
-                    call: call.clone(),
-                    component: Some(0),
-                },
-                Sx::UserCall {
-                    call: call.clone(),
-                    component: Some(1),
-                },
-                Sx::UserCall {
-                    call,
-                    component: Some(2),
-                },
-            ))),
-            4 => Some(Value::Vec4((
-                Sx::UserCall {
-                    call: call.clone(),
-                    component: Some(0),
-                },
-                Sx::UserCall {
-                    call: call.clone(),
-                    component: Some(1),
-                },
-                Sx::UserCall {
-                    call: call.clone(),
-                    component: Some(2),
-                },
-                Sx::UserCall {
-                    call,
-                    component: Some(3),
-                },
-            ))),
+            2..=4 => Value::from_lanes(
+                (0..u32::from(ret_components))
+                    .map(|component| Sx::UserCall {
+                        call: call.clone(),
+                        component: Some(component),
+                    })
+                    .collect(),
+            ),
             _ => None,
         };
         result.map(|value| {

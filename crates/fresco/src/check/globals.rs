@@ -348,10 +348,7 @@ impl Checker {
             let valid = if name == "resolution" {
                 matches!(value, Value::Vec2(_))
             } else {
-                matches!(
-                    value,
-                    Value::Scalar(_) | Value::Distance(_) | Value::Coverage(_) | Value::Mask(_)
-                )
+                value.is_scalar_like()
             };
             if !valid {
                 let expected = if name == "resolution" {
@@ -390,12 +387,10 @@ impl Checker {
         if let Some(sx) = &self.runtime_channel_cache.time {
             return sx.clone();
         }
-        let sx = match self.eval_zero_arg_engine_fn("time") {
-            Some(
-                Value::Scalar(sx) | Value::Distance(sx) | Value::Coverage(sx) | Value::Mask(sx),
-            ) => sx,
-            _ => Sx::EntryInput(hir::EntryInput::Time),
-        };
+        let sx = self
+            .eval_zero_arg_engine_fn("time")
+            .and_then(Value::into_scalar_sx)
+            .unwrap_or(Sx::EntryInput(hir::EntryInput::Time));
         self.runtime_channel_cache.time = Some(sx.clone());
         sx
     }
@@ -413,12 +408,10 @@ impl Checker {
         if let Some(sx) = &self.runtime_channel_cache.delta_time {
             return sx.clone();
         }
-        let sx = match self.eval_zero_arg_engine_fn("delta_time") {
-            Some(
-                Value::Scalar(sx) | Value::Distance(sx) | Value::Coverage(sx) | Value::Mask(sx),
-            ) => sx,
-            _ => Sx::EntryInput(hir::EntryInput::Delta),
-        };
+        let sx = self
+            .eval_zero_arg_engine_fn("delta_time")
+            .and_then(Value::into_scalar_sx)
+            .unwrap_or(Sx::EntryInput(hir::EntryInput::Delta));
         self.runtime_channel_cache.delta_time = Some(sx.clone());
         sx
     }

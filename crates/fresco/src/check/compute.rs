@@ -238,16 +238,11 @@ fn input_value(
 
 fn components(value: Value) -> Result<Vec<Sx>, String> {
     match value {
-        Value::Scalar(s) | Value::Distance(s) | Value::Coverage(s) | Value::Mask(s) => Ok(vec![s]),
-        Value::Vec2((x, y)) => Ok(vec![x, y]),
-        Value::Vec3((x, y, z)) => Ok(vec![x, y, z]),
-        Value::Vec4((x, y, z, w)) => Ok(vec![x, y, z, w]),
         Value::ColorField { rgba, .. } => Ok(rgba.to_vec()),
         Value::Color { rgba, .. } => Ok(rgba.into_iter().map(Sx::Lit).collect()),
-        other => Err(format!(
-            "unsupported compute output field type {}",
-            other.kind()
-        )),
+        other => other
+            .lanes()
+            .ok_or_else(|| format!("unsupported compute output field type {}", other.kind())),
     }
 }
 
