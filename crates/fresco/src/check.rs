@@ -2738,36 +2738,27 @@ impl<'a> ArgBag<'a> {
     }
 
     /// Take the argument named `name`, or the next unused positional one.
-    fn take(&mut self, name: &str) -> Option<&'a SExpr> {
-        // named match first
-        for (i, a) in self.args.iter().enumerate() {
-            if !self.taken[i] && a.name.as_deref() == Some(name) {
-                self.taken[i] = true;
-                return Some(&a.value);
-            }
-        }
-        // then first unused positional
-        for (i, a) in self.args.iter().enumerate() {
-            if !self.taken[i] && a.name.is_none() {
-                self.taken[i] = true;
-                return Some(&a.value);
-            }
-        }
-        None
-    }
-
-    pub(crate) fn take_named(&mut self, name: &str) -> Option<&'a SExpr> {
-        self.take(name)
+    pub(crate) fn take(&mut self, name: &str) -> Option<&'a SExpr> {
+        self.take_exact_named(name)
+            .or_else(|| self.take_next_positional())
     }
 
     pub(crate) fn take_exact_named(&mut self, name: &str) -> Option<&'a SExpr> {
-        for (i, a) in self.args.iter().enumerate() {
-            if !self.taken[i] && a.name.as_deref() == Some(name) {
-                self.taken[i] = true;
-                return Some(&a.value);
-            }
-        }
-        None
+        self.take_first(|arg| arg.name.as_deref() == Some(name))
+    }
+
+    fn take_next_positional(&mut self) -> Option<&'a SExpr> {
+        self.take_first(|arg| arg.name.is_none())
+    }
+
+    fn take_first(&mut self, matches: impl Fn(&Arg) -> bool) -> Option<&'a SExpr> {
+        let args = self.args;
+        let index = args
+            .iter()
+            .enumerate()
+            .position(|(i, arg)| !self.taken[i] && matches(arg))?;
+        self.taken[index] = true;
+        Some(&args[index].value)
     }
 
     fn require(&mut self, name: &str, diags: &mut Vec<Diag>) -> Option<&'a SExpr> {

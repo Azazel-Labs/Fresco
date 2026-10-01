@@ -111,11 +111,11 @@ builtin! {
 pub fn distribute_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Value> {
     let index_expr = bag.require("index", &mut ctx.diags)?;
     let count_expr = bag.require("count", &mut ctx.diags)?;
-    let start_expr = bag.take_named("start");
-    let end_expr = bag.take_named("end");
-    let width_expr = bag.take_named("width");
-    let gap_expr = bag.take_named("gap");
-    let anchor_expr = bag.take_named("anchor");
+    let start_expr = bag.take("start");
+    let end_expr = bag.take("end");
+    let width_expr = bag.take("width");
+    let gap_expr = bag.take("gap");
+    let anchor_expr = bag.take("anchor");
 
     let uses_spacing_mode = width_expr.is_some() || gap_expr.is_some() || anchor_expr.is_some();
     let uses_bounds_mode = start_expr.is_some() || end_expr.is_some();
@@ -455,7 +455,7 @@ inventory::submit! {
 
 pub fn hash_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Value> {
     let value_expr = bag.require("value", &mut ctx.diags)?;
-    let salt = match bag.take_named("salt") {
+    let salt = match bag.take("salt") {
         Some(expr) => ctx.as_scalar(expr)?,
         None => Sx::Lit(0.0),
     };

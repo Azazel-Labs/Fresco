@@ -178,7 +178,7 @@ fn stroke_path_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Val
 
     let coverage = path_stroke_coverage(ctx, path.profile_id(), width);
 
-    let layer = if let Some(color_expr) = bag.take_named("color") {
+    let layer = if let Some(color_expr) = bag.take("color") {
         match ctx.as_fill_style(color_expr)? {
             FillStyle::Solid(color) => premultiply_color(color.map(Sx::Lit), coverage),
             FillStyle::Dynamic(rgba) => premultiply_color(rgba, coverage),

@@ -213,7 +213,7 @@ impl Checker {
     fn builtin_reduce(&mut self, bag: &mut ArgBag<'_>) -> Option<Value> {
         let items_expr = bag.require("items", &mut self.diags)?;
         let seed_expr = bag.require("seed", &mut self.diags)?;
-        let op_expr = bag.take_named("op").or_else(|| bag.take("op"));
+        let op_expr = bag.take("op").or_else(|| bag.take("op"));
 
         let items_val = self.eval(items_expr)?;
         let mut acc = self.eval(seed_expr)?;

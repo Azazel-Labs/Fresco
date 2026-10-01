@@ -169,7 +169,7 @@ pub fn postprocess_layer_check_impl(
     bag: &mut ArgBag<'_>,
 ) -> Option<Value> {
     let fn_expr = bag
-        .take_named("fn")
+        .take("fn")
         .or_else(|| bag.take("fn"))
         .or_else(|| bag.take("effect"));
     let Some(fn_expr) = fn_expr else {

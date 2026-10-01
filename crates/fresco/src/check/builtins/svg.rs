@@ -599,8 +599,8 @@ pub fn path_svg_check_impl(
 ) -> Option<Value> {
     let path_expr = bag.require("path", &mut ctx.diags)?;
     let path_src = require_string_literal(ctx, path_expr, "`path_svg`")?;
-    let view_box_expr = bag.take_named("view_box");
-    let normalize_expr = bag.take_named("normalize");
+    let view_box_expr = bag.take("view_box");
+    let normalize_expr = bag.take("normalize");
 
     let (path_data, inferred_view_box) = extract_svg_path_data_and_view_box(&path_src);
     let explicit_view_box = if let Some(vb_expr) = view_box_expr {
@@ -683,10 +683,10 @@ pub fn path_svg_check_impl(
     }
 
     let mut sampling = crate::hir::PathSamplingPolicy::default();
-    let samples_expr = bag.take_named("samples");
-    let tolerance_expr = bag.take_named("tolerance");
-    let max_subdivisions_expr = bag.take_named("max_subdivisions");
-    let preserve_cubics_expr = bag.take_named("preserve_cubics");
+    let samples_expr = bag.take("samples");
+    let tolerance_expr = bag.take("tolerance");
+    let max_subdivisions_expr = bag.take("max_subdivisions");
+    let preserve_cubics_expr = bag.take("preserve_cubics");
 
     if samples_expr.is_some() && tolerance_expr.is_some() {
         ctx.diags.push(

@@ -35,7 +35,7 @@ builtin! {
             "linear" => {
                 let along_arg = args.require("along", &mut ctx.diags)?;
                 let along = ctx.parse_gradient_along(along_arg)?;
-                let anchor = match args.take_named("anchor") {
+                let anchor = match args.take("anchor") {
                     Some(anchor_expr) => ctx.parse_gradient_anchor(anchor_expr)?,
                     None => GradientAnchor::Scene,
                 };
@@ -63,12 +63,12 @@ impl Checker {
         &mut self,
         args: &mut ArgBag<'_>,
     ) -> Option<Vec<GradientStop>> {
-        if let Some(stops_expr) = args.take_named("stops") {
+        if let Some(stops_expr) = args.take("stops") {
             return self.parse_gradient_stop_array(stops_expr);
         }
 
-        let start_expr = args.take_named("start");
-        let end_expr = args.take_named("end");
+        let start_expr = args.take("start");
+        let end_expr = args.take("end");
         if start_expr.is_some() || end_expr.is_some() {
             let start = start_expr?;
             let end = end_expr?;

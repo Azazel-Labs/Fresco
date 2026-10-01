@@ -2905,7 +2905,7 @@ impl Checker {
         style_stack.push(style_name.to_string());
         self.scopes.push(HashMap::new());
         for param in &style.params {
-            let arg_expr = bag.take_named(&param.name).unwrap_or(&param.default);
+            let arg_expr = bag.take(&param.name).unwrap_or(&param.default);
             let Some(value) = self.eval(arg_expr) else {
                 self.scopes.pop();
                 style_stack.pop();
