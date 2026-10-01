@@ -2579,6 +2579,13 @@ impl Checker {
 
     #[inline(never)]
     fn eval_unary_expr(&mut self, e: &SExpr) -> Option<Value> {
+        if matches!(e.node, Expr::Unary(UnOp::Deref | UnOp::AddressOf, _)) {
+            self.diags.push(Diag::error(
+                e.span.clone(),
+                "device pointer operations require native SPIR-V compilation",
+            ));
+            return None;
+        }
         let Expr::Unary(UnOp::Neg, inner) = &e.node else {
             unreachable!("expression dispatcher must match evaluator");
         };

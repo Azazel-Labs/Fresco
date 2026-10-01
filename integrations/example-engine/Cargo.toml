@@ -17,11 +17,14 @@ serde = { version = "1.0", features = ["derive"] }
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
 wgpu = { workspace = true, optional = true, features = ["std", "dx12", "metal", "vulkan", "wgsl", "webgpu"] }
 wgpu-naga-bridge = { workspace = true, optional = true }
+ash = { version = "0.38", optional = true }
+wgpu-hal = { version = "30.0.0", git = "https://github.com/nickdarnell/wgpu", branch = "naga/physical-storage-pointers", optional = true, features = ["vulkan", "validation_canary"] }
 
 [features]
 default = ["runtime"]
 runtime = ["dep:wgpu", "dep:naga", "dep:wgpu-naga-bridge", "fresco-artifact/naga", "images"]
 images = ["dep:image"]
+native-pointers-test = ["runtime", "dep:ash", "dep:wgpu-hal", "wgpu/naga-ir"]
 
 [dev-dependencies]
 fresco.workspace = true
@@ -35,6 +38,10 @@ required-features = ["runtime"]
 [[example]]
 name = "owned_compute"
 required-features = ["runtime"]
+
+[[example]]
+name = "native_pointers"
+required-features = ["native-pointers-test"]
 
 [lints]
 workspace = true

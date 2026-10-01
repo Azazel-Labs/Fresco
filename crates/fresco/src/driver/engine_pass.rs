@@ -412,6 +412,10 @@ fn emit_expr(expression: &SExpr, context: EmitContext<'_>) -> Result<String, Str
             "({}{})",
             match op {
                 UnOp::Neg => "-",
+                UnOp::Deref | UnOp::AddressOf =>
+                    return Err(
+                        "device pointer operations require native SPIR-V compilation".into()
+                    ),
             },
             emit_expr(value, context)?
         )),

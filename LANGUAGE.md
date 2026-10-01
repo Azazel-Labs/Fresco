@@ -1715,6 +1715,65 @@ separate from language semantics.
 
 ## Maintenance and evidence
 
+### Native device pointers
+
+The explicit native compute compiler (`fresco::driver::native::compile`) accepts
+`T*` and `Ptr<T>` as read-write device pointers. `Ptr<T, Access.Read>` is read-only;
+`AddressSpace.Device` is the supported optional third type argument. Access is
+part of type identity, and conversions between pointer access types are not implicit.
+The portable compiler does not enable physical pointers.
+
+Native functions support `*p`, `&p.field`, `p.field`, and `p->field`. Pointer-to-array
+access uses `(*p)[index]`; raw `p[index]` and pointer arithmetic remain unsupported.
+`let p = roots.values` holds an SSA address. Its binding is immutable, while stores
+through its pointee depend on the pointer's access permission. Taking the address
+of a local or descriptor-bound root does not produce a device pointer. Mutable
+pointer locals, pointer helper parameters/returns, null values, address casts,
+atomics, and pointer-containing aggregate copies are diagnosed as unsupported.
+Ordinary scalar helpers remain real Naga functions; they are not forcibly inlined.
+
+Engine registration selects the compute function, workgroup size, and explicit
+root descriptor bindings. An entry returns void and takes either no argument or
+one `u32` argument receiving the x component of global invocation ID. Root `param`
+records are host-supplied read-only storage bindings, without editable defaults.
+The native path directly constructs the complete Naga module and emits SPIR-V;
+it never emits or reparses WGSL. Existing canvas/material paths have not migrated
+to this new lowering path. Native imports, generic specialization, vector/matrix
+types and general control flow beyond blocks/conditionals are not implemented yet.
+
+```sh
+cargo run -p fresco-cli -- native crates/fresco-cli/tests/fixtures/native-pointers.fr --entry update_one --bind roots=0:0 -o target/native.spv --manifest target/native.json
+```
+
+The manifest reflects record offsets, sizes, alignments, fixed-array strides,
+pointer access, root bindings and physical-memory read/write requirements.
+Pointers occupy eight bytes aligned to eight bytes; this describes the supported
+Naga storage layout, not a promise of arbitrary scalar-layout compatibility.
+Provide addresses as exact bytes or `u64`, never floating-point material parameters
+or JavaScript `Number`. The native SPIR-V writer uses restricted fixed-array
+indexing (clamping); an authored guard is required when out-of-range work must be
+skipped. No pointer-valued zero-fill/null is synthesized.
+
+A native host must enable Vulkan buffer device addresses and maintain valid,
+aligned, live allocations and synchronization. The safe wgpu API continues to
+reject these modules; execution requires its unsafe passthrough boundary. Memory
+loads are emitted at their use and observe intervening stores through aliases.
+Pointer access permissions do not imply exclusive ownership or automatic barriers.
+
+The local hardware check is explicit:
+
+```sh
+cargo run -p fresco-example-engine --example native_pointers --features native-pointers-test
+```
+
+It requires Vulkan hardware, Khronos validation and `spirv-val` (or `SPIRV_VAL`).
+Normal CI checks authored native IR and SPIR-V, without executing GPU tests.
+The [design plan](docs/native-pointers-design.md) tracks remaining Naga helper,
+span/address-conversion work and the real Lumina ABI integration. Those are still
+pending, as is general engine-stage composition with this compiler. Texture and
+descriptor handles are a separate resource feature. Slang is a design reference,
+not a compatibility-test dependency.
+
 Update this document **in the same change** when language or engine behavior changes:
 
 1. Update semantics, example, owner, and limits together.

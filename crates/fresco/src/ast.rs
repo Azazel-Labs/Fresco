@@ -38,6 +38,8 @@ pub enum BinOp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOp {
     Neg,
+    Deref,
+    AddressOf,
 }
 
 #[derive(Debug, Clone)]

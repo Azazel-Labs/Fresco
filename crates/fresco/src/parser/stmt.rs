@@ -394,11 +394,10 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             })
             .boxed();
 
-        let store_stmt = ident_sp.clone()
-            .then(expr.clone().delimited_by(just(Token::LBracket),just(Token::RBracket)))
+        let store_stmt = expr.clone()
             .then_ignore(just(Token::Eq)).then(expr.clone())
-            .map_with(|(((name,name_span),index),value),e| Stmt::Store {
-                target: sp(Expr::Index {array: Box::new(sp(Expr::Var(name),name_span)),index: Box::new(index)}, e.span()),
+            .map_with(|(target,value),e| Stmt::Store {
+                target,
                 value, span:e.span(),
             }).boxed();
         let assign_stmt = ident_sp
@@ -1470,8 +1469,8 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
             let_scatter_stmt,
             const_stmt,
             typed_let_stmt,
-            store_stmt,
             assign_stmt,
+            store_stmt,
             if_stmt,
             c_for_stmt,
             for_stmt,

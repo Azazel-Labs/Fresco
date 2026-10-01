@@ -20,6 +20,7 @@ Reproduce the gap and consult existing tests before resuming an older task.
 | Workstream | Owning plan |
 | --- | --- |
 | Engine integration syntax, render-graph explanation, and optional runtime/C ABI | [Engine integration follow-up](#engine-integration-follow-up) |
+| Native device pointers, bounded spans, and Lumina ABI integration | [Pointer syntax and implementation plan](docs/native-pointers-design.md) |
 | Compiler/runtime source-of-truth correctness and consolidation | [Active checklist](#compiler-runtime-source-of-truth) |
 | Shader size, helper sharing, temporal evaluation | [Lowering scalability tasks](#lowering-scalability) |
 | Runtime path geometry and arc-length accuracy | [Path follow-up tasks](#path-geometry-and-arc-length) |
@@ -600,6 +601,14 @@ and the [current engine contract](LANGUAGE.md#language-engine-and-host).
 - [ ] Extend general engine struct-uniform layout beyond scalar/vector f32 storage:
   nested structs, matrices, arrays, and integer-preserving storage. Keep offsets,
   alignment, manifest types, uploads, and shader declarations in agreement.
+- [ ] Implement the [native pointer plan](docs/native-pointers-design.md): explicit
+  target policy and complete IR emission first, then fixed-size pointers, Naga
+  helper/span/address-conversion support, and a verified Lumina ABI integration.
+  Follow Slang's pointer syntax and semantics where supported, including `T*`,
+  `Ptr<T>`, read-write device defaults, and automatic field dereference.
+  Fixed-size native compute syntax, direct IR/SPIR-V, access checking and ABI
+  reflection are implemented. Remaining: shared engine composition, pointer helper
+  ABI, bounded spans/address casts in Naga, and the real Lumina material path.
 - [ ] Define capabilities and diagnostics for bindless resources, non-uniform
   indexing, uniformity, and explicit texture sampling; unsupported constructs must
   fail at their owning layer rather than silently miscompile.

@@ -86,8 +86,7 @@ fn statements(body: &[Stmt], scope: &mut Scope, diags: &mut Vec<Diag>) {
     for stmt in body {
         match stmt {
             Stmt::Store { target, span, .. } => {
-                if let crate::ast::Expr::Index { array, .. } = &target.node
-                    && let crate::ast::Expr::Var(name) = &array.node
+                if let Some(name) = assignment_root(target)
                     && let Some(binding) = scope.get(name)
                     && !binding.mutable
                 {
@@ -190,6 +189,17 @@ fn statements(body: &[Stmt], scope: &mut Scope, diags: &mut Vec<Diag>) {
     }
 }
 
+fn assignment_root(expr: &crate::ast::SExpr) -> Option<&str> {
+    use crate::ast::Expr;
+    match &expr.node {
+        Expr::Var(name) => name.split('.').next(),
+        Expr::Index { array, .. } | Expr::Member(array, _) => assignment_root(array),
+        // Dereferencing a pointer changes the memory being assigned. The typed
+        // native checker owns pointee permissions; portable checking rejects it.
+        _ => None,
+    }
+}
+
 fn hook(hook: &PassFnHookDecl, globals: &Scope, diags: &mut Vec<Diag>) {
     // Unselected staged hooks may use syntax not yet supported by the ordinary
     // parser. Their existing selected-hook validation owns those parse errors.
@@ -283,6 +293,16 @@ mod tests {
             .into_output_errors();
         assert!(errors.is_empty(), "{errors:?}");
         program.expect("valid program")
+    }
+
+    #[test]
+    fn immutable_projected_stores_are_rejected() {
+        for target in ["x[0]", "x[0][0]", "x.value[0]", "(x).value", "x[0].value"] {
+            let source = format!("fn test() {{ let x = [1.0]; {target} = 2.0; }}");
+            let errors = validate(&parse(&source)).expect_err("immutable projected store");
+            assert_eq!(errors.len(), 1, "{source}");
+            assert!(errors[0].message.contains("immutable binding `x`"));
+        }
     }
 
     #[test]

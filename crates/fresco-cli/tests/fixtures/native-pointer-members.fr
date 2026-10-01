@@ -1,0 +1,16 @@
+struct Cell { value: u32 }
+struct Node { cell: Cell* }
+struct Roots {
+    input: Ptr<Node, Access.Read>
+    output: Cell*
+}
+param roots: Roots
+
+fn store(value: u32) {
+    roots.output->value = value
+}
+
+fn update_one() {
+    let p = &roots.input.cell.value
+    store(*p)
+}

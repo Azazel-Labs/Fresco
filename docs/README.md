@@ -58,6 +58,7 @@ their task lists as current completion status.
 
 | Plan | Scope |
 | --- | --- |
+| [Native device pointers](native-pointers-design.md) | Implemented native compute pointer slice, direct Naga IR lowering, and remaining span/Lumina ABI milestones |
 | [Tiled deferred renderer](../integrations/example-engine/docs/example-engine-deferred.md) | G-buffer formats, engine material tables, GGX lighting, browser selection, and current limits |
 | [Standalone example engine](../integrations/example-engine/docs/example-engine-architecture.md) | Shared Rust GPU runtime, bundled engine sources, native executable, browser host, and staged playground extraction |
 | [Fresco Next language design](fresco-next-language-design.md) | Proposed standalone redesign with typed library extensions, scoped blocks, explicit sampling, and engine contracts |

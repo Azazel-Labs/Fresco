@@ -7,6 +7,7 @@ use std::process::ExitCode;
 use std::thread;
 
 mod fmt;
+mod native;
 
 #[derive(ClapParser)]
 #[command(
@@ -131,6 +132,8 @@ impl From<BuildProfileArg> for driver::BuildProfile {
 enum Command {
     /// Format .fr files in-place (or run in check mode)
     Fmt(FmtArgs),
+    /// Compile an engine-selected compute function directly to native SPIR-V.
+    Native(native::Args),
 }
 
 #[derive(clap::Args)]
@@ -153,6 +156,10 @@ struct FmtArgs {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+
+    if let Some(Command::Native(args)) = &cli.cmd {
+        return native::run(args);
+    }
 
     if let Some(Command::Fmt(fmt_args)) = cli.cmd {
         if fmt_args.paths.is_empty() {

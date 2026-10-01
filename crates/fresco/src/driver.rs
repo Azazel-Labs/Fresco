@@ -18,6 +18,7 @@ mod explain;
 mod gpu_function;
 mod implementations;
 mod mesh_pass;
+pub mod native;
 mod operation_composition;
 pub(crate) mod pass_plan;
 mod pipeline;

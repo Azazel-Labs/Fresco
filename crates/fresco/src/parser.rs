@@ -324,6 +324,11 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
             .boxed();
 
         let regular_ty = type_ident_sp()
+            .then(just(Token::Dot).ignore_then(ident_sp()).or_not())
+            .map(|((base, span), member)| match member {
+                Some((member, end)) => (format!("{base}.{member}"), span.start..end.end),
+                None => (base, span),
+            })
             .then(
                 ty.clone()
                     .or(
@@ -399,7 +404,15 @@ pub(super) fn fn_param_type_sp<'src>() -> PBox<'src, (String, Span)> {
             })
             .boxed();
 
-        choice((tuple_ty, regular_ty)).boxed()
+        choice((tuple_ty, regular_ty))
+            .then(just(Token::Star).repeated().count())
+            .map_with(|((mut name, _), pointers), e| {
+                for _ in 0..pointers {
+                    name = format!("Ptr<{name}>");
+                }
+                (name, e.span())
+            })
+            .boxed()
     });
 
     // Declaration-only sugar: `i32|u32`, `i32|vec2`, etc.

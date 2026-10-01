@@ -531,7 +531,7 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .map_with(|((name, name_span), args), e| AccessStep::Method(name, name_span, args, e.span()))
             .boxed();
 
-        let postfix_member = just(Token::Dot)
+        let postfix_member = just(Token::Dot).or(just(Token::Arrow))
             .ignore_then(ident_sp.clone().or(just(Token::Vertex)
                 .map_with(|_, e| ("vertex".to_string(), e.span()))))
             .map(|(field, field_span): (String, Span)| AccessStep::Member(field, field_span))
@@ -596,11 +596,17 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
         // without extra parentheses when the coord involves arithmetic.
         // Logical negation has boolean equality's type contract and evaluates
         // its operand once. Parse it outside the complete member/index chain.
-        let logical_unary = just(Token::Bang)
+        let logical_unary = choice((just(Token::Bang), just(Token::Star), just(Token::Amp)))
+            .map_with(|op, e| (op, e.span()))
             .repeated().collect::<Vec<_>>().then(postfix)
-            .map(|(ops, value)| ops.into_iter().rev().fold(value, |value, _| {
-                let span = value.span.clone();
-                binx(BinOp::Eq, value, sp(Expr::Var("false".into()), span))
+            .map(|(ops, value)| ops.into_iter().rev().fold(value, |value, (op, prefix): (Token, Span)| {
+                let span = prefix.start..value.span.end;
+                match op {
+                    Token::Star => sp(Expr::Unary(UnOp::Deref, Box::new(value)), span),
+                    Token::Amp => sp(Expr::Unary(UnOp::AddressOf, Box::new(value)), span),
+                    Token::Bang => binx(BinOp::Eq, value, sp(Expr::Var("false".into()), span)),
+                    _ => unreachable!("prefix parser accepts only *, & and !"),
+                }
             })).boxed();
         let at_expr = logical_unary
             .clone()
@@ -642,7 +648,9 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
 
         let product = tagged_expr
             .clone()
-            .then(mul_div_op.then(tagged_expr).repeated().collect::<Vec<_>>())
+            // A following `*place = value` starts a store, not a continued
+            // multiplication expression from the preceding statement.
+            .then(mul_div_op.then(tagged_expr).then_ignore(just(Token::Eq).not()).repeated().collect::<Vec<_>>())
             .try_map(|(l, ops), _span| {
                 ops.into_iter().try_fold(l, |l, (op, r)| {
                     if matches!(op, BinOp::Div)
@@ -683,11 +691,11 @@ pub(super) fn expr_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, S
             .ignore_then(
                 just(Token::Shl)
                     .to(BinOp::Shl)
-                    .or(just(Token::Shr).to(BinOp::Shr)),
+                    .or(just(Token::Gt).then(just(Token::Gt)).to(BinOp::Shr)),
             )
             .or(just(Token::Shl)
                 .to(BinOp::Shl)
-                .or(just(Token::Shr).to(BinOp::Shr)))
+                .or(just(Token::Gt).then(just(Token::Gt)).to(BinOp::Shr)))
             .then_ignore(nl.clone())
             .boxed();
 

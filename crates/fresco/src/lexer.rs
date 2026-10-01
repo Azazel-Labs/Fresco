@@ -339,8 +339,6 @@ pub enum Token {
     OrOr,
     #[token("<<")]
     Shl,
-    #[token(">>")]
-    Shr,
     #[token("|>")]
     PipeOp,
     #[token("++")]
@@ -507,7 +505,6 @@ impl Token {
             | Self::AndAnd
             | Self::OrOr
             | Self::Shl
-            | Self::Shr
             | Self::PlusPlus
             | Self::MinusMinus
             | Self::Question => Some(TokenHighlightKind::Operator),
@@ -591,7 +588,6 @@ impl std::fmt::Display for Token {
             AndAnd => write!(f, "`&&`"),
             OrOr => write!(f, "`||`"),
             Shl => write!(f, "`<<`"),
-            Shr => write!(f, "`>>`"),
             PipeOp => write!(f, "`|>`"),
             PlusPlus => write!(f, "`++`"),
             MinusMinus => write!(f, "`--`"),

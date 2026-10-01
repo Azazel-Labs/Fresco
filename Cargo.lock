@@ -689,6 +689,7 @@ dependencies = [
 name = "fresco-example-engine"
 version = "0.2.0"
 dependencies = [
+ "ash",
  "fresco",
  "fresco-artifact",
  "image",
@@ -698,6 +699,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "wgpu",
+ "wgpu-hal",
  "wgpu-naga-bridge",
 ]
 

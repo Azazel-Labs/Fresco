@@ -755,7 +755,7 @@ fn preprocess_source(src: &str) -> Result<String, Vec<Diag>> {
     }
 }
 
-fn lex(src: &str) -> Result<Vec<(lexer::Token, Span)>, Vec<Diag>> {
+pub(super) fn lex(src: &str) -> Result<Vec<(lexer::Token, Span)>, Vec<Diag>> {
     let mut tokens = Vec::new();
     let mut lex_diags = Vec::new();
     for (tok, span) in lexer::Token::lexer(src).spanned() {
@@ -774,11 +774,22 @@ fn lex(src: &str) -> Result<Vec<(lexer::Token, Span)>, Vec<Diag>> {
     }
 }
 
-fn parse(
+pub(super) fn parse(
     src: &str,
     tokens: &[(lexer::Token, Span)],
     filename: &str,
     _require_entry_point: bool,
+) -> Result<Program, Vec<Diag>> {
+    let program = parse_syntax(src, tokens, filename)?;
+    check::bindings::validate(&program)?;
+    Ok(program)
+}
+
+/// Native checking distinguishes immutable pointer bindings from writable pointees.
+pub(super) fn parse_syntax(
+    src: &str,
+    tokens: &[(lexer::Token, Span)],
+    filename: &str,
 ) -> Result<Program, Vec<Diag>> {
     let eoi = src.len()..src.len();
     let (program, parse_errs) = parser::program()
@@ -817,8 +828,6 @@ fn parse(
     {
         method.source_file = filename.to_string();
     }
-    check::bindings::validate(&program)?;
-
     // Standalone `.fr` files may contain helpers or library functions without
     // declaring a canvas or surface entry point. Host preview tooling may pick
     // one root entry when one exists, but the compiler should not reject such

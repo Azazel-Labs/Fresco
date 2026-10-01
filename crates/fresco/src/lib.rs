@@ -14,6 +14,7 @@ pub mod language_docs;
 pub mod lexer;
 pub(crate) mod lower;
 pub mod material_hir;
+pub mod native_type;
 pub(crate) mod parser;
 pub(crate) mod pipeline_layout;
 pub(crate) mod registry;
