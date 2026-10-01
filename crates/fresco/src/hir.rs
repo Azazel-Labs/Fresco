@@ -3706,33 +3706,15 @@ pub fn parse_array_param_type_ex(ty_name: &str) -> Option<(&str, ArrayParamSize)
     let inner = ty_name.strip_prefix("array<")?.strip_suffix('>')?;
 
     // Commas in nested type arguments belong to the element type.
-    let mut depth = 0usize;
-    let mut separator = None;
-    for (index, ch) in inner.char_indices() {
-        match ch {
-            '<' => depth += 1,
-            '>' => depth = depth.checked_sub(1)?,
-            ',' if depth == 0 => {
-                separator = Some(index);
-                break;
-            }
-            _ => {}
-        }
-    }
-    if depth != 0 {
-        return None;
-    }
-    if let Some(index) = separator {
-        let (elem_ty, suffix) = inner.split_at(index);
-        let len_text = &suffix[1..];
-        // Fixed-size array: array<T, N>
-        let elem_ty = elem_ty.trim();
-        let len = len_text.trim().parse::<usize>().ok()?;
-        Some((elem_ty, ArrayParamSize::Fixed(len)))
-    } else {
+    match *crate::native_type::split_top_level_commas(inner)?.as_slice() {
         // Dynamic array: array<T>
-        let elem_ty = inner.trim();
-        Some((elem_ty, ArrayParamSize::Dynamic))
+        [elem_ty] => Some((elem_ty.trim(), ArrayParamSize::Dynamic)),
+        // Fixed-size array: array<T, N>
+        [elem_ty, len] => Some((
+            elem_ty.trim(),
+            ArrayParamSize::Fixed(len.trim().parse::<usize>().ok()?),
+        )),
+        _ => None,
     }
 }
 

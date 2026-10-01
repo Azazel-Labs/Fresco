@@ -54,20 +54,7 @@ fn serialize_layout_signature_token(token: &Token) -> String {
 }
 
 fn format_number_with_unit(bits: u64, unit: Unit) -> String {
-    let suffix = match unit {
-        Unit::None => "",
-        Unit::Px => "px",
-        Unit::Uv => "uv",
-        Unit::Vw => "vw",
-        Unit::Vh => "vh",
-        Unit::Vmin => "vmin",
-        Unit::Vmax => "vmax",
-        Unit::Deg => "deg",
-        Unit::Turn => "turn",
-        Unit::Sec => "s",
-        Unit::MilliSec => "ms",
-    };
-    format!("{}{}", f64::from_bits(bits), suffix)
+    format!("{}{}", f64::from_bits(bits), unit.suffix())
 }
 
 #[cfg(test)]

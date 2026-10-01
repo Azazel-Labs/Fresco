@@ -102,6 +102,39 @@ pub enum Unit {
     MilliSec,
 }
 
+impl Unit {
+    /// Suffixed units in the order number literals try them; `ms` precedes `s`.
+    const SUFFIXED: [Self; 10] = [
+        Self::Deg,
+        Self::Turn,
+        Self::Px,
+        Self::Uv,
+        Self::Vw,
+        Self::Vh,
+        Self::Vmin,
+        Self::Vmax,
+        Self::MilliSec,
+        Self::Sec,
+    ];
+
+    /// Source spelling of the unit suffix (empty for a unitless number).
+    pub const fn suffix(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Px => "px",
+            Self::Uv => "uv",
+            Self::Vw => "vw",
+            Self::Vh => "vh",
+            Self::Vmin => "vmin",
+            Self::Vmax => "vmax",
+            Self::Deg => "deg",
+            Self::Turn => "turn",
+            Self::Sec => "s",
+            Self::MilliSec => "ms",
+        }
+    }
+}
+
 fn parse_num(lex: &mut logos::Lexer<'_, Token>) -> Option<(u64, Unit)> {
     parse_number(lex.slice())
 }
@@ -113,33 +146,12 @@ fn parse_typed_num(lex: &mut logos::Lexer<'_, Token>) -> Option<(u64, bool)> {
 }
 
 fn parse_number(s: &str) -> Option<(u64, Unit)> {
-    let (num, unit) = if let Some(n) = s.strip_suffix("deg") {
-        (n, Unit::Deg)
-    } else if let Some(n) = s.strip_suffix("turn") {
-        (n, Unit::Turn)
-    } else if let Some(n) = s.strip_suffix("px") {
-        (n, Unit::Px)
-    } else if let Some(n) = s.strip_suffix("uv") {
-        (n, Unit::Uv)
-    } else if let Some(n) = s.strip_suffix("vw") {
-        (n, Unit::Vw)
-    } else if let Some(n) = s.strip_suffix("vh") {
-        (n, Unit::Vh)
-    } else if let Some(n) = s.strip_suffix("vmin") {
-        (n, Unit::Vmin)
-    } else if let Some(n) = s.strip_suffix("vmax") {
-        (n, Unit::Vmax)
-    } else if let Some(n) = s.strip_suffix("ms") {
-        (n, Unit::MilliSec)
-    } else if let Some(n) = s.strip_suffix('s') {
-        (n, Unit::Sec)
-    } else if let Some(n) = s.strip_suffix('u') {
-        (n, Unit::None)
-    } else if let Some(n) = s.strip_suffix('i') {
-        (n, Unit::None)
-    } else {
-        (s, Unit::None)
-    };
+    let (num, unit) = Unit::SUFFIXED
+        .iter()
+        .find_map(|&unit| s.strip_suffix(unit.suffix()).map(|n| (n, unit)))
+        // Integer type suffixes carry no unit.
+        .or_else(|| s.strip_suffix(['u', 'i']).map(|n| (n, Unit::None)))
+        .unwrap_or((s, Unit::None));
     let v: f64 = num.parse().ok()?;
     Some((v.to_bits(), unit))
 }

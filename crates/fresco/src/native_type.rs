@@ -18,6 +18,29 @@ pub enum Type {
     Pointer { pointee: Box<Type>, access: Access },
 }
 
+/// Split type arguments at commas outside nested `<...>`; `None` when the
+/// angle brackets are unbalanced. Parts are not trimmed.
+pub(crate) fn split_top_level_commas(source: &str) -> Option<Vec<&str>> {
+    let mut depth = 0_usize;
+    let mut start = 0;
+    let mut parts = Vec::new();
+    for (index, character) in source.char_indices() {
+        match character {
+            '<' => depth += 1,
+            '>' => depth = depth.checked_sub(1)?,
+            ',' if depth == 0 => {
+                parts.push(&source[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    (depth == 0).then(|| {
+        parts.push(&source[start..]);
+        parts
+    })
+}
+
 impl Type {
     pub fn parse(source: &str) -> Result<Self, String> {
         let source = source.trim();
@@ -31,27 +54,11 @@ impl Type {
             let tail = tail
                 .strip_suffix('>')
                 .ok_or("unterminated type arguments")?;
-            let mut depth = 0_i32;
-            let mut start = 0;
-            let mut args = Vec::new();
-            for (i, c) in tail.char_indices() {
-                match c {
-                    '<' => depth += 1,
-                    '>' => depth -= 1,
-                    ',' if depth == 0 => {
-                        args.push(tail[start..i].trim());
-                        start = i + 1;
-                    }
-                    _ => {}
-                }
-                if depth < 0 {
-                    return Err("unbalanced type arguments".into());
-                }
-            }
-            if depth != 0 {
-                return Err("unbalanced type arguments".into());
-            }
-            args.push(tail[start..].trim());
+            let args: Vec<&str> = split_top_level_commas(tail)
+                .ok_or("unbalanced type arguments")?
+                .into_iter()
+                .map(str::trim)
+                .collect();
             return match (name.trim(), args.as_slice()) {
                 ("array", [element, count]) => {
                     let count = count.parse::<u32>().map_err(|_| "array length must be a positive u32")?;
