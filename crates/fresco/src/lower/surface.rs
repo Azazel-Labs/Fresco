@@ -310,18 +310,10 @@ fn lower_surface_vertex_fn(input: SurfaceVertexInputs<'_>) -> Option<naga::Funct
                 .collect::<Vec<_>>();
             match values.as_slice() {
                 [value] => *value,
-                _ => {
-                    let ty = match values.len() {
-                        2 => t.v2,
-                        3 => t.v3,
-                        4 => t.v4,
-                        _ => unreachable!("checked vertex output width"),
-                    };
-                    cx.ir.add(Ex::Compose {
-                        ty,
-                        components: values,
-                    })
-                }
+                _ => cx.ir.add(Ex::Compose {
+                    ty: t.f32_vec(values.len()),
+                    components: values,
+                }),
             }
         } else {
             cx.ir.add(Ex::AccessIndex {
@@ -702,12 +694,7 @@ fn lower_material_value(
         MaterialValue::Matrix(columns) => columns
             .iter()
             .map(|column| {
-                let ty = match column.len() {
-                    2 => cx.ir.types.v2,
-                    3 => cx.ir.types.v3,
-                    4 => cx.ir.types.v4,
-                    _ => unreachable!("checked matrix dimension"),
-                };
+                let ty = cx.ir.types.f32_vec(column.len());
                 let components = column.iter().map(|v| cx.sx_at(v, uv)).collect();
                 cx.ir.add(Ex::Compose { ty, components })
             })

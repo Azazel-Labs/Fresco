@@ -1203,15 +1203,7 @@ impl<'h> FnCtx<'h> {
             let expected_scalars = helper
                 .params
                 .iter()
-                .map(|param| match param.ty {
-                    crate::hir::UserFnParamTy::Scalar => 1usize,
-                    crate::hir::UserFnParamTy::Vec2 => 2usize,
-                    crate::hir::UserFnParamTy::Vec3 => 3usize,
-                    crate::hir::UserFnParamTy::Vec4 => 4usize,
-                    crate::hir::UserFnParamTy::Mat2 => 4usize,
-                    crate::hir::UserFnParamTy::Mat3 => 9usize,
-                    crate::hir::UserFnParamTy::Mat4 => 16usize,
-                })
+                .map(|param| param.ty.scalar_count())
                 .sum::<usize>();
             debug_assert_eq!(
                 call.args.len(),
@@ -1225,28 +1217,30 @@ impl<'h> FnCtx<'h> {
             let mut packed = Vec::with_capacity(helper.params.len());
             let mut cursor = 0usize;
             for param in &helper.params {
-                match param.ty {
-                    crate::hir::UserFnParamTy::Scalar => {
-                        let scalar = call
-                            .args
-                            .get(cursor)
-                            .map(|sx| self.native_scalar(sx, p))
-                            .unwrap_or_else(|| self.ir.lit(0.0));
-                        packed.push(scalar);
+                if let Some(width) = param.ty.vector_width() {
+                    let mut comps = Vec::with_capacity(width);
+                    for _ in 0..width {
+                        comps.push(
+                            call.args
+                                .get(cursor)
+                                .map(|sx| self.native_scalar(sx, p))
+                                .unwrap_or_else(|| self.ir.lit(0.0)),
+                        );
                         cursor += 1;
                     }
-                    crate::hir::UserFnParamTy::Vec2
-                    | crate::hir::UserFnParamTy::Vec3
-                    | crate::hir::UserFnParamTy::Vec4 => {
-                        let width = match param.ty {
-                            crate::hir::UserFnParamTy::Vec2 => 2usize,
-                            crate::hir::UserFnParamTy::Vec3 => 3usize,
-                            crate::hir::UserFnParamTy::Vec4 => 4usize,
-                            _ => unreachable!(),
-                        };
-                        let mut comps = Vec::with_capacity(width);
-                        for _ in 0..width {
-                            comps.push(
+                    let ty = vector_type_handle(param.scalar_kind, width, &self.ir.types);
+                    packed.push(self.ir.add(Ex::Compose {
+                        ty,
+                        components: comps,
+                    }));
+                } else if let Some(rows) = param.ty.matrix_dim() {
+                    let vec_ty = self.ir.types.f32_vec(rows);
+                    let mat_ty = self.ir.types.f32_mat(rows);
+                    let mut cols = Vec::with_capacity(rows);
+                    for _ in 0..rows {
+                        let mut col_components = Vec::with_capacity(rows);
+                        for _ in 0..rows {
+                            col_components.push(
                                 call.args
                                     .get(cursor)
                                     .map(|sx| self.native_scalar(sx, p))
@@ -1254,60 +1248,23 @@ impl<'h> FnCtx<'h> {
                             );
                             cursor += 1;
                         }
-                        let ty = match param.ty {
-                            crate::hir::UserFnParamTy::Vec2 => {
-                                vector_type_handle(param.scalar_kind, 2, &self.ir.types)
-                            }
-                            crate::hir::UserFnParamTy::Vec3 => {
-                                vector_type_handle(param.scalar_kind, 3, &self.ir.types)
-                            }
-                            crate::hir::UserFnParamTy::Vec4 => {
-                                vector_type_handle(param.scalar_kind, 4, &self.ir.types)
-                            }
-                            _ => unreachable!(),
-                        };
-                        packed.push(self.ir.add(Ex::Compose {
-                            ty,
-                            components: comps,
+                        cols.push(self.ir.add(Ex::Compose {
+                            ty: vec_ty,
+                            components: col_components,
                         }));
                     }
-                    crate::hir::UserFnParamTy::Mat2
-                    | crate::hir::UserFnParamTy::Mat3
-                    | crate::hir::UserFnParamTy::Mat4 => {
-                        let (rows, vec_ty, mat_ty) = match param.ty {
-                            crate::hir::UserFnParamTy::Mat2 => {
-                                (2usize, self.ir.types.v2, self.ir.types.m2)
-                            }
-                            crate::hir::UserFnParamTy::Mat3 => {
-                                (3usize, self.ir.types.v3, self.ir.types.m3)
-                            }
-                            crate::hir::UserFnParamTy::Mat4 => {
-                                (4usize, self.ir.types.v4, self.ir.types.m4)
-                            }
-                            _ => unreachable!(),
-                        };
-                        let mut cols = Vec::with_capacity(rows);
-                        for _ in 0..rows {
-                            let mut col_components = Vec::with_capacity(rows);
-                            for _ in 0..rows {
-                                col_components.push(
-                                    call.args
-                                        .get(cursor)
-                                        .map(|sx| self.native_scalar(sx, p))
-                                        .unwrap_or_else(|| self.ir.lit(0.0)),
-                                );
-                                cursor += 1;
-                            }
-                            cols.push(self.ir.add(Ex::Compose {
-                                ty: vec_ty,
-                                components: col_components,
-                            }));
-                        }
-                        packed.push(self.ir.add(Ex::Compose {
-                            ty: mat_ty,
-                            components: cols,
-                        }));
-                    }
+                    packed.push(self.ir.add(Ex::Compose {
+                        ty: mat_ty,
+                        components: cols,
+                    }));
+                } else {
+                    let scalar = call
+                        .args
+                        .get(cursor)
+                        .map(|sx| self.native_scalar(sx, p))
+                        .unwrap_or_else(|| self.ir.lit(0.0));
+                    packed.push(scalar);
+                    cursor += 1;
                 }
             }
             packed

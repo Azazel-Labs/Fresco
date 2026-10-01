@@ -72,21 +72,12 @@ fn lower_hook(
     let mut fields = Vec::new();
     for output in &hook.outputs {
         let components: Vec<_> = output.iter().map(|sx| cx.sx_at(sx, uv)).collect();
-        let field = match components.len() {
-            1 => components[0],
-            2 => cx.ir.add(Ex::Compose {
-                ty: t.v2,
+        let field = match components.as_slice() {
+            [scalar] => *scalar,
+            _ => cx.ir.add(Ex::Compose {
+                ty: t.f32_vec(components.len()),
                 components,
             }),
-            3 => cx.ir.add(Ex::Compose {
-                ty: t.v3,
-                components,
-            }),
-            4 => cx.ir.add(Ex::Compose {
-                ty: t.v4,
-                components,
-            }),
-            _ => unreachable!("checker emits scalar or vector fields"),
         };
         fields.push(field);
     }

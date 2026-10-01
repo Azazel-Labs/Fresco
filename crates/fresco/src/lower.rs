@@ -208,6 +208,16 @@ impl TypeHandles {
             _ => unreachable!("f32 vectors have 2, 3, or 4 components, not {width}"),
         }
     }
+
+    /// The square `matNxN<f32>` type for `dim` in `2..=4`.
+    fn f32_mat(&self, dim: usize) -> Handle<naga::Type> {
+        match dim {
+            2 => self.m2,
+            3 => self.m3,
+            4 => self.m4,
+            _ => unreachable!("f32 matrices have 2, 3, or 4 rows, not {dim}"),
+        }
+    }
 }
 
 struct ModuleBuilder {
@@ -518,10 +528,7 @@ fn ensure_global_uniform_buffers<'a>(
         for ((field_name, _), (offset, components)) in def.fields.iter().zip(def.field_layouts()) {
             let ty = match components {
                 1 => t.f32_,
-                2 => t.v2,
-                3 => t.v3,
-                4 => t.v4,
-                _ => unreachable!("validated global uniform component count"),
+                width => t.f32_vec(width as usize),
             };
             members.push(naga::StructMember {
                 name: Some(field_name.clone()),

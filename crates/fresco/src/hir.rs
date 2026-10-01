@@ -813,6 +813,46 @@ pub enum UserFnParamTy {
     Mat4,
 }
 
+impl UserFnParamTy {
+    /// Number of scalar slots the parameter flattens to.
+    pub const fn scalar_count(self) -> usize {
+        match self {
+            UserFnParamTy::Scalar => 1,
+            UserFnParamTy::Vec2 => 2,
+            UserFnParamTy::Vec3 => 3,
+            UserFnParamTy::Vec4 | UserFnParamTy::Mat2 => 4,
+            UserFnParamTy::Mat3 => 9,
+            UserFnParamTy::Mat4 => 16,
+        }
+    }
+
+    /// Component count for vector parameters.
+    pub const fn vector_width(self) -> Option<usize> {
+        match self {
+            UserFnParamTy::Vec2 => Some(2),
+            UserFnParamTy::Vec3 => Some(3),
+            UserFnParamTy::Vec4 => Some(4),
+            UserFnParamTy::Scalar
+            | UserFnParamTy::Mat2
+            | UserFnParamTy::Mat3
+            | UserFnParamTy::Mat4 => None,
+        }
+    }
+
+    /// Row (and column) count for square matrix parameters.
+    pub const fn matrix_dim(self) -> Option<usize> {
+        match self {
+            UserFnParamTy::Mat2 => Some(2),
+            UserFnParamTy::Mat3 => Some(3),
+            UserFnParamTy::Mat4 => Some(4),
+            UserFnParamTy::Scalar
+            | UserFnParamTy::Vec2
+            | UserFnParamTy::Vec3
+            | UserFnParamTy::Vec4 => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum UserFnValue {
     Scalar(Sx),

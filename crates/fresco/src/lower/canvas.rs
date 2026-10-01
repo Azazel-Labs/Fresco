@@ -908,21 +908,10 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
                 continue;
             }
 
-            let vec_ty = match param.ty {
-                crate::hir::UserFnParamTy::Vec2 => {
-                    Some(vector_type_handle(param.scalar_kind, 2, &this.cx.ir.types))
-                }
-                crate::hir::UserFnParamTy::Vec3 => {
-                    Some(vector_type_handle(param.scalar_kind, 3, &this.cx.ir.types))
-                }
-                crate::hir::UserFnParamTy::Vec4 => {
-                    Some(vector_type_handle(param.scalar_kind, 4, &this.cx.ir.types))
-                }
-                _ => None,
-            };
-            let Some(vec_ty) = vec_ty else {
+            let Some(width) = param.ty.vector_width() else {
                 continue;
             };
+            let vec_ty = vector_type_handle(param.scalar_kind, width, &this.cx.ir.types);
 
             let Some(first_slot) = param.scalar_slots.first() else {
                 continue;
@@ -1325,19 +1314,13 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
         } else if let Some(vec) = self.value_vector(value, self.helper.ret_components as usize) {
             vec
         } else {
+            let width = usize::from(self.helper.ret_components);
             let comps = self.value_components(value);
-            match self.helper.ret_components {
-                2 => self.cx.ir.vec2(comps[0], comps[1]),
-                3 => self.cx.ir.add(Ex::Compose {
-                    ty: self.cx.ir.types.v3,
-                    components: vec![comps[0], comps[1], comps[2]],
-                }),
-                4 => self.cx.ir.add(Ex::Compose {
-                    ty: self.cx.ir.types.v4,
-                    components: vec![comps[0], comps[1], comps[2], comps[3]],
-                }),
-                _ => unreachable!("unsupported helper return arity"),
-            }
+            let ty = self.cx.ir.types.f32_vec(width);
+            self.cx.ir.add(Ex::Compose {
+                ty,
+                components: comps[..width].to_vec(),
+            })
         };
         self.cx
             .ir

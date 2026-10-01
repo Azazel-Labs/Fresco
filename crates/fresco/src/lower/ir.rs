@@ -746,60 +746,36 @@ impl IrBuilder {
         } else {
             for param in &helper.params {
                 let arg_name = format!("arg_{}", param.name);
-                match param.ty {
-                    crate::hir::UserFnParamTy::Scalar => {
-                        let h = function.arg(&arg_name, scalar_type_handle(param.scalar_kind, t));
-                        if let Some(slot) = param.scalar_slots.first() {
-                            param_scalars.insert(slot.clone(), h);
-                        }
+                if let Some(width) = param.ty.vector_width() {
+                    let ty = vector_type_handle(param.scalar_kind, width, t);
+                    let vec_arg = function.arg(&arg_name, ty);
+                    for (index, slot) in param.scalar_slots.iter().enumerate() {
+                        let comp = function.expr(Ex::AccessIndex {
+                            base: vec_arg,
+                            index: index as u32,
+                        });
+                        param_scalars.insert(slot.clone(), comp);
                     }
-                    crate::hir::UserFnParamTy::Vec2
-                    | crate::hir::UserFnParamTy::Vec3
-                    | crate::hir::UserFnParamTy::Vec4 => {
-                        let ty = match param.ty {
-                            crate::hir::UserFnParamTy::Vec2 => {
-                                vector_type_handle(param.scalar_kind, 2, t)
-                            }
-                            crate::hir::UserFnParamTy::Vec3 => {
-                                vector_type_handle(param.scalar_kind, 3, t)
-                            }
-                            crate::hir::UserFnParamTy::Vec4 => {
-                                vector_type_handle(param.scalar_kind, 4, t)
-                            }
-                            _ => unreachable!(),
-                        };
-                        let vec_arg = function.arg(&arg_name, ty);
-                        for (index, slot) in param.scalar_slots.iter().enumerate() {
-                            let comp = function.expr(Ex::AccessIndex {
-                                base: vec_arg,
-                                index: index as u32,
-                            });
-                            param_scalars.insert(slot.clone(), comp);
-                        }
+                } else if let Some(rows) = param.ty.matrix_dim() {
+                    let matrix_ty = t.f32_mat(rows);
+                    let mat_arg = function.arg(&arg_name, matrix_ty);
+                    for (index, slot) in param.scalar_slots.iter().enumerate() {
+                        let col = index.div_euclid(rows);
+                        let row = index % rows;
+                        let col_expr = function.expr(Ex::AccessIndex {
+                            base: mat_arg,
+                            index: col as u32,
+                        });
+                        let comp = function.expr(Ex::AccessIndex {
+                            base: col_expr,
+                            index: row as u32,
+                        });
+                        param_scalars.insert(slot.clone(), comp);
                     }
-                    crate::hir::UserFnParamTy::Mat2
-                    | crate::hir::UserFnParamTy::Mat3
-                    | crate::hir::UserFnParamTy::Mat4 => {
-                        let (matrix_ty, rows) = match param.ty {
-                            crate::hir::UserFnParamTy::Mat2 => (t.m2, 2usize),
-                            crate::hir::UserFnParamTy::Mat3 => (t.m3, 3usize),
-                            crate::hir::UserFnParamTy::Mat4 => (t.m4, 4usize),
-                            _ => unreachable!(),
-                        };
-                        let mat_arg = function.arg(&arg_name, matrix_ty);
-                        for (index, slot) in param.scalar_slots.iter().enumerate() {
-                            let col = index.div_euclid(rows);
-                            let row = index % rows;
-                            let col_expr = function.expr(Ex::AccessIndex {
-                                base: mat_arg,
-                                index: col as u32,
-                            });
-                            let comp = function.expr(Ex::AccessIndex {
-                                base: col_expr,
-                                index: row as u32,
-                            });
-                            param_scalars.insert(slot.clone(), comp);
-                        }
+                } else {
+                    let h = function.arg(&arg_name, scalar_type_handle(param.scalar_kind, t));
+                    if let Some(slot) = param.scalar_slots.first() {
+                        param_scalars.insert(slot.clone(), h);
                     }
                 }
             }
