@@ -92,13 +92,8 @@ pub(crate) fn build_shaders(
         "x" | "thumb" => "x",
         other => return Err(format!("unsupported visualizer domain `{other}`")),
     };
-    let sweep_max = if spec.sweep_max.is_finite() && spec.sweep_max > 0.0 {
-        spec.sweep_max.max(0.0001)
-    } else if domain == "time" {
-        4.0
-    } else {
-        1.0
-    };
+    let sweep_max =
+        positive_sweep_max(spec.sweep_max).unwrap_or(if domain == "time" { 4.0 } else { 1.0 });
     let draw_wgsl = draw::build_draw_shader(
         variant_wgsl,
         &fn_name,
@@ -133,19 +128,20 @@ pub(crate) fn build_shader(
     build_shaders(variant_wgsl, manifest_text, spec, None).map(|set| set.draw_wgsl)
 }
 
+/// A caller-supplied sweep length, when it is finite and positive.
+fn positive_sweep_max(sweep_max: f32) -> Option<f32> {
+    (sweep_max.is_finite() && sweep_max > 0.0).then(|| sweep_max.max(0.0001))
+}
+
 pub(crate) fn build_metadata(
     spec: &VisualizerSpec<'_>,
     expr_text: Option<&str>,
 ) -> VisualizerMetadata {
-    let resolved_sweep_max = if spec.sweep_max.is_finite() && spec.sweep_max > 0.0 {
-        spec.sweep_max.max(0.0001)
-    } else if spec.domain == "time" {
-        4.0
-    } else if spec.domain == "x" {
-        1.0
-    } else {
-        0.0
-    };
+    let resolved_sweep_max = positive_sweep_max(spec.sweep_max).unwrap_or(match spec.domain {
+        "time" => 4.0,
+        "x" => 1.0,
+        _ => 0.0,
+    });
     let range_hint = spec
         .range_hint
         .or_else(|| extract_range_hint(expr_text.unwrap_or_default()));
@@ -160,8 +156,7 @@ pub(crate) fn build_metadata(
             fit_mode: Some("auto-range".to_string()),
             y_min_hint: range_hint.map(|(lo, _)| lo),
             y_max_hint: range_hint.map(|(_, hi)| hi),
-            preview_label: None,
-            preview_detail: None,
+            ..VisualizerMetadata::default()
         },
         VisualizerKind::Swatch => VisualizerMetadata {
             kind: "swatch".to_string(),
@@ -169,11 +164,7 @@ pub(crate) fn build_metadata(
             sweep_max: resolved_sweep_max,
             x_axis_label: Some("time".to_string()),
             y_axis_label: Some("color".to_string()),
-            fit_mode: None,
-            y_min_hint: None,
-            y_max_hint: None,
-            preview_label: None,
-            preview_detail: None,
+            ..VisualizerMetadata::default()
         },
         VisualizerKind::Thumbnail => {
             build_thumbnail_metadata(spec.semantic_type, expr_text.unwrap_or_default())
@@ -184,57 +175,61 @@ pub(crate) fn build_metadata(
 fn build_thumbnail_metadata(semantic_type: &str, expr_text: &str) -> VisualizerMetadata {
     if semantic_type == "space" {
         let transform_labels = collect_space_transform_labels(expr_text);
-        let summary = format_space_transform_summary(&transform_labels);
+        let summary = format_preview_summary(&transform_labels);
         let preview_detail = format_space_preview_detail(&transform_labels);
         return VisualizerMetadata {
             kind: "thumbnail".to_string(),
             domain: "thumb".to_string(),
-            sweep_max: 0.0,
             x_axis_label: Some("space probe".to_string()),
             y_axis_label: Some("space".to_string()),
             fit_mode: Some("space-probe".to_string()),
-            y_min_hint: None,
-            y_max_hint: None,
             preview_label: Some(format!("space {summary}")),
             preview_detail: Some(preview_detail),
+            ..VisualizerMetadata::default()
         };
     }
 
     if semantic_type == "shape" {
         let shape_labels = collect_shape_preview_labels(expr_text);
-        let summary = format_shape_preview_summary(&shape_labels);
+        let summary = format_preview_summary(&shape_labels);
         let preview_detail = format_shape_preview_detail(expr_text, &shape_labels);
         return VisualizerMetadata {
             kind: "thumbnail".to_string(),
             domain: "thumb".to_string(),
-            sweep_max: 0.0,
             x_axis_label: Some("shape probe".to_string()),
             y_axis_label: Some("shape".to_string()),
             fit_mode: Some("shape-probe".to_string()),
-            y_min_hint: None,
-            y_max_hint: None,
             preview_label: Some(format!("shape {summary}")),
             preview_detail: Some(preview_detail),
+            ..VisualizerMetadata::default()
         };
     }
 
     VisualizerMetadata {
         kind: "thumbnail".to_string(),
         domain: "thumb".to_string(),
-        sweep_max: 0.0,
-        x_axis_label: None,
-        y_axis_label: None,
-        fit_mode: None,
-        y_min_hint: None,
-        y_max_hint: None,
-        preview_label: None,
-        preview_detail: None,
+        ..VisualizerMetadata::default()
     }
 }
 
 fn collect_shape_preview_labels(expr_text: &str) -> Vec<String> {
     let mut labels = Vec::new();
     let mut saw_constructor = false;
+    for ident in called_idents(expr_text) {
+        if let Some(label) = map_shape_preview_label(ident, saw_constructor) {
+            if is_shape_constructor_name(ident) {
+                saw_constructor = true;
+            }
+            labels.push(label);
+        }
+    }
+    labels.dedup();
+    labels
+}
+
+/// Identifiers in `expr_text` that are immediately followed by `(`, in order.
+fn called_idents(expr_text: &str) -> Vec<&str> {
+    let mut idents = Vec::new();
     let bytes = expr_text.as_bytes();
     let mut index = 0usize;
     while index < bytes.len() {
@@ -255,21 +250,14 @@ fn collect_shape_preview_labels(expr_text: &str) -> Vec<String> {
             while probe < bytes.len() && (bytes[probe] as char).is_ascii_whitespace() {
                 probe += 1;
             }
-            if probe < bytes.len()
-                && bytes[probe] as char == '('
-                && let Some(label) = map_shape_preview_label(ident, saw_constructor)
-            {
-                if is_shape_constructor_name(ident) {
-                    saw_constructor = true;
-                }
-                labels.push(label);
+            if probe < bytes.len() && bytes[probe] as char == '(' {
+                idents.push(ident);
             }
         } else {
             index += 1;
         }
     }
-    labels.dedup();
-    labels
+    idents
 }
 
 fn is_shape_constructor_name(name: &str) -> bool {
@@ -297,18 +285,16 @@ fn is_shape_constructor_name(name: &str) -> bool {
 
 fn map_shape_preview_label(name: &str, saw_constructor: bool) -> Option<String> {
     match name {
-        "box" | "circle" | "ring" | "line" | "polyline" | "sector" | "arc" | "superellipse"
-        | "capsule" | "ellipse" | "star" | "triangle" | "polygon" | "cross" | "diamond" => {
-            Some(name.replace('_', "-"))
-        }
         "svg" => Some("svg-shape".to_string()),
         "svg_path" => Some("svg-path".to_string()),
+        _ if is_shape_constructor_name(name) => Some(name.replace('_', "-")),
         "round" | "dilate" | "erode" | "smooth" if saw_constructor => Some(name.replace('_', "-")),
         _ => None,
     }
 }
 
-fn format_shape_preview_summary(labels: &[String]) -> String {
+/// Up to three labels joined in order, with a `+N` overflow count.
+fn format_preview_summary(labels: &[String]) -> String {
     if labels.is_empty() {
         return "probe".to_string();
     }
@@ -350,37 +336,10 @@ fn format_shape_preview_detail(expr_text: &str, labels: &[String]) -> String {
 }
 
 fn collect_space_transform_labels(expr_text: &str) -> Vec<String> {
-    let mut labels = Vec::new();
-    let bytes = expr_text.as_bytes();
-    let mut index = 0usize;
-    while index < bytes.len() {
-        let ch = bytes[index] as char;
-        if ch.is_ascii_alphabetic() || ch == '_' {
-            let start = index;
-            index += 1;
-            while index < bytes.len() {
-                let next = bytes[index] as char;
-                if next.is_ascii_alphanumeric() || next == '_' {
-                    index += 1;
-                } else {
-                    break;
-                }
-            }
-            let ident = &expr_text[start..index];
-            let mut probe = index;
-            while probe < bytes.len() && (bytes[probe] as char).is_ascii_whitespace() {
-                probe += 1;
-            }
-            if probe < bytes.len()
-                && bytes[probe] as char == '('
-                && let Some(label) = map_space_transform_label(ident, expr_text)
-            {
-                labels.push(label);
-            }
-        } else {
-            index += 1;
-        }
-    }
+    let mut labels: Vec<_> = called_idents(expr_text)
+        .into_iter()
+        .filter_map(|ident| map_space_transform_label(ident, expr_text))
+        .collect();
     labels.dedup();
     labels
 }
@@ -413,18 +372,6 @@ fn map_space_transform_label(name: &str, expr_text: &str) -> Option<String> {
         }
         _ => None,
     }
-}
-
-fn format_space_transform_summary(labels: &[String]) -> String {
-    if labels.is_empty() {
-        return "probe".to_string();
-    }
-    const MAX_LABELS: usize = 3;
-    let mut parts = labels.iter().take(MAX_LABELS).cloned().collect::<Vec<_>>();
-    if labels.len() > MAX_LABELS {
-        parts.push(format!("+{}", labels.len() - MAX_LABELS));
-    }
-    parts.join(" -> ")
 }
 
 fn format_space_preview_detail(labels: &[String]) -> String {
@@ -712,9 +659,7 @@ fn build_viz_call_args(
         args.push(viz_context_expression(&context.ty, &options)?);
         fixed_count = 1;
     } else {
-        if !reflected_params.is_empty() {
-            args.push(options.uv_expr.to_string());
-        }
+        args.push(options.uv_expr.to_string());
         if reflected_params.len() > 1 {
             args.push(options.time_expr.to_string());
         }
@@ -751,11 +696,8 @@ fn build_viz_call_args(
         manifest_defs
             .into_iter()
             .map(|def| ParamDef {
-                name: def.name.clone(),
-                ty: reflected_by_name
-                    .get(&def.name)
-                    .cloned()
-                    .unwrap_or(def.ty.clone()),
+                ty: reflected_by_name.get(&def.name).cloned().unwrap_or(def.ty),
+                name: def.name,
             })
             .collect()
     };
