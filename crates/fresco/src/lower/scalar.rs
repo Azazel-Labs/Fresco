@@ -29,22 +29,8 @@ impl<'h> FnCtx<'h> {
     }
 
     fn sx_vec_is_sample_point_invariant(&mut self, v: &crate::hir::SxVec) -> bool {
-        match v {
-            crate::hir::SxVec::V2(v) => {
-                self.sx_is_sample_point_invariant(&v.0) && self.sx_is_sample_point_invariant(&v.1)
-            }
-            crate::hir::SxVec::V3(v) => {
-                self.sx_is_sample_point_invariant(&v.0)
-                    && self.sx_is_sample_point_invariant(&v.1)
-                    && self.sx_is_sample_point_invariant(&v.2)
-            }
-            crate::hir::SxVec::V4(v) => {
-                self.sx_is_sample_point_invariant(&v.0)
-                    && self.sx_is_sample_point_invariant(&v.1)
-                    && self.sx_is_sample_point_invariant(&v.2)
-                    && self.sx_is_sample_point_invariant(&v.3)
-            }
-        }
+        v.components()
+            .all(|component| self.sx_is_sample_point_invariant(component))
     }
 
     fn user_helper_is_sample_point_invariant(&mut self, helper_id: &str) -> bool {
@@ -230,266 +216,98 @@ impl<'h> FnCtx<'h> {
             .max()
     }
 
-    fn try_param_vector2(&self, v: &(Sx, Sx)) -> Option<Handle<Ex>> {
-        let (Sx::Param(x), Sx::Param(y)) = (&v.0, &v.1) else {
-            return None;
-        };
-        let xh = *self.ir.param_scalars.get(x)?;
-        let yh = *self.ir.param_scalars.get(y)?;
-        if self.ir.is_scalar_slot_ptr(xh) || self.ir.is_scalar_slot_ptr(yh) {
-            return None;
-        }
-        let (xb, xi) = self.ir.access_index_of(xh)?;
-        let (yb, yi) = self.ir.access_index_of(yh)?;
-        if xb == yb && xi == 0 && yi == 1 && self.param_base_max_access_index(xb) == Some(1) {
-            Some(xb)
-        } else {
-            None
-        }
-    }
-
-    fn try_param_vector3(&self, v: &(Sx, Sx, Sx)) -> Option<Handle<Ex>> {
-        let (Sx::Param(x), Sx::Param(y), Sx::Param(z)) = (&v.0, &v.1, &v.2) else {
-            return None;
-        };
-        let xh = *self.ir.param_scalars.get(x)?;
-        let yh = *self.ir.param_scalars.get(y)?;
-        let zh = *self.ir.param_scalars.get(z)?;
-        if self.ir.is_scalar_slot_ptr(xh)
-            || self.ir.is_scalar_slot_ptr(yh)
-            || self.ir.is_scalar_slot_ptr(zh)
-        {
+    /// Reuse a whole vector parameter when every component is the matching
+    /// lane (`.x`, `.y`, ...) of the same parameter base and that base has no
+    /// further lanes.
+    fn try_param_vector(&self, v: &crate::hir::SxVec) -> Option<Handle<Ex>> {
+        let handles = v
+            .components()
+            .map(|component| match component {
+                Sx::Param(name) => self.ir.param_scalars.get(name).copied(),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()?;
+        if handles.iter().any(|h| self.ir.is_scalar_slot_ptr(*h)) {
             return None;
         }
-        let (xb, xi) = self.ir.access_index_of(xh)?;
-        let (yb, yi) = self.ir.access_index_of(yh)?;
-        let (zb, zi) = self.ir.access_index_of(zh)?;
-        if xb == yb
-            && yb == zb
-            && xi == 0
-            && yi == 1
-            && zi == 2
-            && self.param_base_max_access_index(xb) == Some(2)
-        {
-            Some(xb)
-        } else {
-            None
-        }
-    }
-
-    fn try_param_vector4(&self, v: &(Sx, Sx, Sx, Sx)) -> Option<Handle<Ex>> {
-        let (Sx::Param(x), Sx::Param(y), Sx::Param(z), Sx::Param(w)) = (&v.0, &v.1, &v.2, &v.3)
-        else {
-            return None;
-        };
-        let xh = *self.ir.param_scalars.get(x)?;
-        let yh = *self.ir.param_scalars.get(y)?;
-        let zh = *self.ir.param_scalars.get(z)?;
-        let wh = *self.ir.param_scalars.get(w)?;
-        if self.ir.is_scalar_slot_ptr(xh)
-            || self.ir.is_scalar_slot_ptr(yh)
-            || self.ir.is_scalar_slot_ptr(zh)
-            || self.ir.is_scalar_slot_ptr(wh)
-        {
-            return None;
-        }
-        let (xb, xi) = self.ir.access_index_of(xh)?;
-        let (yb, yi) = self.ir.access_index_of(yh)?;
-        let (zb, zi) = self.ir.access_index_of(zh)?;
-        let (wb, wi) = self.ir.access_index_of(wh)?;
-        if xb == yb
-            && yb == zb
-            && zb == wb
-            && xi == 0
-            && yi == 1
-            && zi == 2
-            && wi == 3
-            && self.param_base_max_access_index(xb) == Some(3)
-        {
-            Some(xb)
-        } else {
-            None
-        }
+        let lanes = handles
+            .iter()
+            .map(|h| self.ir.access_index_of(*h))
+            .collect::<Option<Vec<_>>>()?;
+        let base = lanes[0].0;
+        let last = u32::try_from(lanes.len() - 1).ok()?;
+        let in_order = lanes
+            .iter()
+            .enumerate()
+            .all(|(lane, (b, index))| *b == base && usize::try_from(*index) == Ok(lane));
+        (in_order && self.param_base_max_access_index(base) == Some(last)).then_some(base)
     }
 
     fn vec_from_sxvec(&mut self, v: &crate::hir::SxVec, p: Handle<Ex>) -> Handle<Ex> {
-        use crate::hir::SxVec;
-        match v {
-            SxVec::V2(v) => {
-                match (&v.0, &v.1) {
-                    (
-                        Sx::NormalizeComponent {
-                            v: inner_v,
-                            index: 0,
-                        },
-                        Sx::NormalizeComponent { index: 1, .. },
-                    ) => {
-                        let vec = self.vec_from_sxvec(inner_v, p);
-                        return self.ir.m1(Mf::Normalize, vec);
-                    }
-                    (Sx::MinComponent { a, b, index: 0 }, Sx::MinComponent { index: 1, .. }) => {
-                        let av = self.vec_from_sxvec(a, p);
-                        let bv = self.vec_from_sxvec(b, p);
-                        return self.ir.m2(Mf::Min, av, bv);
-                    }
-                    (Sx::MaxComponent { a, b, index: 0 }, Sx::MaxComponent { index: 1, .. }) => {
-                        let av = self.vec_from_sxvec(a, p);
-                        let bv = self.vec_from_sxvec(b, p);
-                        return self.ir.m2(Mf::Max, av, bv);
-                    }
-                    (
-                        Sx::ClampVecComponent {
-                            x,
-                            lo,
-                            hi,
-                            index: 0,
-                        },
-                        Sx::ClampVecComponent { index: 1, .. },
-                    ) => {
-                        let xv = self.vec_from_sxvec(x, p);
-                        let lv = self.vec_from_sxvec(lo, p);
-                        let hv = self.vec_from_sxvec(hi, p);
-                        return self.ir.m3(Mf::Clamp, xv, lv, hv);
-                    }
-                    _ => {}
-                }
-                if let Some(base) = self.try_param_vector2(v) {
-                    return base;
-                }
-                let (x, y) = &**v;
-                let xh = self.sx_at(x, p);
-                let yh = self.sx_at(y, p);
-                self.ir.add(Ex::Compose {
-                    ty: self.ir.types.v2,
-                    components: vec![xh, yh],
-                })
+        // Componentwise builtins that were scalarized by the checker are
+        // re-vectorized when every lane `i` carries the same op with `index: i`.
+        let same_op_in_every_lane = |matches_lane: fn(&Sx, u8) -> bool| {
+            v.components()
+                .zip(0u8..)
+                .skip(1)
+                .all(|(component, lane)| matches_lane(component, lane))
+        };
+        match v.component(0) {
+            Some(Sx::NormalizeComponent {
+                v: inner_v,
+                index: 0,
+            }) if same_op_in_every_lane(
+                |c, lane| matches!(c, Sx::NormalizeComponent { index, .. } if *index == lane),
+            ) =>
+            {
+                let vec = self.vec_from_sxvec(inner_v, p);
+                return self.ir.m1(Mf::Normalize, vec);
             }
-            SxVec::V3(v) => {
-                match (&v.0, &v.1, &v.2) {
-                    (
-                        Sx::NormalizeComponent {
-                            v: inner_v,
-                            index: 0,
-                        },
-                        Sx::NormalizeComponent { index: 1, .. },
-                        Sx::NormalizeComponent { index: 2, .. },
-                    ) => {
-                        let vec = self.vec_from_sxvec(inner_v, p);
-                        return self.ir.m1(Mf::Normalize, vec);
-                    }
-                    (
-                        Sx::MinComponent { a, b, index: 0 },
-                        Sx::MinComponent { index: 1, .. },
-                        Sx::MinComponent { index: 2, .. },
-                    ) => {
-                        let av = self.vec_from_sxvec(a, p);
-                        let bv = self.vec_from_sxvec(b, p);
-                        return self.ir.m2(Mf::Min, av, bv);
-                    }
-                    (
-                        Sx::MaxComponent { a, b, index: 0 },
-                        Sx::MaxComponent { index: 1, .. },
-                        Sx::MaxComponent { index: 2, .. },
-                    ) => {
-                        let av = self.vec_from_sxvec(a, p);
-                        let bv = self.vec_from_sxvec(b, p);
-                        return self.ir.m2(Mf::Max, av, bv);
-                    }
-                    (
-                        Sx::ClampVecComponent {
-                            x,
-                            lo,
-                            hi,
-                            index: 0,
-                        },
-                        Sx::ClampVecComponent { index: 1, .. },
-                        Sx::ClampVecComponent { index: 2, .. },
-                    ) => {
-                        let xv = self.vec_from_sxvec(x, p);
-                        let lv = self.vec_from_sxvec(lo, p);
-                        let hv = self.vec_from_sxvec(hi, p);
-                        return self.ir.m3(Mf::Clamp, xv, lv, hv);
-                    }
-                    _ => {}
-                }
-                if let Some(base) = self.try_param_vector3(v) {
-                    return base;
-                }
-                let (x, y, z) = &**v;
-                let xh = self.sx_at(x, p);
-                let yh = self.sx_at(y, p);
-                let zh = self.sx_at(z, p);
-                self.ir.add(Ex::Compose {
-                    ty: self.ir.types.v3,
-                    components: vec![xh, yh, zh],
-                })
+            Some(Sx::MinComponent { a, b, index: 0 })
+                if same_op_in_every_lane(
+                    |c, lane| matches!(c, Sx::MinComponent { index, .. } if *index == lane),
+                ) =>
+            {
+                let av = self.vec_from_sxvec(a, p);
+                let bv = self.vec_from_sxvec(b, p);
+                return self.ir.m2(Mf::Min, av, bv);
             }
-            SxVec::V4(v) => {
-                match (&v.0, &v.1, &v.2, &v.3) {
-                    (
-                        Sx::NormalizeComponent {
-                            v: inner_v,
-                            index: 0,
-                        },
-                        Sx::NormalizeComponent { index: 1, .. },
-                        Sx::NormalizeComponent { index: 2, .. },
-                        Sx::NormalizeComponent { index: 3, .. },
-                    ) => {
-                        let vec = self.vec_from_sxvec(inner_v, p);
-                        return self.ir.m1(Mf::Normalize, vec);
-                    }
-                    (
-                        Sx::MinComponent { a, b, index: 0 },
-                        Sx::MinComponent { index: 1, .. },
-                        Sx::MinComponent { index: 2, .. },
-                        Sx::MinComponent { index: 3, .. },
-                    ) => {
-                        let av = self.vec_from_sxvec(a, p);
-                        let bv = self.vec_from_sxvec(b, p);
-                        return self.ir.m2(Mf::Min, av, bv);
-                    }
-                    (
-                        Sx::MaxComponent { a, b, index: 0 },
-                        Sx::MaxComponent { index: 1, .. },
-                        Sx::MaxComponent { index: 2, .. },
-                        Sx::MaxComponent { index: 3, .. },
-                    ) => {
-                        let av = self.vec_from_sxvec(a, p);
-                        let bv = self.vec_from_sxvec(b, p);
-                        return self.ir.m2(Mf::Max, av, bv);
-                    }
-                    (
-                        Sx::ClampVecComponent {
-                            x,
-                            lo,
-                            hi,
-                            index: 0,
-                        },
-                        Sx::ClampVecComponent { index: 1, .. },
-                        Sx::ClampVecComponent { index: 2, .. },
-                        Sx::ClampVecComponent { index: 3, .. },
-                    ) => {
-                        let xv = self.vec_from_sxvec(x, p);
-                        let lv = self.vec_from_sxvec(lo, p);
-                        let hv = self.vec_from_sxvec(hi, p);
-                        return self.ir.m3(Mf::Clamp, xv, lv, hv);
-                    }
-                    _ => {}
-                }
-                if let Some(base) = self.try_param_vector4(v) {
-                    return base;
-                }
-                let (x, y, z, w) = &**v;
-                let xh = self.sx_at(x, p);
-                let yh = self.sx_at(y, p);
-                let zh = self.sx_at(z, p);
-                let wh = self.sx_at(w, p);
-                self.ir.add(Ex::Compose {
-                    ty: self.ir.types.v4,
-                    components: vec![xh, yh, zh, wh],
-                })
+            Some(Sx::MaxComponent { a, b, index: 0 })
+                if same_op_in_every_lane(
+                    |c, lane| matches!(c, Sx::MaxComponent { index, .. } if *index == lane),
+                ) =>
+            {
+                let av = self.vec_from_sxvec(a, p);
+                let bv = self.vec_from_sxvec(b, p);
+                return self.ir.m2(Mf::Max, av, bv);
             }
+            Some(Sx::ClampVecComponent {
+                x,
+                lo,
+                hi,
+                index: 0,
+            }) if same_op_in_every_lane(
+                |c, lane| matches!(c, Sx::ClampVecComponent { index, .. } if *index == lane),
+            ) =>
+            {
+                let xv = self.vec_from_sxvec(x, p);
+                let lv = self.vec_from_sxvec(lo, p);
+                let hv = self.vec_from_sxvec(hi, p);
+                return self.ir.m3(Mf::Clamp, xv, lv, hv);
+            }
+            _ => {}
         }
+        if let Some(base) = self.try_param_vector(v) {
+            return base;
+        }
+        let components = v
+            .components()
+            .map(|component| self.sx_at(component, p))
+            .collect();
+        self.ir.add(Ex::Compose {
+            ty: self.ir.types.f32_vec(v.width()),
+            components,
+        })
     }
 
     // ------------------------------------------------------- HIR scalars

@@ -31,20 +31,7 @@ fn clamp(value: f32, lo: f32, hi: f32) -> Result<f32, Error> {
     Ok(value.clamp(lo, hi))
 }
 fn vector(v: &SxVec, vars: &HashMap<&str, f32>) -> Result<Vec<f32>, Error> {
-    match v {
-        SxVec::V2(v) => Ok(vec![evaluate(&v.0, vars)?, evaluate(&v.1, vars)?]),
-        SxVec::V3(v) => Ok(vec![
-            evaluate(&v.0, vars)?,
-            evaluate(&v.1, vars)?,
-            evaluate(&v.2, vars)?,
-        ]),
-        SxVec::V4(v) => Ok(vec![
-            evaluate(&v.0, vars)?,
-            evaluate(&v.1, vars)?,
-            evaluate(&v.2, vars)?,
-            evaluate(&v.3, vars)?,
-        ]),
-    }
+    v.components().map(|c| evaluate(c, vars)).collect()
 }
 
 pub(crate) fn evaluate(sx: &Sx, vars: &HashMap<&str, f32>) -> Result<f32, Error> {

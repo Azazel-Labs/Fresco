@@ -198,6 +198,18 @@ struct TypeHandles {
     contour_arrays: [Handle<naga::Type>; 3],
 }
 
+impl TypeHandles {
+    /// The `vecN<f32>` type for `width` in `2..=4`.
+    fn f32_vec(&self, width: usize) -> Handle<naga::Type> {
+        match width {
+            2 => self.v2,
+            3 => self.v3,
+            4 => self.v4,
+            _ => unreachable!("f32 vectors have 2, 3, or 4 components, not {width}"),
+        }
+    }
+}
+
 struct ModuleBuilder {
     module: naga::Module,
     function_dedup_cache: HashMap<String, Handle<naga::Function>>,

@@ -1335,6 +1335,41 @@ pub enum SxVec {
 }
 
 impl SxVec {
+    /// Number of components (2, 3, or 4).
+    #[must_use]
+    pub fn width(&self) -> usize {
+        match self {
+            SxVec::V2(_) => 2,
+            SxVec::V3(_) => 3,
+            SxVec::V4(_) => 4,
+        }
+    }
+
+    /// The component at `index`, or `None` when `index >= self.width()`.
+    #[must_use]
+    pub fn component(&self, index: usize) -> Option<&Sx> {
+        match (self, index) {
+            (SxVec::V2(v), 0) => Some(&v.0),
+            (SxVec::V2(v), 1) => Some(&v.1),
+            (SxVec::V3(v), 0) => Some(&v.0),
+            (SxVec::V3(v), 1) => Some(&v.1),
+            (SxVec::V3(v), 2) => Some(&v.2),
+            (SxVec::V4(v), 0) => Some(&v.0),
+            (SxVec::V4(v), 1) => Some(&v.1),
+            (SxVec::V4(v), 2) => Some(&v.2),
+            (SxVec::V4(v), 3) => Some(&v.3),
+            _ => None,
+        }
+    }
+
+    /// The components in order (`x`, `y`, then `z` and `w` when present).
+    pub fn components(&self) -> impl ExactSizeIterator<Item = &Sx> + '_ {
+        (0..self.width()).map(|index| {
+            self.component(index)
+                .expect("component index is below the vector width")
+        })
+    }
+
     /// Apply coordinate substitution to every `Sx` leaf in this vector.
     pub fn subst_coord(self, new_x: &Sx, new_y: &Sx) -> SxVec {
         match self {
@@ -1394,23 +1429,7 @@ impl SxVec {
 
     /// Visit every `Sx` leaf in this vector.
     pub fn for_each_sx(&self, visit: &mut impl FnMut(&Sx)) {
-        match self {
-            SxVec::V2(v) => {
-                visit(&v.0);
-                visit(&v.1);
-            }
-            SxVec::V3(v) => {
-                visit(&v.0);
-                visit(&v.1);
-                visit(&v.2);
-            }
-            SxVec::V4(v) => {
-                visit(&v.0);
-                visit(&v.1);
-                visit(&v.2);
-                visit(&v.3);
-            }
-        }
+        self.components().for_each(visit);
     }
 }
 

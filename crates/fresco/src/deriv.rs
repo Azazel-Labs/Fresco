@@ -186,18 +186,7 @@ fn d(expr: &Sx, axis: Axis) -> Sx {
 }
 
 fn vec_component(v: &SxVec, index: u8) -> Option<Sx> {
-    match (v, index) {
-        (SxVec::V2(v), 0) => Some(v.0.clone()),
-        (SxVec::V2(v), 1) => Some(v.1.clone()),
-        (SxVec::V3(v), 0) => Some(v.0.clone()),
-        (SxVec::V3(v), 1) => Some(v.1.clone()),
-        (SxVec::V3(v), 2) => Some(v.2.clone()),
-        (SxVec::V4(v), 0) => Some(v.0.clone()),
-        (SxVec::V4(v), 1) => Some(v.1.clone()),
-        (SxVec::V4(v), 2) => Some(v.2.clone()),
-        (SxVec::V4(v), 3) => Some(v.3.clone()),
-        _ => None,
-    }
+    v.component(usize::from(index)).cloned()
 }
 
 fn d_minmax_component(a: &SxVec, b: &SxVec, index: u8, axis: Axis) -> Sx {
@@ -231,47 +220,26 @@ fn add_terms(terms: Vec<Sx>) -> Sx {
 }
 
 fn d_dot(a: &SxVec, b: &SxVec, axis: Axis) -> Sx {
-    match (a, b) {
-        (SxVec::V2(va), SxVec::V2(vb)) => add_terms(vec![
-            d(&va.0, axis) * vb.0.clone() + va.0.clone() * d(&vb.0, axis),
-            d(&va.1, axis) * vb.1.clone() + va.1.clone() * d(&vb.1, axis),
-        ]),
-        (SxVec::V3(va), SxVec::V3(vb)) => add_terms(vec![
-            d(&va.0, axis) * vb.0.clone() + va.0.clone() * d(&vb.0, axis),
-            d(&va.1, axis) * vb.1.clone() + va.1.clone() * d(&vb.1, axis),
-            d(&va.2, axis) * vb.2.clone() + va.2.clone() * d(&vb.2, axis),
-        ]),
-        (SxVec::V4(va), SxVec::V4(vb)) => add_terms(vec![
-            d(&va.0, axis) * vb.0.clone() + va.0.clone() * d(&vb.0, axis),
-            d(&va.1, axis) * vb.1.clone() + va.1.clone() * d(&vb.1, axis),
-            d(&va.2, axis) * vb.2.clone() + va.2.clone() * d(&vb.2, axis),
-            d(&va.3, axis) * vb.3.clone() + va.3.clone() * d(&vb.3, axis),
-        ]),
-        _ => Sx::Lit(0.0),
+    if a.width() != b.width() {
+        return Sx::Lit(0.0);
     }
+    add_terms(
+        a.components()
+            .zip(b.components())
+            .map(|(a, b)| d(a, axis) * b.clone() + a.clone() * d(b, axis))
+            .collect(),
+    )
 }
 
 fn d_length(v: &SxVec, axis: Axis) -> Sx {
     let len = Sx::Length(v.clone());
     let len_safe = Sx::Max(Box::new(len), Box::new(Sx::Lit(1.0e-6)));
 
-    let numerator = match v {
-        SxVec::V2(v) => add_terms(vec![
-            v.0.clone() * d(&v.0, axis),
-            v.1.clone() * d(&v.1, axis),
-        ]),
-        SxVec::V3(v) => add_terms(vec![
-            v.0.clone() * d(&v.0, axis),
-            v.1.clone() * d(&v.1, axis),
-            v.2.clone() * d(&v.2, axis),
-        ]),
-        SxVec::V4(v) => add_terms(vec![
-            v.0.clone() * d(&v.0, axis),
-            v.1.clone() * d(&v.1, axis),
-            v.2.clone() * d(&v.2, axis),
-            v.3.clone() * d(&v.3, axis),
-        ]),
-    };
+    let numerator = add_terms(
+        v.components()
+            .map(|component| component.clone() * d(component, axis))
+            .collect(),
+    );
 
     numerator / len_safe
 }
@@ -784,16 +752,7 @@ mod tests {
     use std::collections::HashMap;
 
     fn eval_vec(expr: &SxVec, x: f32, y: f32) -> Vec<f32> {
-        match expr {
-            SxVec::V2(v) => vec![eval(&v.0, x, y), eval(&v.1, x, y)],
-            SxVec::V3(v) => vec![eval(&v.0, x, y), eval(&v.1, x, y), eval(&v.2, x, y)],
-            SxVec::V4(v) => vec![
-                eval(&v.0, x, y),
-                eval(&v.1, x, y),
-                eval(&v.2, x, y),
-                eval(&v.3, x, y),
-            ],
-        }
+        expr.components().map(|c| eval(c, x, y)).collect()
     }
 
     fn dummy_hir() -> Hir {
