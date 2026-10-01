@@ -104,9 +104,7 @@ impl ModuleLoader for FsModuleLoader<'_> {
                 full_path.display()
             )
         })?;
-        let src = std::fs::read_to_string(&canonical)
-            .map_err(|e| format!("cannot read imported module `{}`: {e}", canonical.display()))?;
-        Ok((canonical.display().to_string(), src))
+        read_module(&canonical, "imported module")
     }
 
     fn implicit_engine_modules(
@@ -117,49 +115,20 @@ impl ModuleLoader for FsModuleLoader<'_> {
             // An explicit profile is authoritative: never fall back to discovery
             // or to recursively loading an incomplete profile.
             let entry = engine_dir.join("engine.fr");
-            let canonical = std::fs::canonicalize(&entry).map_err(|e| {
-                format!(
-                    "cannot resolve explicit engine entry `{}`: {e}",
-                    entry.display()
-                )
-            })?;
-            let src = std::fs::read_to_string(&canonical).map_err(|e| {
-                format!(
-                    "cannot read explicit engine entry `{}`: {e}",
-                    canonical.display()
-                )
-            })?;
-            return Ok(vec![(canonical.display().to_string(), src)]);
+            return Ok(vec![read_canonical(&entry, "explicit engine entry")?]);
         }
-        let root_path = Path::new(root_canonical);
-        let Some(mut search_dir) = root_path.parent() else {
-            return Ok(Vec::new());
-        };
-
-        let mut engine_dir: Option<PathBuf> = None;
-        loop {
-            let candidate = search_dir.join("engine");
-            if candidate.is_dir() {
-                engine_dir = Some(candidate);
-                break;
-            }
-            let Some(parent) = search_dir.parent() else {
-                break;
-            };
-            search_dir = parent;
-        }
-
-        let Some(engine_dir) = engine_dir else {
+        // The nearest ancestor `engine` directory of the root file.
+        let Some(engine_dir) = Path::new(root_canonical).parent().and_then(|dir| {
+            dir.ancestors()
+                .map(|ancestor| ancestor.join("engine"))
+                .find(|candidate| candidate.is_dir())
+        }) else {
             return Ok(Vec::new());
         };
 
         let entry = engine_dir.join("engine.fr");
         if entry.is_file() {
-            let canonical = std::fs::canonicalize(&entry)
-                .map_err(|e| format!("cannot resolve engine entry `{}`: {e}", entry.display()))?;
-            let src = std::fs::read_to_string(&canonical)
-                .map_err(|e| format!("cannot read engine entry `{}`: {e}", canonical.display()))?;
-            return Ok(vec![(canonical.display().to_string(), src)]);
+            return Ok(vec![read_canonical(&entry, "engine entry")?]);
         }
 
         let mut files = Vec::new();
@@ -171,15 +140,13 @@ impl ModuleLoader for FsModuleLoader<'_> {
         })?;
         files.sort();
 
-        let mut out = Vec::with_capacity(files.len());
-        for file in files {
-            let canonical = std::fs::canonicalize(&file).unwrap_or(file.clone());
-            let src = std::fs::read_to_string(&canonical)
-                .map_err(|e| format!("cannot read engine module `{}`: {e}", canonical.display()))?;
-            out.push((canonical.display().to_string(), src));
-        }
-
-        Ok(out)
+        files
+            .into_iter()
+            .map(|file| {
+                let canonical = std::fs::canonicalize(&file).unwrap_or(file);
+                read_module(&canonical, "engine module")
+            })
+            .collect()
     }
 }
 
@@ -199,10 +166,9 @@ impl ModuleLoader for MemModuleLoader {
         import_path: &str,
         current_canonical: &str,
     ) -> Result<(String, String), String> {
-        let base_dir = match current_canonical.rfind('/') {
-            Some(i) => &current_canonical[..i],
-            None => "",
-        };
+        let base_dir = current_canonical
+            .rsplit_once('/')
+            .map_or("", |(parent, _)| parent);
         let canonical = normalize_virtual_path(base_dir, import_path).ok_or_else(|| {
             format!("cannot resolve import path `{import_path}` from `{current_canonical}`")
         })?;
@@ -253,6 +219,20 @@ impl ModuleLoader for MemModuleLoader {
     }
 }
 
+/// Read the `what` module at an already canonical path, keyed by that path.
+fn read_module(canonical: &Path, what: &str) -> Result<(String, String), String> {
+    let src = std::fs::read_to_string(canonical)
+        .map_err(|e| format!("cannot read {what} `{}`: {e}", canonical.display()))?;
+    Ok((canonical.display().to_string(), src))
+}
+
+/// Canonicalize `path`, then read it as the `what` module.
+fn read_canonical(path: &Path, what: &str) -> Result<(String, String), String> {
+    let canonical = std::fs::canonicalize(path)
+        .map_err(|e| format!("cannot resolve {what} `{}`: {e}", path.display()))?;
+    read_module(&canonical, what)
+}
+
 fn collect_fr_files_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
@@ -289,9 +269,5 @@ fn normalize_virtual_path(base_dir: &str, import_path: &str) -> Option<String> {
         }
     }
     let result = parts.join("/");
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
+    (!result.is_empty()).then_some(result)
 }
