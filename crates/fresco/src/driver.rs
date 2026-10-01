@@ -106,23 +106,25 @@ fn init_trace_subscriber_once(verbose: bool, trace_verbosity: TraceVerbosity) {
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(default_filter))
         };
 
+        use tracing_subscriber::fmt::format::FmtSpan;
+        fn init_fmt(filter: tracing_subscriber::EnvFilter, span_events: FmtSpan) {
+            let _ = tracing_subscriber::fmt()
+                .with_env_filter(filter)
+                .with_span_events(span_events)
+                .with_target(false)
+                .with_writer(std::io::stderr)
+                .try_init();
+        }
+
         match mode.as_str() {
             "1" | "on" | "fmt" => {
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(filter)
-                    .with_span_events(
-                        tracing_subscriber::fmt::format::FmtSpan::NEW
-                            | tracing_subscriber::fmt::format::FmtSpan::CLOSE,
-                    )
-                    .with_target(false)
-                    .with_writer(std::io::stderr)
-                    .try_init();
+                init_fmt(filter, FmtSpan::NEW | FmtSpan::CLOSE);
             }
             "json" => {
                 let _ = tracing_subscriber::fmt()
                     .json()
                     .with_env_filter(filter)
-                    .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+                    .with_span_events(FmtSpan::CLOSE)
                     .with_writer(std::io::stderr)
                     .try_init();
             }
@@ -147,12 +149,7 @@ fn init_trace_subscriber_once(verbose: bool, trace_verbosity: TraceVerbosity) {
                 eprintln!(
                     "FRESCO_TRACE=chrome requires --features trace-chrome; falling back to fmt"
                 );
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(filter)
-                    .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-                    .with_target(false)
-                    .with_writer(std::io::stderr)
-                    .try_init();
+                init_fmt(filter, FmtSpan::CLOSE);
             }
             #[cfg(feature = "trace-tracy")]
             "tracy" => {
@@ -168,21 +165,11 @@ fn init_trace_subscriber_once(verbose: bool, trace_verbosity: TraceVerbosity) {
                 eprintln!(
                     "FRESCO_TRACE=tracy requires --features trace-tracy; falling back to fmt"
                 );
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(filter)
-                    .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-                    .with_target(false)
-                    .with_writer(std::io::stderr)
-                    .try_init();
+                init_fmt(filter, FmtSpan::CLOSE);
             }
             other => {
                 eprintln!("unknown FRESCO_TRACE mode `{other}`. valid: off|fmt|json|chrome|tracy");
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(filter)
-                    .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-                    .with_target(false)
-                    .with_writer(std::io::stderr)
-                    .try_init();
+                init_fmt(filter, FmtSpan::CLOSE);
             }
         }
     });
