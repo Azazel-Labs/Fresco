@@ -119,6 +119,39 @@ pub(crate) fn build_shaders(
     })
 }
 
+/// How a stage reports Naga validation errors in its diagnostic message.
+#[derive(Debug, Clone, Copy)]
+enum ValidationErrorFormat {
+    Debug,
+    Display,
+}
+
+/// Parse, validate, and re-emit a generated visualizer `stage` shader.
+fn emit_normalized_wgsl(
+    source: &str,
+    stage: &str,
+    validation_format: ValidationErrorFormat,
+) -> Result<String, String> {
+    let module = naga::front::wgsl::parse_str(source)
+        .map_err(|err| format!("visualizer {stage} WGSL parse failed: {err}"))?;
+    let mut validator = naga::valid::Validator::new(
+        naga::valid::ValidationFlags::all(),
+        naga::valid::Capabilities::default(),
+    );
+    let info = validator
+        .validate(&module)
+        .map_err(|err| match validation_format {
+            ValidationErrorFormat::Debug => {
+                format!("visualizer {stage} naga validation failed: {err:?}")
+            }
+            ValidationErrorFormat::Display => {
+                format!("visualizer {stage} naga validation failed: {err}")
+            }
+        })?;
+    naga::back::wgsl::write_string(&module, &info, naga::back::wgsl::WriterFlags::empty())
+        .map_err(|err| format!("visualizer {stage} wgsl emit failed: {err}"))
+}
+
 #[cfg(test)]
 pub(crate) fn build_shader(
     variant_wgsl: &str,

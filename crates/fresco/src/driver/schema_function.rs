@@ -231,14 +231,7 @@ pub(super) fn validate_resource_functions(
                     &mut source,
                 )?;
             }
-            let module = naga::front::wgsl::parse_str(&source)
-                .map_err(|error| error.emit_to_string(&source))?;
-            naga::valid::Validator::new(
-                naga::valid::ValidationFlags::all(),
-                naga::valid::Capabilities::all(),
-            )
-            .validate(&module)
-            .map_err(|error| error.emit_to_string(&source))?;
+            super::gpu_function::parse_validate(&source, naga::valid::Capabilities::all())?;
             Ok(())
         };
         validate().map_err(|message| {
@@ -1460,13 +1453,8 @@ impl SchemaFunction {
         let probe = format!(
             "{definitions}{schema}{functions}fn {entry}({signature}) {{ let fresco_schema_result = {output}; }}\n"
         );
-        let module = naga::front::wgsl::parse_str(&probe).map_err(|e| e.emit_to_string(&probe))?;
-        let info = naga::valid::Validator::new(
-            naga::valid::ValidationFlags::all(),
-            naga::valid::Capabilities::all(),
-        )
-        .validate(&module)
-        .map_err(|e| e.emit_to_string(&probe))?;
+        let (module, info) =
+            super::gpu_function::parse_validate(&probe, naga::valid::Capabilities::all())?;
         let (handle, function) = module
             .functions
             .iter()
@@ -1528,14 +1516,7 @@ impl SchemaFunction {
         let source =
             format!("{functions}fn {entry}({signature}) -> {return_type} {{ return {output}; }}\n");
         let validation = format!("{definitions}{schema}{source}");
-        let module =
-            naga::front::wgsl::parse_str(&validation).map_err(|e| e.emit_to_string(&validation))?;
-        naga::valid::Validator::new(
-            naga::valid::ValidationFlags::all(),
-            naga::valid::Capabilities::all(),
-        )
-        .validate(&module)
-        .map_err(|e| e.emit_to_string(&validation))?;
+        super::gpu_function::parse_validate(&validation, naga::valid::Capabilities::all())?;
         let mut type_definitions = BTreeMap::new();
         for definition in definitions.split_inclusive("}\n") {
             let name = definition

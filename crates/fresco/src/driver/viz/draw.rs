@@ -123,19 +123,5 @@ fn fs(in: VsOut) -> @location(0) vec4<f32> {{
         shade = shade,
     );
 
-    emit_normalized_wgsl(&source)
-}
-
-fn emit_normalized_wgsl(source: &str) -> Result<String, String> {
-    let module = naga::front::wgsl::parse_str(source)
-        .map_err(|err| format!("visualizer draw WGSL parse failed: {err}"))?;
-    let mut validator = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    );
-    let info = validator
-        .validate(&module)
-        .map_err(|err| format!("visualizer draw naga validation failed: {err:?}"))?;
-    naga::back::wgsl::write_string(&module, &info, naga::back::wgsl::WriterFlags::empty())
-        .map_err(|err| format!("visualizer draw wgsl emit failed: {err}"))
+    super::emit_normalized_wgsl(&source, "draw", super::ValidationErrorFormat::Debug)
 }

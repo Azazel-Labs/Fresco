@@ -651,16 +651,7 @@ draw Outline(geometry: Geometry, ink: color, target: attachment<rgba16float,pres
                 ),
             ),
         ]);
-        let compiled = super::super::compile_bundle_virtual(&files, "main.fr", false).unwrap();
-        let module = naga::front::wgsl::parse_str(&compiled.wgsl).unwrap();
-        naga::valid::Validator::new(
-            naga::valid::ValidationFlags::all(),
-            naga::valid::Capabilities::default(),
-        )
-        .validate(&module)
-        .unwrap();
-        let manifest: fresco_artifact::ManifestRoot =
-            serde_json::from_str(&compiled.manifest).unwrap();
+        let (module, manifest) = super::super::style_tests::compile(&files);
         let surface = &manifest.surfaces[0];
         let producer = surface
             .mesh_passes

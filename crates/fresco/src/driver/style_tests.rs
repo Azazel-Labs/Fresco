@@ -61,7 +61,10 @@ style Half for base : Response {
     files
 }
 
-fn compile(files: &HashMap<String, String>) -> (naga::Module, fresco_artifact::ManifestRoot) {
+/// Compile `files` from `main.fr`, validate the WGSL, and parse the manifest.
+pub(super) fn compile(
+    files: &HashMap<String, String>,
+) -> (naga::Module, fresco_artifact::ManifestRoot) {
     let output = compile_bundle_virtual(files, "main.fr", false).unwrap();
     let module = naga::front::wgsl::parse_str(&output.wgsl).unwrap();
     naga::valid::Validator::new(

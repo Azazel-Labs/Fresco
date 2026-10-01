@@ -26,7 +26,7 @@ fn cs_reduce() {{
         params_field = preview_uniform_params_field_wgsl(),
         sample_count = VIZ_SERIES_SAMPLES,
     );
-    emit_normalized_wgsl(&source)
+    super::emit_normalized_wgsl(&source, "reduce", super::ValidationErrorFormat::Display)
 }
 
 #[expect(
@@ -128,19 +128,5 @@ fn cs_reduce() {{
         fit_logic = fit_logic,
     );
 
-    emit_normalized_wgsl(&source)
-}
-
-fn emit_normalized_wgsl(source: &str) -> Result<String, String> {
-    let module = naga::front::wgsl::parse_str(source)
-        .map_err(|err| format!("visualizer reduce WGSL parse failed: {err}"))?;
-    let mut validator = naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::default(),
-    );
-    let info = validator
-        .validate(&module)
-        .map_err(|err| format!("visualizer reduce naga validation failed: {err}"))?;
-    naga::back::wgsl::write_string(&module, &info, naga::back::wgsl::WriterFlags::empty())
-        .map_err(|err| format!("visualizer reduce wgsl emit failed: {err}"))
+    super::emit_normalized_wgsl(&source, "reduce", super::ValidationErrorFormat::Display)
 }

@@ -2335,16 +2335,7 @@ provide Action for main_plan { finish { complete: all(first); presentation: all(
     }
     #[test]
     fn style_operations_compile_reusable_draws() {
-        let output = super::super::compile_bundle_virtual(&files(), "main.fr", false).unwrap();
-        let module = naga::front::wgsl::parse_str(&output.wgsl).unwrap();
-        naga::valid::Validator::new(
-            naga::valid::ValidationFlags::all(),
-            naga::valid::Capabilities::default(),
-        )
-        .validate(&module)
-        .unwrap();
-        let manifest: fresco_artifact::ManifestRoot =
-            serde_json::from_str(&output.manifest).unwrap();
+        let (_, manifest) = super::super::style_tests::compile(&files());
         let renderer = manifest.renderers.iter().find(|r| r.selected).unwrap();
         let invocations: Vec<_> = renderer
             .steps

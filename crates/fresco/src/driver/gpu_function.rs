@@ -557,6 +557,18 @@ pub(super) fn format_float(value: f64) -> String {
     }
 }
 
+/// Parse and validate WGSL, reporting either failure against `source`.
+pub(super) fn parse_validate(
+    source: &str,
+    capabilities: naga::valid::Capabilities,
+) -> Result<(naga::Module, naga::valid::ModuleInfo), String> {
+    let module = naga::front::wgsl::parse_str(source).map_err(|e| e.emit_to_string(source))?;
+    let info = naga::valid::Validator::new(naga::valid::ValidationFlags::all(), capabilities)
+        .validate(&module)
+        .map_err(|e| e.emit_to_string(source))?;
+    Ok((module, info))
+}
+
 /// Replace every character that is not an ASCII identifier character with `_`.
 pub(super) fn sanitize(name: &str) -> String {
     name.chars()
