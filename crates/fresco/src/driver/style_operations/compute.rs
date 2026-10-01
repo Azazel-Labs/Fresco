@@ -18,7 +18,7 @@ pub(super) fn scalar_argument(
     value: &SExpr,
 ) -> Result<Argument, Vec<Diag>> {
     Ok(
-        if let Some((index, setting)) = path(value).and_then(|name| {
+        if let Some((index, setting)) = value.dotted_path().and_then(|name| {
             style
                 .params
                 .iter()
@@ -144,7 +144,7 @@ pub(super) fn instantiate(
             span: value.span.clone(),
         });
         let value = projected_value.as_ref().unwrap_or(value);
-        let ty = compact(
+        let ty = compact_type(
             projections
                 .get(&parameter.name)
                 .map_or(parameter.ty.as_str(), |projection| {
@@ -191,7 +191,7 @@ pub(super) fn instantiate(
                         "compute input requires a selected renderer provider",
                     )
                 })?;
-            let name = path(value).expect("validated resource argument");
+            let name = value.dotted_path().expect("validated resource argument");
             let contract = context
                 .style_contracts
                 .iter()

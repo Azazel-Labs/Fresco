@@ -1,5 +1,10 @@
 use crate::lexer::{Token, Unit};
 
+/// A type spelling with all whitespace removed, for spelling comparisons.
+pub(crate) fn compact_type(ty: &str) -> String {
+    ty.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
 pub(crate) fn canonical_layout_identity(value: &str) -> String {
     value
         .chars()

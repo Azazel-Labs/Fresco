@@ -55,14 +55,6 @@ pub(super) fn resource_dimensions(resource: &ResourceType) -> &'static [(&'stati
     }
 }
 
-fn path(value: &SExpr) -> Option<String> {
-    match &value.node {
-        Expr::Var(name) => Some(name.clone()),
-        Expr::Member(base, name) => Some(format!("{}.{name}", path(base)?)),
-        _ => None,
-    }
-}
-
 /// Only CPU-known operation inputs and resource dimensions can construct work.
 /// Values read out of shader buffers or arbitrary view fields cannot size an
 /// allocation without GPU readback, which is outside this operation model.
@@ -71,7 +63,7 @@ pub(super) fn host_type(
     operation: &StyleOperation,
     value: &SExpr,
 ) -> Result<String, Vec<Diag>> {
-    if let Some(name) = path(value) {
+    if let Some(name) = value.dotted_path() {
         if matches!(name.as_str(), "true" | "false") {
             return Ok("bool".into());
         }

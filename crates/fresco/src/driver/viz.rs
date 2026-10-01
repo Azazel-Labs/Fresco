@@ -1,3 +1,4 @@
+use crate::pipeline_layout::compact_type;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -888,7 +889,7 @@ fn parse_entry_params(wgsl: &str, fn_name: &str) -> Vec<EntryParam> {
             };
             EntryParam {
                 name: name.to_string(),
-                ty: normalize_type_name(ty),
+                ty: compact_type(ty),
             }
         })
         .collect()
@@ -926,7 +927,7 @@ fn detect_fresco_entry_function(wgsl: &str) -> Option<String> {
             .filter(|part| !part.is_empty())
             .map(|part| {
                 part.find(':')
-                    .map(|idx| normalize_type_name(&part[idx + 1..]))
+                    .map(|idx| compact_type(&part[idx + 1..]))
                     .unwrap_or_default()
             })
             .collect::<Vec<_>>();
@@ -960,7 +961,7 @@ fn is_generated_helper_function_name(name: &str) -> bool {
 fn is_canvas_entry_signature(types: &[String]) -> bool {
     let t = types
         .iter()
-        .map(|item| normalize_type_name(item))
+        .map(|item| compact_type(item))
         .collect::<Vec<_>>();
     (t.len() >= 3 && t[0] == "vec2<f32>" && t[1] == "f32" && t[2] == "vec2<f32>")
         || (t.len() >= 4
@@ -973,7 +974,7 @@ fn is_canvas_entry_signature(types: &[String]) -> bool {
 fn entry_prefix_info_from_types(types: &[String]) -> (bool, usize) {
     let t = types
         .iter()
-        .map(|item| normalize_type_name(item))
+        .map(|item| compact_type(item))
         .collect::<Vec<_>>();
     let has_base = t.len() >= 3 && t[0] == "vec2<f32>" && t[1] == "f32";
     if !has_base {
@@ -988,12 +989,8 @@ fn entry_prefix_info_from_types(types: &[String]) -> (bool, usize) {
     (false, 3)
 }
 
-fn normalize_type_name(ty: &str) -> String {
-    ty.chars().filter(|ch| !ch.is_whitespace()).collect()
-}
-
 fn is_color_like_param_type(ty: &str) -> bool {
-    matches!(normalize_type_name(ty).as_str(), "color" | "vec4<f32>")
+    matches!(compact_type(ty).as_str(), "color" | "vec4<f32>")
 }
 
 fn slot_width_for_type(ty: &str) -> usize {
@@ -1018,7 +1015,7 @@ fn uniform_vec4_expression(index: usize) -> String {
 
 fn viz_uniform_arg_expression(ty: &str, slot_offset: usize) -> String {
     let slot = uniform_param_expression(slot_offset);
-    match normalize_type_name(ty).as_str() {
+    match compact_type(ty).as_str() {
         "bool" => format!("({slot} >= 0.5)"),
         "u32" => format!("u32(max({slot}, 0.0))"),
         "i32" => format!("i32(round({slot}))"),

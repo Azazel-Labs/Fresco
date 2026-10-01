@@ -7,7 +7,8 @@ fn geometry(
     operation: &StyleOperation,
     value: &SExpr,
 ) -> Result<String, Vec<Diag>> {
-    let name = path(value)
+    let name = value
+        .dotted_path()
         .ok_or_else(|| fail(&value.span, "expected a prepared geometry bounds member"))?;
     let (parameter, member) = name
         .split_once('.')
@@ -42,7 +43,7 @@ pub(super) fn metadata(
 ) -> Result<(Option<ManifestDrawBounds>, Option<String>), Vec<Diag>> {
     let bounds = match &operation.visibility {
         None => None,
-        Some(value) if path(value).as_deref() == Some("uncullable") => None,
+        Some(value) if value.dotted_path().as_deref() == Some("uncullable") => None,
         Some(value) => {
             let Expr::Pipe {
                 recv, name, args, ..
@@ -85,7 +86,8 @@ pub(super) fn metadata(
         .sort_position
         .as_ref()
         .map(|value| {
-            let member = path(value)
+            let member = value
+                .dotted_path()
                 .and_then(|name| name.strip_suffix(".center").map(str::to_owned))
                 .ok_or_else(|| {
                     fail(&value.span, "sort_position requires geometry.bounds.center")

@@ -1,4 +1,5 @@
-use super::{VIZ_SERIES_SAMPLES, normalize_type_name, preview_uniform_params_field_wgsl};
+use super::{VIZ_SERIES_SAMPLES, preview_uniform_params_field_wgsl};
+use crate::pipeline_layout::compact_type;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DrawMode {
@@ -62,7 +63,7 @@ pub(super) fn build_draw_shader(
         ),
     };
 
-    let bridge_return = match normalize_type_name(semantic_type).as_str() {
+    let bridge_return = match compact_type(semantic_type).as_str() {
         "space" | "vec2" | "vec2<f32>" => {
             format!(
                 "let raw = {fn_name}({call}); return vec4<f32>(raw.x, raw.y, 0.0, 1.0);",

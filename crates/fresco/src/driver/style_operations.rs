@@ -1,5 +1,6 @@
 //! Instantiate authored draw operations from a statically constructed style graph.
 use crate::ast::{attr_arg, attrs_named, find_attr, find_attr_with_first_arg, has_attr};
+use crate::pipeline_layout::compact_type;
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestImplementationSelection, ManifestStyleInvocation};
 use std::collections::{BTreeMap, BTreeSet};
@@ -10,16 +11,6 @@ mod compute;
 const MAX_NODES: usize = 1024;
 fn fail(span: &Span, message: impl Into<String>) -> Vec<Diag> {
     vec![Diag::error(span.clone(), message)]
-}
-fn path(value: &SExpr) -> Option<String> {
-    match &value.node {
-        Expr::Var(name) => Some(name.clone()),
-        Expr::Member(base, member) => Some(format!("{}.{member}", path(base)?)),
-        _ => None,
-    }
-}
-fn compact(ty: &str) -> String {
-    ty.chars().filter(|c| !c.is_whitespace()).collect()
 }
 fn scalar(ty: &str) -> bool {
     matches!(
@@ -172,7 +163,7 @@ impl Graph<'_> {
         value: &SExpr,
         scope: &Scope,
     ) -> Result<fresco_artifact::types::SamplerPreset, Vec<Diag>> {
-        let symbol = path(value).ok_or_else(|| {
+        let symbol = value.dotted_path().ok_or_else(|| {
             fail(
                 &value.span,
                 "sampler binding requires an immutable standard sampler",
@@ -234,7 +225,7 @@ impl Graph<'_> {
                         .ok_or_else(|| {
                             fail(&node.span, format!("unknown shading input `{name}`"))
                         })?;
-                    if compact(&input.ty) == "sampler" {
+                    if compact_type(&input.ty) == "sampler" {
                         let preset = self.sampler_value(value, scope)?;
                         if active && self.shading_samplers.insert(name.clone(), preset).is_some() {
                             return Err(fail(
@@ -244,7 +235,8 @@ impl Graph<'_> {
                         }
                         continue;
                     }
-                    let handle = path(value)
+                    let handle = value
+                        .dotted_path()
                         .and_then(|name| scope.handles.get(&name))
                         .ok_or_else(|| {
                             fail(
@@ -576,7 +568,7 @@ impl Graph<'_> {
                                     .map_err(|message| fail(&node.span, message))?;
                                 if let Some(port) = port
                                     && args.iter().any(|arg| {
-                                        path(&arg.value).is_some_and(|name| {
+                                        arg.value.dotted_path().is_some_and(|name| {
                                             name.starts_with(&format!("{port}."))
                                         })
                                     })
@@ -621,7 +613,7 @@ impl Graph<'_> {
                     let resources = if active {
                         args.iter()
                             .filter_map(|arg| {
-                                let handle = scope.handles.get(&path(&arg.value)?)?;
+                                let handle = scope.handles.get(&arg.value.dotted_path()?)?;
                                 Some((
                                     arg.name.clone().expect("checked named operation argument"),
                                     handle
@@ -730,9 +722,9 @@ impl Graph<'_> {
                         format!("unknown operation argument `{name}`"),
                     )
                 })?;
-            let ty = compact(&parameter.ty);
+            let ty = compact_type(&parameter.ty);
             if ty == "DrawRange" {
-                if !scope.per_self || path(&arg.value).as_deref() != Some("self") {
+                if !scope.per_self || arg.value.dotted_path().as_deref() != Some("self") {
                     return Err(fail(
                         &arg.value.span,
                         "DrawRange must be the current for self invocation",
@@ -754,8 +746,10 @@ impl Graph<'_> {
                             ),
                         ));
                     }
-                } else if let Some(setting) =
-                    path(&arg.value).and_then(|n| self.style.params.iter().find(|p| p.name == n))
+                } else if let Some(setting) = arg
+                    .value
+                    .dotted_path()
+                    .and_then(|n| self.style.params.iter().find(|p| p.name == n))
                 {
                     if setting.ty_name != ty {
                         return Err(fail(
@@ -786,7 +780,7 @@ impl Graph<'_> {
                     .iter()
                     .find(|c| c.name == self.style.contract)
                     .expect("contract");
-                let name = path(&arg.value).ok_or_else(|| {
+                let name = arg.value.dotted_path().ok_or_else(|| {
                     fail(
                         &arg.value.span,
                         "resource arguments must name contract inputs or target attachments",
@@ -870,7 +864,7 @@ impl Graph<'_> {
                 let same_handle = actual.as_ref().is_some_and(|actual| {
                     matches!((super::compute_operations::resource_type(actual, "read"), super::compute_operations::resource_type(&ty, "read")), (Ok(a), Ok(b)) if a == b)
                 });
-                if actual.as_deref().map(compact) != Some(ty.clone()) && !same_handle {
+                if actual.as_deref().map(compact_type) != Some(ty.clone()) && !same_handle {
                     return Err(fail(
                         &arg.value.span,
                         format!("operation resource `{name}` does not provide `{ty}`"),
@@ -992,7 +986,7 @@ pub(super) fn prepare_selection(
         let inputs = style
             .shading_inputs
             .iter()
-            .filter(|input| compact(&input.ty) != "sampler")
+            .filter(|input| compact_type(&input.ty) != "sampler")
             .map(|input| {
                 let producer = graph.shading_bindings[&input.name];
                 (
@@ -1108,7 +1102,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             if !inputs.insert(&parameter.name) {
                 return Err(fail(&parameter.span, "duplicate operation parameter"));
             }
-            let ty = compact(&parameter.ty);
+            let ty = compact_type(&parameter.ty);
             if ty.starts_with("attachment<") {
                 super::style_graph::attachment(&ty)
                     .map_err(|message| fail(&parameter.span, message))?;
@@ -1136,7 +1130,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             super::compute_operations::validate(program, pass)?;
             continue;
         }
-        let source = operation.raster.as_ref().and_then(path).ok_or_else(|| {
+        let source = operation.raster.as_ref().and_then(SExpr::dotted_path).ok_or_else(|| {
             fail(
                 &pass.span,
                 "draw operation requires raster geometry_parameter",
@@ -1162,8 +1156,9 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     "generated vertices require prepared geometry",
                 ));
             }
-            let input =
-                path(vertices).and_then(|name| operation.inputs.iter().find(|p| p.name == name));
+            let input = vertices
+                .dotted_path()
+                .and_then(|name| operation.inputs.iter().find(|p| p.name == name));
             if !input.is_some_and(|p| {
                 matches!(
                     super::compute_operations::resource_type(&p.ty, "read"),
@@ -1279,7 +1274,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     .iter()
                     .any(|p| p.name == field.name && p.ty.starts_with("attachment<"))
                 || field.values.len() != 1
-                || path(&field.values[0]).as_deref() != Some("load_store")
+                || field.values[0].dotted_path().as_deref() != Some("load_store")
             {
                 return Err(fail(
                     &field.span,
@@ -1299,7 +1294,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 ));
             }
         }
-        if operation.inputs.iter().any(|p| compact(&p.ty).ends_with(",test_only>"))
+        if operation.inputs.iter().any(|p| compact_type(&p.ty).ends_with(",test_only>"))
             && pass.state.iter().find(|(name, _)| name == "depth_write").is_some_and(|(_, value)| !matches!(&value.node, Expr::Var(name) if matches!(name.as_str(), "false" | "off"))) {
             return Err(fail(&pass.span, "test_only attachments require operations to disable depth writes"));
         }
@@ -1465,7 +1460,7 @@ fn instantiate(
             .find(|a| a.name.as_ref() == Some(&parameter.name))
             .expect("checked argument")
             .value;
-        let ty = compact(&parameter.ty);
+        let ty = compact_type(&parameter.ty);
         if ty == "DrawRange" || context.resource_types.iter().any(|r| r.name == ty) {
             continue;
         }
@@ -1490,7 +1485,8 @@ fn instantiate(
             continue;
         }
         if ty == "sampler" {
-            let preset = path(value)
+            let preset = value
+                .dotted_path()
                 .and_then(|symbol| fresco_artifact::types::SamplerPreset::parse(&symbol))
                 .ok_or_else(|| fail(&value.span, "invalid checked sampler argument"))?;
             ensure_binding(&mut pass, context, &parameter.name, "sampler")?;
@@ -1575,8 +1571,9 @@ fn instantiate(
                 span: value.span.clone(),
             });
             let value = root_value.as_ref().unwrap_or(value);
-            let source = if let Some((lane, setting)) =
-                path(value).and_then(|n| style.params.iter().enumerate().find(|(_, p)| p.name == n))
+            let source = if let Some((lane, setting)) = value
+                .dotted_path()
+                .and_then(|n| style.params.iter().enumerate().find(|(_, p)| p.name == n))
             {
                 ensure_settings_binding(&mut pass, context)?;
                 let lane = selection
@@ -1645,7 +1642,7 @@ fn instantiate(
                 if ty == "color" { "vec4" } else { &ty }
             ));
         } else {
-            let argument = path(value).expect("checked resource");
+            let argument = value.dotted_path().expect("checked resource");
             let contract = context
                 .style_contracts
                 .iter()
@@ -1724,7 +1721,7 @@ fn instantiate(
         let mut arguments = BTreeMap::new();
         let mut geometry = BTreeMap::new();
         for parameter in &operation.inputs {
-            let ty = compact(&parameter.ty);
+            let ty = compact_type(&parameter.ty);
             if scalar(&ty) {
                 if projections.contains_key(&parameter.name) {
                     // Shader-only projections were excluded from all host expressions above.
@@ -1764,7 +1761,9 @@ fn instantiate(
             });
     }
     if let Some((vertices, offset)) = &operation.generated_vertices {
-        let binding = path(vertices).expect("validated generated vertex parameter");
+        let binding = vertices
+            .dotted_path()
+            .expect("validated generated vertex parameter");
         let invocation = reference.invocation.as_mut().expect("draw invocation");
         if !invocation.compute_inputs.contains_key(&binding) {
             return Err(fail(
@@ -1867,7 +1866,7 @@ pub(super) fn ensure_binding(
         .chain(&factory.bindings)
         .find(|b| b.name == name)
     {
-        if binding.value_signature.as_deref().map(compact) != Some(compact(ty)) {
+        if binding.value_signature.as_deref().map(compact_type) != Some(compact_type(ty)) {
             return Err(fail(
                 &pass.span,
                 format!("operation binding `{name}` conflicts with factory type"),

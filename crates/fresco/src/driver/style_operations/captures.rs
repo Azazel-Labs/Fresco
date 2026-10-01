@@ -13,7 +13,7 @@ pub(super) fn projection(
     style: &StyleDecl,
     value: &SExpr,
 ) -> Result<Option<Projection>, Vec<Diag>> {
-    let Some(name) = path(value) else {
+    let Some(name) = value.dotted_path() else {
         return Ok(None);
     };
     let Some((root, member)) = name.split_once('.') else {
@@ -63,7 +63,8 @@ pub(super) fn reject_host(
     if projections.is_empty() {
         return Ok(());
     }
-    if path(value)
+    if value
+        .dotted_path()
         .is_some_and(|name| projections.contains_key(name.split('.').next().expect("path")))
     {
         return Err(fail(

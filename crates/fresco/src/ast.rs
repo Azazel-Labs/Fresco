@@ -13,6 +13,18 @@ pub struct Spanned<T> {
 
 pub type SExpr = Spanned<Expr>;
 
+impl SExpr {
+    /// The dotted name of a variable or member chain, such as `a.b.c`.
+    #[must_use]
+    pub fn dotted_path(&self) -> Option<String> {
+        match &self.node {
+            Expr::Var(name) => Some(name.clone()),
+            Expr::Member(base, member) => Some(format!("{}.{member}", base.dotted_path()?)),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOp {
     LogicalAnd,

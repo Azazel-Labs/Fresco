@@ -1,5 +1,6 @@
 //! Engine-owned mesh preparation and resource aggregate contracts.
 use crate::ast::{attr_arg, find_attr, has_attr};
+use crate::pipeline_layout::compact_type;
 use crate::{ast::*, diag::Diag};
 use std::collections::BTreeSet;
 
@@ -44,17 +45,13 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
                 .find(|f| f.name == roles.args[index])
                 .expect("checked role")
         };
-        let compact = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-        let vertex = compact(&field(0).ty_name);
-        let element = vertex
-            .strip_prefix("buffer<")
-            .and_then(|s| s.strip_suffix(",read>"));
+        let element = read_buffer_element(&field(0).ty_name);
         if !element.is_some_and(|element| program.structs.iter().any(|s| s.name == element)) {
             return Err(fail(
                 "geometry vertices require buffer<Record, read>".into(),
             ));
         }
-        if compact(&field(1).ty_name) != "buffer<u32,read>"
+        if compact_type(&field(1).ty_name) != "buffer<u32,read>"
             || field(2).ty_name != "u32"
             || field(3).ty_name != "u32"
         {
@@ -230,15 +227,7 @@ pub(super) fn producer<'a>(
         .iter()
         .find(|f| f.name == roles.args[0])
         .expect("checked vertices");
-    let ty: String = vertices
-        .ty_name
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
-    let element = ty
-        .strip_prefix("buffer<")
-        .and_then(|s| s.strip_suffix(",read>"))
-        .expect("checked vertex stream");
+    let element = read_buffer_element(&vertices.ty_name).expect("checked vertex stream");
     if declaration.params.len() != 1
         || declaration
             .return_ty
@@ -295,15 +284,15 @@ pub(super) fn roles(resource: &StructDecl) -> [&StructFieldDecl; 5] {
     })
 }
 pub(super) fn element(resource: &StructDecl) -> String {
-    let ty: String = roles(resource)[0]
-        .ty_name
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
-    ty.strip_prefix("buffer<")
+    read_buffer_element(&roles(resource)[0].ty_name).expect("validated geometry element")
+}
+
+/// The record type of a `buffer<Record, read>` spelling.
+fn read_buffer_element(ty: &str) -> Option<String> {
+    compact_type(ty)
+        .strip_prefix("buffer<")
         .and_then(|s| s.strip_suffix(",read>"))
-        .expect("validated geometry element")
-        .into()
+        .map(str::to_owned)
 }
 
 pub(super) fn select_draw(

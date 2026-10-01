@@ -1,15 +1,13 @@
 //! Validate engine graph contracts before lowering their explicit integration points.
 use crate::ast::{attr_arg, attrs_named, has_attr};
+use crate::pipeline_layout::compact_type;
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestRecipeResource, ManifestRecipeStep};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn path(expr: &SExpr) -> Result<String, String> {
-    match &expr.node {
-        Expr::Var(name) => Ok(name.clone()),
-        Expr::Member(base, member) => Ok(format!("{}.{}", path(base)?, member)),
-        _ => Err("expected a declared resource or node name".into()),
-    }
+    expr.dotted_path()
+        .ok_or_else(|| "expected a declared resource or node name".into())
 }
 fn one(field: &StyleGraphField) -> Result<&SExpr, String> {
     match field.values.as_slice() {
@@ -80,11 +78,8 @@ fn all(field: &StyleGraphField) -> Result<Vec<String>, String> {
         )),
     }
 }
-fn compact(ty: &str) -> String {
-    ty.chars().filter(|c| !c.is_whitespace()).collect()
-}
 pub(super) fn attachment(ty: &str) -> Result<(String, String), String> {
-    let ty = compact(ty);
+    let ty = compact_type(ty);
     let parts: Vec<_> = ty
         .strip_prefix("attachment<")
         .and_then(|s| s.strip_suffix('>'))
@@ -111,7 +106,7 @@ pub(super) fn attachment(ty: &str) -> Result<(String, String), String> {
     Ok(((*format).into(), (*access).into()))
 }
 fn resource_type(program: &Program, ty: &str) -> Result<(), String> {
-    let ty = compact(ty);
+    let ty = compact_type(ty);
     if ty == "draw_instance_id" {
         return Ok(());
     }
@@ -250,9 +245,9 @@ pub(super) fn bound_resource(
                 .iter()
                 .any(|a| a.name == "draw_data" && a.args.as_slice() == ["instance_id"])
                 || has_attr(&binding.attrs, "source")
-                || binding.value_signature.as_deref().map(compact).as_deref()
+                || binding.value_signature.as_deref().map(compact_type).as_deref()
                     != Some("uniform<u32>")
-                || compact(expected) != "draw_instance_id"
+                || compact_type(expected) != "draw_instance_id"
                 || step.bindings.contains_key(*binding_name)
             {
                 return Err(format!(
@@ -292,7 +287,7 @@ pub(super) fn bound_resource(
                 .iter()
                 .find(|f| f.name == *member)
                 .ok_or_else(|| format!("unknown shader output `{endpoint}`"))?;
-            if compact(&field.ty_name) != compact(expected) {
+            if compact_type(&field.ty_name) != compact_type(expected) {
                 return Err(format!(
                     "shader output `{endpoint}` requires `{expected}`, found `{}`",
                     field.ty_name
@@ -352,7 +347,7 @@ pub(super) fn bound_resource(
         .iter()
         .find(|r| r.name == resource)
         .ok_or_else(|| format!("unknown provider resource `{resource}`"))?;
-    let expected = compact(expected);
+    let expected = compact_type(expected);
     let mut found = false;
     for step in steps
         .iter()
@@ -367,7 +362,7 @@ pub(super) fn bound_resource(
                 .find(|b| b.name == *name)
                 .and_then(|b| b.value_signature.as_ref())
                 .ok_or_else(|| format!("untyped provider endpoint `{}.{name}`", step.name))?;
-            let actual = compact(signature);
+            let actual = compact_type(signature);
             if actual != expected && actual != format!("uniform<{expected}>") {
                 return Err(format!(
                     "provider resource `{resource}` requires `{expected}`, found `{actual}` at `{}.{name}`",
@@ -770,7 +765,7 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
                     key.clone(),
                     input.name.clone(),
                     inputs[&input.name].clone(),
-                    compact(&input.ty),
+                    compact_type(&input.ty),
                 ],
                 0..0,
             ));
@@ -919,7 +914,7 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
                     key.clone(),
                     member.name.clone(),
                     resource.clone(),
-                    compact(&member.ty_name),
+                    compact_type(&member.ty_name),
                 ],
                 0..0,
             ));
@@ -1369,13 +1364,13 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                 let mut types: BTreeMap<_, _> = target
                     .fields
                     .iter()
-                    .map(|f| (f.name.clone(), compact(&f.ty_name)))
+                    .map(|f| (f.name.clone(), compact_type(&f.ty_name)))
                     .collect();
                 types.extend(
                     contract
                         .inputs
                         .iter()
-                        .map(|i| (i.name.clone(), compact(&i.ty))),
+                        .map(|i| (i.name.clone(), compact_type(&i.ty))),
                 );
                 if pipeline.pass_refs.iter().any(|r| r.invocation.is_some()) {
                     types.insert(
@@ -1387,7 +1382,7 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                         {
                             for capture in &pass.service_captures {
                                 if types
-                                    .insert(capture.name.clone(), compact(&capture.ty))
+                                    .insert(capture.name.clone(), compact_type(&capture.ty))
                                     .is_some()
                                 {
                                     return Err("shader service capture conflicts with a contribution input".into());
@@ -1402,7 +1397,7 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                     let [name, ty] = input.args.as_slice() else {
                         return Err("contribution input requires name and type".into());
                     };
-                    if types.get(name) != Some(&compact(ty)) {
+                    if types.get(name) != Some(&compact_type(ty)) {
                         return Err(format!(
                             "incompatible contribution input `{name}` of type `{ty}`"
                         ));
@@ -1432,8 +1427,8 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                                     step.pass
                                 )
                             })?;
-                        if compact(actual) != *expected
-                            && compact(actual) != format!("uniform<{expected}>")
+                        if compact_type(actual) != *expected
+                            && compact_type(actual) != format!("uniform<{expected}>")
                         {
                             return Err(format!(
                                 "contribution binding `{}.{binding}` requires `{expected}`, found `{actual}`",

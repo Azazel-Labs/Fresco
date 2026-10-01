@@ -16,7 +16,7 @@ pub(crate) enum ShaderResourceType {
 /// None means this is not a shader resource spelling. A recognized but invalid
 /// resource remains an error rather than falling through to a record type.
 pub(crate) fn shader_resource_type(ty: &str) -> Option<Result<ShaderResourceType, String>> {
-    let ty: String = ty.chars().filter(|c| !c.is_whitespace()).collect();
+    let ty = crate::pipeline_layout::compact_type(ty);
     if ty == "sampler" {
         Some(Ok(ShaderResourceType::Sampler))
     } else if ty.starts_with("texture2d<") || ty.starts_with("buffer<") {
@@ -30,7 +30,7 @@ pub(crate) fn shader_resource_type(ty: &str) -> Option<Result<ShaderResourceType
 /// has write access. Keep access checking separate from physical WGSL storage
 /// buffer access, where a write-only declaration lowers to read_write.
 pub(crate) fn resource_type(ty: &str, access: &str) -> Result<ResourceType, String> {
-    let ty: String = ty.chars().filter(|c| !c.is_whitespace()).collect();
+    let ty = crate::pipeline_layout::compact_type(ty);
     let (image, inner) = if let Some(inner) = ty.strip_prefix("buffer<") {
         (false, inner)
     } else if let Some(inner) = ty.strip_prefix("texture2d<") {
