@@ -412,31 +412,31 @@ fn manifest_global_uniforms(
     )
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "This compiler boundary explicitly threads independent checking or lowering inputs."
-)]
 pub fn render(
     target: EmitTarget,
     build_profile: BuildProfile,
-    hirs: &[Hir],
-    material_hirs: &[MaterialHir],
-    compute_library: &crate::check::compute::ComputeLibrary,
-    structs: &[StructDecl],
-    pass_decls: &[PassDecl],
-    pipelines: &[PipelineDecl],
-    vertex_interfaces: &[VertexInterfaceDecl],
-    vertex_formats: &[VertexFormatDecl],
-    vertex_factories: &[VertexFactoryDecl],
-    module: &naga::Module,
-    info: &naga::valid::ModuleInfo,
-    tex_bindings: &HashMap<String, u32>,
-    pass_target_bindings: &HashMap<String, HashMap<usize, u32>>,
-    path_bindings: &HashMap<String, u32>,
-    param_bindings: &HashMap<String, u32>,
-    global_uniform_bindings: &HashMap<String, u32>,
-    resource_layout: crate::ast::ResourceLayout,
+    compiled: &super::pipeline::CompiledProgram,
 ) -> Result<String, EmitError> {
+    let super::pipeline::CompiledProgram {
+        hirs,
+        material_hirs,
+        compute_library,
+        structs,
+        passes: pass_decls,
+        pipelines,
+        vertex_interfaces,
+        vertex_formats,
+        vertex_factories,
+        module,
+        info,
+        tex_bindings,
+        pass_target_bindings,
+        path_bindings,
+        param_bindings,
+        global_uniform_bindings,
+        ..
+    } = compiled;
+    let resource_layout = compiled.resource_layout;
     let mut shader_prelude =
         naga::back::wgsl::write_string(module, info, naga::back::wgsl::WriterFlags::empty())
             .map_err(|e| EmitError::WgslBackend(e.to_string()))?;

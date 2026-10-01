@@ -444,28 +444,8 @@ fn render_compiled_source(
     include_explain: bool,
     context: &CompileContext,
 ) -> Result<CompileOutput, Vec<DiagnosticRecord>> {
-    let emitted = emit::render(
-        emit_target,
-        context.build_profile,
-        &compiled.hirs,
-        &compiled.material_hirs,
-        &compiled.compute_library,
-        &compiled.structs,
-        &compiled.passes,
-        &compiled.pipelines,
-        &compiled.vertex_interfaces,
-        &compiled.vertex_formats,
-        &compiled.vertex_factories,
-        &compiled.module,
-        &compiled.info,
-        &compiled.tex_bindings,
-        &compiled.pass_target_bindings,
-        &compiled.path_bindings,
-        &compiled.param_bindings,
-        &compiled.global_uniform_bindings,
-        compiled.resource_layout,
-    )
-    .map_err(|err| vec![emit_failure(filename, err)])?;
+    let emitted = emit::render(emit_target, context.build_profile, &compiled)
+        .map_err(|err| vec![emit_failure(filename, err)])?;
     let explain = include_explain.then(|| {
         explain::render(
             &compiled.hirs,
@@ -548,53 +528,13 @@ fn render_compiled_bundle(
     total_start: Instant,
 ) -> Result<CompileBundleOutput, Vec<DiagnosticRecord>> {
     let emit_wgsl_start = Instant::now();
-    let wgsl = emit::render(
-        EmitTarget::Wgsl,
-        context.build_profile,
-        &compiled.hirs,
-        &compiled.material_hirs,
-        &compiled.compute_library,
-        &compiled.structs,
-        &compiled.passes,
-        &compiled.pipelines,
-        &compiled.vertex_interfaces,
-        &compiled.vertex_formats,
-        &compiled.vertex_factories,
-        &compiled.module,
-        &compiled.info,
-        &compiled.tex_bindings,
-        &compiled.pass_target_bindings,
-        &compiled.path_bindings,
-        &compiled.param_bindings,
-        &compiled.global_uniform_bindings,
-        compiled.resource_layout,
-    )
-    .map_err(|err| vec![emit_failure(filename, err)])?;
+    let wgsl = emit::render(EmitTarget::Wgsl, context.build_profile, &compiled)
+        .map_err(|err| vec![emit_failure(filename, err)])?;
     let emit_wgsl_ms = elapsed_ms(emit_wgsl_start);
 
     let emit_manifest_start = Instant::now();
-    let manifest = emit::render(
-        EmitTarget::Manifest,
-        context.build_profile,
-        &compiled.hirs,
-        &compiled.material_hirs,
-        &compiled.compute_library,
-        &compiled.structs,
-        &compiled.passes,
-        &compiled.pipelines,
-        &compiled.vertex_interfaces,
-        &compiled.vertex_formats,
-        &compiled.vertex_factories,
-        &compiled.module,
-        &compiled.info,
-        &compiled.tex_bindings,
-        &compiled.pass_target_bindings,
-        &compiled.path_bindings,
-        &compiled.param_bindings,
-        &compiled.global_uniform_bindings,
-        compiled.resource_layout,
-    )
-    .map_err(|err| vec![emit_failure(filename, err)])?;
+    let manifest = emit::render(EmitTarget::Manifest, context.build_profile, &compiled)
+        .map_err(|err| vec![emit_failure(filename, err)])?;
     let emit_manifest_ms = elapsed_ms(emit_manifest_start);
 
     let explain_start = Instant::now();
@@ -796,51 +736,11 @@ pub fn compile_variant_with_files(
         pipeline::compile_variant_at_span(src, filename, true, &context, resolved_span, files)
             .map_err(flatten_file_diags)?;
 
-    let wgsl = emit::render(
-        EmitTarget::Wgsl,
-        context.build_profile,
-        &compiled.hirs,
-        &compiled.material_hirs,
-        &compiled.compute_library,
-        &compiled.structs,
-        &compiled.passes,
-        &compiled.pipelines,
-        &compiled.vertex_interfaces,
-        &compiled.vertex_formats,
-        &compiled.vertex_factories,
-        &compiled.module,
-        &compiled.info,
-        &compiled.tex_bindings,
-        &compiled.pass_target_bindings,
-        &compiled.path_bindings,
-        &compiled.param_bindings,
-        &compiled.global_uniform_bindings,
-        compiled.resource_layout,
-    )
-    .map_err(|err| vec![emit_failure(filename, err)])?;
+    let wgsl = emit::render(EmitTarget::Wgsl, context.build_profile, &compiled)
+        .map_err(|err| vec![emit_failure(filename, err)])?;
 
-    let manifest = emit::render(
-        EmitTarget::Manifest,
-        context.build_profile,
-        &compiled.hirs,
-        &compiled.material_hirs,
-        &compiled.compute_library,
-        &compiled.structs,
-        &compiled.passes,
-        &compiled.pipelines,
-        &compiled.vertex_interfaces,
-        &compiled.vertex_formats,
-        &compiled.vertex_factories,
-        &compiled.module,
-        &compiled.info,
-        &compiled.tex_bindings,
-        &compiled.pass_target_bindings,
-        &compiled.path_bindings,
-        &compiled.param_bindings,
-        &compiled.global_uniform_bindings,
-        compiled.resource_layout,
-    )
-    .map_err(|err| vec![emit_failure(filename, err)])?;
+    let manifest = emit::render(EmitTarget::Manifest, context.build_profile, &compiled)
+        .map_err(|err| vec![emit_failure(filename, err)])?;
 
     Ok(VariantCompileOutput {
         wgsl,
@@ -3252,27 +3152,7 @@ pub fn run(options: Options) -> ExitCode {
         }
     }
 
-    let out = match emit::render(
-        options.emit,
-        options.context.build_profile,
-        &compiled.hirs,
-        &compiled.material_hirs,
-        &compiled.compute_library,
-        &compiled.structs,
-        &compiled.passes,
-        &compiled.pipelines,
-        &compiled.vertex_interfaces,
-        &compiled.vertex_formats,
-        &compiled.vertex_factories,
-        &compiled.module,
-        &compiled.info,
-        &compiled.tex_bindings,
-        &compiled.pass_target_bindings,
-        &compiled.path_bindings,
-        &compiled.param_bindings,
-        &compiled.global_uniform_bindings,
-        compiled.resource_layout,
-    ) {
+    let out = match emit::render(options.emit, options.context.build_profile, &compiled) {
         Ok(out) => out,
         Err(message) => {
             eprintln!("{message}");
@@ -3358,28 +3238,8 @@ mod tests_canvas_variant {
     }
 
     fn render_compiled_wgsl(compiled: &pipeline::CompiledProgram) -> String {
-        emit::render(
-            EmitTarget::Wgsl,
-            BuildProfile::All,
-            &compiled.hirs,
-            &compiled.material_hirs,
-            &compiled.compute_library,
-            &compiled.structs,
-            &compiled.passes,
-            &compiled.pipelines,
-            &compiled.vertex_interfaces,
-            &compiled.vertex_formats,
-            &compiled.vertex_factories,
-            &compiled.module,
-            &compiled.info,
-            &compiled.tex_bindings,
-            &compiled.pass_target_bindings,
-            &compiled.path_bindings,
-            &compiled.param_bindings,
-            &compiled.global_uniform_bindings,
-            compiled.resource_layout,
-        )
-        .expect("variant WGSL should emit")
+        emit::render(EmitTarget::Wgsl, BuildProfile::All, compiled)
+            .expect("variant WGSL should emit")
     }
 
     #[test]

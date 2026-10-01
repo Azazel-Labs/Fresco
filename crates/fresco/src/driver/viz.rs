@@ -1,11 +1,8 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-mod bridge;
 mod draw;
-mod merge;
 mod reduce;
-mod uniforms;
 
 const MAX_RUNTIME_PARAMS: usize = 16;
 const PREVIEW_UNIFORM_PARAM_VECS: usize = MAX_RUNTIME_PARAMS.div_ceil(4);
