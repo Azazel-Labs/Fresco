@@ -210,10 +210,7 @@ impl Checker {
                             Diag::error(cmd.span.clone(), "`line` requires a preceding `move`")
                                 .with_help("start path blocks with `move (x, y)`"),
                         );
-                        return Some(
-                            PathValue::from_points(0, vec![(0.0, 0.0), (1.0, 0.0)])
-                                .expect("static fallback path"),
-                        );
+                        return Some(PathValue::fallback());
                     };
                     let p = self.eval_static_vec2_from_expr(to, "`line` target")?;
                     primitives.push(hir::PathPrimitive::Line { from: cur, to: p });
@@ -225,10 +222,7 @@ impl Checker {
                             Diag::error(cmd.span.clone(), "`cubic` requires a preceding `move`")
                                 .with_help("start path blocks with `move (x, y)`"),
                         );
-                        return Some(
-                            PathValue::from_points(0, vec![(0.0, 0.0), (1.0, 0.0)])
-                                .expect("static fallback path"),
-                        );
+                        return Some(PathValue::fallback());
                     };
                     let p1 = self.eval_static_vec2_from_expr(c1, "`cubic` control point c1")?;
                     let p2 = self.eval_static_vec2_from_expr(c2, "`cubic` control point c2")?;
@@ -246,10 +240,7 @@ impl Checker {
                             Diag::error(cmd.span.clone(), "`arc` requires a preceding `move`")
                                 .with_help("start path blocks with `move (x, y)`"),
                         );
-                        return Some(
-                            PathValue::from_points(0, vec![(0.0, 0.0), (1.0, 0.0)])
-                                .expect("static fallback path"),
-                        );
+                        return Some(PathValue::fallback());
                     };
                     let c = self.eval_static_vec2_from_expr(center, "`arc` center")?;
                     let r = self.eval_static_scalar_from_expr(radius, "`arc` radius")?;
@@ -284,7 +275,7 @@ impl Checker {
             )
             .with_help("include `move` followed by one or more drawing commands"),
         );
-        Some(PathValue::from_points(0, vec![(0.0, 0.0), (1.0, 0.0)]).expect("static fallback path"))
+        Some(PathValue::fallback())
     }
 
     fn resolve_anchor_value_name(&mut self, name: &str, span: &Span) -> Option<Value> {

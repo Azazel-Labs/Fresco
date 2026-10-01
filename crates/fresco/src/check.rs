@@ -29,8 +29,8 @@ use crate::ast::*;
 use crate::diag::{Diag, has_errors};
 use crate::hir::{
     self, Blend, CenteredMode, ColorSource, GlowColorSpace, GlowFalloff, GlowReach, GradientAnchor,
-    GradientKind, GradientStop, Hir, Layer, LayerId, Param, ParamDefault, Shape, ShapeId, Sx, V2,
-    Xform,
+    GradientKind, GradientStop, Hir, Layer, LayerId, PATH_CONST_SEGMENT_THRESHOLD, Param,
+    ParamDefault, PathStorageDecision, Shape, ShapeId, Sx, V2, Xform,
 };
 use crate::pipeline_layout::canonical_layout_identity;
 
@@ -1770,43 +1770,16 @@ pub(crate) struct PathValue {
     storage: PathStorageDecision,
 }
 
-pub(crate) const PATH_CONST_SEGMENT_THRESHOLD: usize = 64;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PathStorageDecision {
-    ConstModuleEmbedded,
-    BufferExceedsConstThreshold,
-}
-
 impl PathValue {
-    pub(crate) fn from_points(profile_id: usize, points: Vec<(f32, f32)>) -> Option<Self> {
-        if points.len() < 2 {
-            return None;
+    /// A unit-length one-segment path that stands in for a path whose
+    /// construction already reported a diagnostic.
+    pub(crate) fn fallback() -> Self {
+        Self {
+            profile_id: 0,
+            segment_count: 1,
+            total_length: 1.0,
+            storage: PathStorageDecision::for_segment_count(1),
         }
-        let segment_count = points.len().saturating_sub(1);
-        let mut total = 0.0_f32;
-        for i in 1..points.len() {
-            let a = points[i - 1];
-            let b = points[i];
-            let dx = b.0 - a.0;
-            let dy = b.1 - a.1;
-            let len = (dx * dx + dy * dy).sqrt();
-            total += len;
-        }
-        if total <= f32::EPSILON {
-            return None;
-        }
-        let storage = if segment_count <= PATH_CONST_SEGMENT_THRESHOLD {
-            PathStorageDecision::ConstModuleEmbedded
-        } else {
-            PathStorageDecision::BufferExceedsConstThreshold
-        };
-        Some(Self {
-            profile_id,
-            segment_count,
-            total_length: total,
-            storage,
-        })
     }
 
     pub(crate) fn from_derived(
@@ -3170,7 +3143,7 @@ impl Checker {
             sampling,
             flattened_segment_count: 0,
             total_length: 0.0,
-            storage: hir::PathStorageDecision::ConstModuleEmbedded,
+            storage: PathStorageDecision::ConstModuleEmbedded,
             demand: hir::PathChannelDemand::default(),
         };
         let rows = provisional.flattened_rows();
@@ -3181,11 +3154,7 @@ impl Checker {
             0,
             segment_count,
             total_length,
-            if segment_count <= PATH_CONST_SEGMENT_THRESHOLD {
-                PathStorageDecision::ConstModuleEmbedded
-            } else {
-                PathStorageDecision::BufferExceedsConstThreshold
-            },
+            PathStorageDecision::for_segment_count(segment_count),
         ) else {
             self.diags.push(
                 Diag::error(
@@ -3197,20 +3166,12 @@ impl Checker {
             return None;
         };
 
-        let storage = match path.storage_decision() {
-            PathStorageDecision::ConstModuleEmbedded => {
-                hir::PathStorageDecision::ConstModuleEmbedded
-            }
-            PathStorageDecision::BufferExceedsConstThreshold => {
-                hir::PathStorageDecision::BufferExceedsConstThreshold
-            }
-        };
         let profile_id = self.hir.register_path_profile(hir::PathProfile {
             primitives,
             sampling,
             flattened_segment_count: segment_count,
             total_length,
-            storage,
+            storage: path.storage_decision(),
             demand: hir::PathChannelDemand::default(),
         });
         let path = path.with_profile_id(profile_id);

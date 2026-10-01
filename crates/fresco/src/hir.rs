@@ -32,6 +32,21 @@ pub enum PathStorageDecision {
     BufferExceedsConstThreshold,
 }
 
+/// Paths with at most this many flattened segments are embedded as module
+/// constants; longer paths are stored in a buffer.
+pub const PATH_CONST_SEGMENT_THRESHOLD: usize = 64;
+
+impl PathStorageDecision {
+    /// The storage used for a path with `segment_count` flattened segments.
+    pub fn for_segment_count(segment_count: usize) -> Self {
+        if segment_count <= PATH_CONST_SEGMENT_THRESHOLD {
+            Self::ConstModuleEmbedded
+        } else {
+            Self::BufferExceedsConstThreshold
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 #[allow(
     dead_code,
