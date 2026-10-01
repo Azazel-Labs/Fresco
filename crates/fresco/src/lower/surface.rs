@@ -1,6 +1,7 @@
 use super::canvas::lower_user_helper_fn;
 use super::ir::project_context;
 use super::*;
+use crate::context::ContextRole;
 use crate::hir::Hir;
 use crate::material_hir::MaterialHir;
 use std::collections::{BTreeMap, BTreeSet};
@@ -32,17 +33,17 @@ fn surface_inputs(
     let uv = material
         .context
         .roles
-        .get("coord")
+        .get(&ContextRole::Coord)
         .map_or(zero2, |path| project(function, path));
     let time = material
         .context
         .roles
-        .get("time")
+        .get(&ContextRole::Time)
         .map_or(zero, |path| project(function, path));
     let res = material
         .context
         .roles
-        .get("resolution")
+        .get(&ContextRole::Resolution)
         .map_or(zero2, |path| project(function, path));
     let scalars = material
         .context

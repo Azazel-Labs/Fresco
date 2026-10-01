@@ -1,4 +1,5 @@
 use super::*;
+use crate::context::ContextRole;
 use std::collections::{HashMap, HashSet};
 
 const SP: naga::Span = naga::Span::UNDEFINED;
@@ -476,13 +477,13 @@ impl IrBuilder {
             .map(|_| function.arg("ctx", t.entry_context.expect("registered context type")));
         let (uv, time, delta, res, px, aa) = if let Some(context) = entry_context {
             let base = context_argument.expect("context argument");
-            let mut role = |name: &str, vector: bool| {
-                if let Some(path) = context.roles.get(name) {
+            let mut role = |role: ContextRole| {
+                if let Some(path) = context.roles.get(&role) {
                     project_context(&mut function, base, path)
                 } else {
                     // Unused internal channels have no provider. The checker diagnoses reads.
                     let zero = function.expr(Ex::Literal(naga::Literal::F32(0.0)));
-                    if vector {
+                    if role.is_vec2() {
                         function.expr(Ex::Compose {
                             ty: t.v2,
                             components: vec![zero, zero],
@@ -492,10 +493,10 @@ impl IrBuilder {
                     }
                 }
             };
-            let uv = role("coord", true);
-            let time = role("time", false);
-            let delta = role("delta_time", false);
-            let res = role("resolution", true);
+            let uv = role(ContextRole::Coord);
+            let time = role(ContextRole::Time);
+            let delta = role(ContextRole::DeltaTime);
+            let res = role(ContextRole::Resolution);
             (uv, time, delta, res, uv, uv)
         } else if scene_ctx_sig {
             let p = function.arg("p", t.v2);

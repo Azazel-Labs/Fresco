@@ -2530,7 +2530,7 @@ pub struct Checker {
     /// Memoized `time`/`delta_time`/`resolution` runtime channel values,
     /// resolved by calling the FR-authored accessor functions.
     runtime_channel_cache: globals::RuntimeChannelCache,
-    evaluation_context: Option<HashMap<String, Value>>,
+    evaluation_context: Option<HashMap<crate::context::ContextRole, Value>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

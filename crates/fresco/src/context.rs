@@ -3,6 +3,32 @@
 use crate::ast::{InterfaceDecl, Span, StructDecl};
 use crate::diag::Diag;
 
+/// A `@semantic` role an engine context field can provide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ContextRole {
+    Coord,
+    Resolution,
+    Time,
+    DeltaTime,
+}
+
+impl ContextRole {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "coord" => Some(Self::Coord),
+            "resolution" => Some(Self::Resolution),
+            "time" => Some(Self::Time),
+            "delta_time" => Some(Self::DeltaTime),
+            _ => None,
+        }
+    }
+
+    /// Whether the role carries a `vec2` (otherwise a scalar).
+    pub const fn is_vec2(self) -> bool {
+        matches!(self, Self::Coord | Self::Resolution)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ContextStruct {
     pub name: String,
@@ -38,7 +64,7 @@ pub struct EntryContext {
     pub method: String,
     pub ty: ContextStruct,
     pub components: Vec<ContextComponent>,
-    pub roles: std::collections::HashMap<String, Vec<u32>>,
+    pub roles: std::collections::HashMap<ContextRole, Vec<u32>>,
 }
 
 impl EntryContext {
@@ -205,24 +231,25 @@ fn collect_fields(
     ty: &ContextStruct,
     prefix: &[u32],
     components: &mut Vec<ContextComponent>,
-    roles: &mut std::collections::HashMap<String, Vec<u32>>,
+    roles: &mut std::collections::HashMap<ContextRole, Vec<u32>>,
 ) -> Result<(), Vec<Diag>> {
     for (index, field) in ty.fields.iter().enumerate() {
         let mut path = prefix.to_vec();
         path.push(u32::try_from(index).expect("context field index fits u32"));
         if let Some(role) = &field.semantic {
-            let valid = match role.as_str() {
-                "coord" | "resolution" => matches!(field.ty, ContextType::Vector(2)),
-                "time" | "delta_time" => matches!(field.ty, ContextType::Float),
-                _ => false,
-            };
-            if !valid {
+            let Some(parsed) = ContextRole::parse(role).filter(|parsed| {
+                if parsed.is_vec2() {
+                    matches!(field.ty, ContextType::Vector(2))
+                } else {
+                    matches!(field.ty, ContextType::Float)
+                }
+            }) else {
                 return Err(vec![Diag::error(
                     field.span.clone(),
                     format!("unknown or incorrectly typed context semantic `{role}`"),
                 )]);
-            }
-            if roles.insert(role.clone(), path.clone()).is_some() {
+            };
+            if roles.insert(parsed, path.clone()).is_some() {
                 return Err(vec![Diag::error(
                     field.span.clone(),
                     format!("duplicate context semantic `{role}`"),

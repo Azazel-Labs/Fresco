@@ -1,13 +1,13 @@
 use super::*;
-use crate::context::{ContextStruct, ContextType, EntryContext};
+use crate::context::{ContextRole, ContextStruct, ContextType, EntryContext};
 
 impl Checker {
     pub(super) fn activate_context_coordinate(&mut self) -> Option<(Sx, Sx)> {
         let roles = self.evaluation_context.as_mut()?;
-        let Value::Vec2(coord) = roles.get("coord")?.clone() else {
+        let Value::Vec2(coord) = roles.get(&ContextRole::Coord)?.clone() else {
             unreachable!("checked role");
         };
-        roles.insert("coord".to_string(), Value::Vec2((Sx::CoordX, Sx::CoordY)));
+        roles.insert(ContextRole::Coord, Value::Vec2((Sx::CoordX, Sx::CoordY)));
         Some(coord)
     }
 
@@ -86,20 +86,20 @@ impl Checker {
         let value = input_value(&contract.ty, &mut 0);
         let mut roles = self.context_roles(&value, span);
         // Ambient sample inputs are distinct from immutable argument projections.
-        if roles.contains_key("coord") {
-            roles.insert("coord".to_string(), Value::Vec2((Sx::CoordX, Sx::CoordY)));
+        if roles.contains_key(&ContextRole::Coord) {
+            roles.insert(ContextRole::Coord, Value::Vec2((Sx::CoordX, Sx::CoordY)));
         }
         for (role, input) in [
-            ("time", hir::EntryInput::Time),
-            ("delta_time", hir::EntryInput::Delta),
+            (ContextRole::Time, hir::EntryInput::Time),
+            (ContextRole::DeltaTime, hir::EntryInput::Delta),
         ] {
-            if roles.contains_key(role) {
-                roles.insert(role.to_string(), Value::Scalar(Sx::EntryInput(input)));
+            if roles.contains_key(&role) {
+                roles.insert(role, Value::Scalar(Sx::EntryInput(input)));
             }
         }
-        if roles.contains_key("resolution") {
+        if roles.contains_key(&ContextRole::Resolution) {
             roles.insert(
-                "resolution".to_string(),
+                ContextRole::Resolution,
                 Value::Vec2((
                     Sx::EntryInput(hir::EntryInput::ResolutionX),
                     Sx::EntryInput(hir::EntryInput::ResolutionY),
@@ -139,12 +139,16 @@ impl Checker {
         }
     }
 
-    pub(super) fn context_roles(&mut self, value: &Value, span: &Span) -> HashMap<String, Value> {
+    pub(super) fn context_roles(
+        &mut self,
+        value: &Value,
+        span: &Span,
+    ) -> HashMap<ContextRole, Value> {
         fn collect(
             checker: &mut Checker,
             value: &Value,
             span: &Span,
-            out: &mut HashMap<String, Value>,
+            out: &mut HashMap<ContextRole, Value>,
         ) {
             let Value::Struct { ty_name, fields } = value else {
                 checker.diags.push(Diag::error(
@@ -161,20 +165,24 @@ impl Checker {
                     continue;
                 };
                 if let Some(role) = &field.semantic {
-                    let valid = match role.as_str() {
-                        "coord" | "resolution" => matches!(value, Value::Vec2(_)),
-                        "time" | "delta_time" => matches!(value, Value::Scalar(_)),
-                        _ => false,
-                    };
-                    if !valid {
+                    let parsed = ContextRole::parse(role).filter(|parsed| {
+                        if parsed.is_vec2() {
+                            matches!(value, Value::Vec2(_))
+                        } else {
+                            matches!(value, Value::Scalar(_))
+                        }
+                    });
+                    if let Some(parsed) = parsed {
+                        if out.insert(parsed, value.clone()).is_some() {
+                            checker.diags.push(Diag::error(
+                                field.span.clone(),
+                                format!("duplicate context semantic `{role}`"),
+                            ));
+                        }
+                    } else {
                         checker.diags.push(Diag::error(
                             field.span.clone(),
                             format!("unknown or incorrectly typed context semantic `{role}`"),
-                        ));
-                    } else if out.insert(role.clone(), value.clone()).is_some() {
-                        checker.diags.push(Diag::error(
-                            field.span.clone(),
-                            format!("duplicate context semantic `{role}`"),
                         ));
                     }
                 }
@@ -192,7 +200,8 @@ impl Checker {
         if let Some(value) = self
             .evaluation_context
             .as_ref()
-            .and_then(|roles| roles.get(role))
+            .zip(ContextRole::parse(role))
+            .and_then(|(roles, role)| roles.get(&role))
         {
             return Some(value.clone());
         }
