@@ -287,17 +287,7 @@ impl Checker {
     }
 
     fn enum_variant_scalar_value(enum_def: &EnumDef, variant_name: &str) -> Value {
-        let mut variants = enum_def
-            .variants
-            .iter()
-            .map(|(name, span)| (name.as_str(), span.start))
-            .collect::<Vec<_>>();
-        variants.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)));
-
-        let ordinal = variants
-            .iter()
-            .position(|(name, _)| *name == variant_name)
-            .unwrap_or(0) as f32;
+        let ordinal = enum_def.ordinal(variant_name).unwrap_or(0) as f32;
         Value::Scalar(Sx::Lit(ordinal))
     }
 

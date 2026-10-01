@@ -528,17 +528,6 @@ pub(crate) fn validate_conformance_method_bodies(
     effects: &[EffectDecl],
     options: &CheckOptions,
 ) -> Result<(), Vec<Diag>> {
-    fn enum_variants_in_decl_order(checker: &Checker, enum_name: &str) -> Option<Vec<String>> {
-        let enum_def = checker.enum_defs.get(enum_name)?;
-        let mut variants = enum_def
-            .variants
-            .iter()
-            .map(|(name, span)| (name.clone(), span.start))
-            .collect::<Vec<_>>();
-        variants.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
-        Some(variants.into_iter().map(|(name, _)| name).collect())
-    }
-
     fn conformance_return_value_matches(
         checker: &mut Checker,
         value: &Value,
@@ -587,18 +576,19 @@ pub(crate) fn validate_conformance_method_bodies(
                         let rounded = ord.round();
                         if (rounded - ord).abs() <= 1e-6 && rounded >= 0.0 {
                             let idx = rounded as usize;
-                            if enum_variants_in_decl_order(checker, enum_name)
-                                .and_then(|variants| variants.get(idx).cloned())
-                                .is_some()
-                            {
+                            if checker.enum_defs.get(enum_name).is_some_and(|enum_def| {
+                                enum_def.variants_in_decl_order().get(idx).is_some()
+                            }) {
                                 return true;
                             }
                         }
                     }
 
-                    let variants = enum_variants_in_decl_order(checker, enum_name)
-                        .unwrap_or_default()
-                        .join(", ");
+                    let variants = checker
+                        .enum_defs
+                        .get(enum_name)
+                        .map(|enum_def| enum_def.variants_in_decl_order().join(", "))
+                        .unwrap_or_default();
                     let help = if variants.is_empty() {
                         format!("use a declared `{enum_name}` variant")
                     } else {

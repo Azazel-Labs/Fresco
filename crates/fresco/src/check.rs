@@ -3647,6 +3647,26 @@ pub(super) struct EnumDef {
     pub(super) variants: HashMap<String, Span>,
 }
 
+impl EnumDef {
+    /// Variant names in declaration order (ties broken by name).
+    pub(super) fn variants_in_decl_order(&self) -> Vec<&str> {
+        let mut variants = self
+            .variants
+            .iter()
+            .map(|(name, span)| (name.as_str(), span.start))
+            .collect::<Vec<_>>();
+        variants.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)));
+        variants.into_iter().map(|(name, _)| name).collect()
+    }
+
+    /// Declaration-order ordinal of `variant`, if it is declared.
+    pub(super) fn ordinal(&self, variant: &str) -> Option<usize> {
+        self.variants_in_decl_order()
+            .iter()
+            .position(|name| *name == variant)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct StructFieldDef {
     pub(super) semantic: Option<String>,

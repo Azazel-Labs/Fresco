@@ -240,17 +240,6 @@ impl Checker {
         }
     }
 
-    fn enum_variants_in_decl_order(&self, enum_name: &str) -> Option<Vec<String>> {
-        let enum_def = self.enum_defs.get(enum_name)?;
-        let mut variants = enum_def
-            .variants
-            .iter()
-            .map(|(name, span)| (name.clone(), span.start))
-            .collect::<Vec<_>>();
-        variants.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
-        Some(variants.into_iter().map(|(name, _)| name).collect())
-    }
-
     fn enum_variant_name_from_scalar(&self, enum_name: &str, sx: &Sx) -> Option<String> {
         let ordinal = Self::try_eval_static_scalar(sx)?;
         if !ordinal.is_finite() {
@@ -261,9 +250,11 @@ impl Checker {
             return None;
         }
         let idx = rounded as usize;
-        self.enum_variants_in_decl_order(enum_name)?
+        self.enum_defs
+            .get(enum_name)?
+            .variants_in_decl_order()
             .get(idx)
-            .cloned()
+            .map(|name| (*name).to_string())
     }
 
     fn validate_enum_scalar_value(
@@ -300,7 +291,9 @@ impl Checker {
         }
 
         let variants = self
-            .enum_variants_in_decl_order(enum_name)
+            .enum_defs
+            .get(enum_name)
+            .map(EnumDef::variants_in_decl_order)
             .unwrap_or_default();
         let help = if variants.is_empty() {
             format!("use a declared `{enum_name}` variant")
