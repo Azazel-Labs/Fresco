@@ -6,6 +6,8 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::{BinOp, Expr, PassDecl, PipelineDecl, SExpr, Stmt, UnOp};
 use crate::hir::Hir;
 
+use super::gpu_function::{binary_op, format_float, sanitize};
+
 #[derive(Debug, Clone)]
 pub(super) struct FullscreenVariant {
     pub key: String,
@@ -460,10 +462,6 @@ fn emit_expr(expression: &SExpr, context: EmitContext<'_>) -> Result<String, Str
     }
 }
 
-fn binary_op(op: BinOp) -> &'static str {
-    super::gpu_function::binary_op(op)
-}
-
 fn wgsl_type(name: &str) -> &str {
     match name {
         "vec2" => "vec2<f32>",
@@ -471,26 +469,6 @@ fn wgsl_type(name: &str) -> &str {
         "vec4" | "color" => "vec4<f32>",
         other => other,
     }
-}
-
-fn format_float(value: f64) -> String {
-    if value.fract() == 0.0 {
-        format!("{value:.1}")
-    } else {
-        value.to_string()
-    }
-}
-
-fn sanitize(name: &str) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
 }
 
 fn indent(text: &str) -> String {
@@ -516,18 +494,7 @@ fn helper_arguments(hir: &Hir) -> Result<String, String> {
         if let Some((element_name, length)) = crate::hir::parse_array_param_type(&param.ty_name) {
             let element = crate::hir::ArrayElemType::from_str(element_name)
                 .ok_or_else(|| format!("unsupported array element type in `{}`", param.name))?;
-            let width = match element {
-                crate::hir::ArrayElemType::F32
-                | crate::hir::ArrayElemType::I32
-                | crate::hir::ArrayElemType::U32
-                | crate::hir::ArrayElemType::Bool => 1,
-                crate::hir::ArrayElemType::Vec2 => 2,
-                crate::hir::ArrayElemType::Vec3 => 3,
-                crate::hir::ArrayElemType::Vec4 | crate::hir::ArrayElemType::Color => 4,
-                crate::hir::ArrayElemType::Mat2 => 4,
-                crate::hir::ArrayElemType::Mat3 => 9,
-                crate::hir::ArrayElemType::Mat4 => 16,
-            };
+            let width = element.scalar_count();
             for _ in 0..length {
                 if matches!(element, crate::hir::ArrayElemType::Color) {
                     args.push(format!(
@@ -598,18 +565,7 @@ fn helper_parameters(hir: &Hir) -> Result<String, String> {
         if let Some((element_name, length)) = crate::hir::parse_array_param_type(&param.ty_name) {
             let element = crate::hir::ArrayElemType::from_str(element_name)
                 .ok_or_else(|| format!("unsupported array element type in `{}`", param.name))?;
-            let width = match element {
-                crate::hir::ArrayElemType::F32
-                | crate::hir::ArrayElemType::I32
-                | crate::hir::ArrayElemType::U32
-                | crate::hir::ArrayElemType::Bool => 1,
-                crate::hir::ArrayElemType::Vec2 => 2,
-                crate::hir::ArrayElemType::Vec3 => 3,
-                crate::hir::ArrayElemType::Vec4 | crate::hir::ArrayElemType::Color => 4,
-                crate::hir::ArrayElemType::Mat2 => 4,
-                crate::hir::ArrayElemType::Mat3 => 9,
-                crate::hir::ArrayElemType::Mat4 => 16,
-            };
+            let width = element.scalar_count();
             for _ in 0..length {
                 if matches!(element, crate::hir::ArrayElemType::Color) {
                     params.push(format!("param_{index}: vec4<f32>"));

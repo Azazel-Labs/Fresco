@@ -557,6 +557,19 @@ pub(super) fn format_float(value: f64) -> String {
     }
 }
 
+/// Replace every character that is not an ASCII identifier character with `_`.
+pub(super) fn sanitize(name: &str) -> String {
+    name.chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '_' {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 /// Link reachable concrete library functions in library scope, not caller resource scope.
 pub(super) fn link_imports(
     functions: &[crate::ast::FnDecl],

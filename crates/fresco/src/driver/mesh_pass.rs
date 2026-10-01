@@ -608,15 +608,3 @@ fn uniform_type(signature: &str) -> Option<&str> {
         .strip_prefix("uniform<")
         .and_then(|value| value.strip_suffix('>'))
 }
-
-fn sanitize(name: &str) -> String {
-    name.chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || character == '_' {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}

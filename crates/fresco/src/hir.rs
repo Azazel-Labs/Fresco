@@ -1156,6 +1156,13 @@ pub fn array_elem_slot(name: &str, index: usize, suffix: &str) -> String {
 }
 
 impl ArrayElemType {
+    /// Number of scalar slots one element occupies.
+    pub const fn scalar_count(self) -> usize {
+        self.slot_suffixes().len()
+    }
+}
+
+impl ArrayElemType {
     /// Suffixes naming each scalar slot of one element (see [`array_elem_slot`]),
     /// in argument order; matrices are row-major.
     pub const fn slot_suffixes(self) -> &'static [&'static str] {
