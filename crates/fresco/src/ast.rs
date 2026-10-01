@@ -222,10 +222,6 @@ pub enum ComposeEntry {
     },
 }
 
-#[allow(
-    dead_code,
-    reason = "AST v0 includes staged fields consumed by planned passes"
-)]
 #[derive(Debug, Clone)]
 pub struct ScatterLifecycle {
     pub instance_name: Spanned<String>,
@@ -233,10 +229,6 @@ pub struct ScatterLifecycle {
     pub respawn_every: SExpr,
 }
 
-#[allow(
-    dead_code,
-    reason = "AST v0 includes staged fields consumed by planned passes"
-)]
 #[derive(Debug, Clone)]
 pub struct ScatterDecl {
     pub count: SExpr,
@@ -249,10 +241,6 @@ pub struct ScatterDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "AST v0 includes staged fields consumed by planned passes"
-)]
 #[derive(Debug, Clone)]
 pub struct ScatterPipeCall {
     pub name: String,
@@ -268,7 +256,7 @@ pub struct StyleStage {
 }
 
 #[derive(Debug, Clone)]
-#[allow(
+#[expect(
     dead_code,
     reason = "style parameter metadata is preserved for diagnostics and future type checks"
 )]
@@ -286,10 +274,6 @@ pub struct StyleParam {
         clippy::large_enum_variant,
         reason = "Keep parsed syntax nodes inline; changing their representation is a separate AST design change."
     )
-)]
-#[allow(
-    dead_code,
-    reason = "AST statement variants are staged for future language features"
 )]
 #[derive(Debug, Clone)]
 pub enum Stmt {
@@ -436,10 +420,6 @@ pub enum Stmt {
     Expr(SExpr),
 }
 
-#[allow(
-    dead_code,
-    reason = "Canvas metadata fields are staged for ABI evolution"
-)]
 #[derive(Debug, Clone)]
 pub struct CanvasParam {
     pub name: String,
@@ -449,10 +429,6 @@ pub struct CanvasParam {
 }
 
 /// The semantic class of a normalized root entry.
-#[allow(
-    dead_code,
-    reason = "Root-entry metadata is staged for explicit compiler IR"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootEntryKind {
     Canvas,
@@ -460,10 +436,6 @@ pub enum RootEntryKind {
 }
 
 /// The semantic role of a root-entry parameter after normalization.
-#[allow(
-    dead_code,
-    reason = "Root-entry metadata is staged for explicit compiler IR"
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootEntryParamRole {
     Primary,
@@ -474,10 +446,6 @@ pub enum RootEntryParamRole {
 }
 
 /// One normalized root-entry parameter with an explicit semantic role.
-#[allow(
-    dead_code,
-    reason = "Root-entry metadata is staged for explicit compiler IR"
-)]
 #[derive(Debug, Clone)]
 pub struct NormalizedRootEntryParam {
     pub name: String,
@@ -488,7 +456,7 @@ pub struct NormalizedRootEntryParam {
 }
 
 /// A first-class normalized root-entry node.
-#[allow(
+#[expect(
     dead_code,
     reason = "Root-entry metadata is staged for explicit compiler IR"
 )]
@@ -533,7 +501,7 @@ fn normalized_root_entry_params(params: &[CanvasParam]) -> Vec<NormalizedRootEnt
 }
 
 /// A shared view over entry-point declarations that execute as a single body.
-#[allow(
+#[expect(
     dead_code,
     reason = "EntryTemplate remains as staged syntax-only glue for parser-side entry bodies"
 )]
@@ -550,10 +518,6 @@ pub struct EntryTemplate {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Template metadata is staged for engine-facing lowering and instantiation"
-)]
 #[derive(Debug, Clone)]
 pub struct TemplatePlugDecl {
     /// Engine-visible callable alias for a bound entry method.
@@ -567,10 +531,6 @@ pub struct TemplatePlugDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Template metadata is staged for engine-facing lowering and instantiation"
-)]
 #[derive(Debug, Clone)]
 pub struct TemplateConfigParamDecl {
     pub attrs: Vec<(String, Vec<String>)>,
@@ -582,7 +542,7 @@ pub struct TemplateConfigParamDecl {
     pub span: Span,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Template declarations are staged for engine-facing lowering and instantiation"
 )]
@@ -628,10 +588,6 @@ pub struct AuthoredEntryBlock {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Canvas metadata fields are staged for ABI evolution"
-)]
 #[derive(Debug, Clone)]
 pub struct Canvas {
     pub entry_kind: String,
@@ -710,7 +666,7 @@ pub enum MaterialReturnTy {
 }
 
 /// One typed channel declaration inside a `material_model` block.
-#[allow(
+#[expect(
     dead_code,
     reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
 )]
@@ -726,7 +682,7 @@ pub struct MaterialChannelDecl {
 }
 
 /// Top-level `material_properties Name [extends Parent] { ... }` declaration.
-#[allow(
+#[expect(
     dead_code,
     reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
 )]
@@ -746,7 +702,7 @@ pub struct MaterialPropertiesDecl {
 }
 
 /// Top-level `schema_expression Name for Properties { shade: <expr> }` declaration.
-#[allow(
+#[expect(
     dead_code,
     reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
 )]
@@ -771,10 +727,6 @@ pub struct SchemaProgramDecl {
     pub output: Vec<SExpr>,
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 #[derive(Debug, Clone)]
 pub struct EvaluationContractBindingDecl {
     pub name: String,
@@ -784,10 +736,6 @@ pub struct EvaluationContractBindingDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 #[derive(Debug, Clone)]
 pub struct SchemaEvaluatorContractDecl {
     pub inputs: Vec<EvaluationContractBindingDecl>,
@@ -795,20 +743,12 @@ pub struct SchemaEvaluatorContractDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationPermutationAtom {
     Ident(String),
     Number(u32),
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvaluationPermutationSpec {
     Single(EvaluationPermutationAtom),
@@ -816,10 +756,6 @@ pub enum EvaluationPermutationSpec {
     Set(Vec<EvaluationPermutationAtom>),
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 #[derive(Debug, Clone)]
 pub struct SchemaEvaluatorPermutationDecl {
     pub name: String,
@@ -828,10 +764,6 @@ pub struct SchemaEvaluatorPermutationDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-)]
 #[derive(Debug, Clone)]
 pub struct SchemaEvaluatorVariantDecl {
     pub predicate: Option<SExpr>,
@@ -909,10 +841,6 @@ pub struct SurfaceDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Function parameter metadata is preserved for diagnostics and tooling"
-)]
 #[derive(Debug, Clone)]
 pub struct FnParam {
     pub is_context: bool,
@@ -925,7 +853,7 @@ pub struct FnParam {
     pub default: Option<SExpr>,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Type parameter metadata is staged for generic function support"
 )]
@@ -938,7 +866,7 @@ pub struct TypeParam {
     pub span: Span,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Const template parameter metadata is staged for compile-time value specialization"
 )]
@@ -951,7 +879,7 @@ pub struct ConstTemplateParam {
     pub span: Span,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Vertex interface declarations are staged for future lowering support"
 )]
@@ -963,7 +891,7 @@ pub struct VertexInterfaceDecl {
     pub span: Span,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Vertex interface member declarations are staged for future lowering support"
 )]
@@ -978,10 +906,6 @@ pub struct VertexInterfaceMemberDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Vertex format declarations are staged for future lowering support"
-)]
 #[derive(Debug, Clone)]
 pub struct VertexFormatDecl {
     pub name: String,
@@ -1003,10 +927,6 @@ pub struct VertexFactoryDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Function declaration metadata is staged for future lowering paths"
-)]
 #[derive(Debug, Clone)]
 pub struct FnDecl {
     /// Compiler-assigned effect contract for dynamically dispatched shader hooks.
@@ -1197,10 +1117,6 @@ pub struct ComputeOutput {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Interface method declarations are staged for interface type checking"
-)]
 #[derive(Debug, Clone)]
 pub struct InterfaceMethodDecl {
     pub name: String,
@@ -1211,10 +1127,6 @@ pub struct InterfaceMethodDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Interface declarations are staged for generic bound checking"
-)]
 #[derive(Debug, Clone)]
 pub struct InterfaceDecl {
     pub entry: Option<(String, String)>,
@@ -1224,7 +1136,7 @@ pub struct InterfaceDecl {
     pub span: Span,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Conformance declarations are staged for generic bound checking"
 )]
@@ -1243,17 +1155,13 @@ pub struct ConformanceDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Enum variants keep source spans for diagnostics and tooling"
-)]
 #[derive(Debug, Clone)]
 pub struct EnumVariant {
     pub name: String,
     pub span: Span,
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Enum declaration metadata is staged for semantic expansion"
 )]
@@ -1265,10 +1173,6 @@ pub struct EnumDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Struct declarations are staged for semantic expansion"
-)]
 #[derive(Debug, Clone)]
 pub struct StructFieldDecl {
     pub attrs: Vec<(String, Vec<String>)>,
@@ -1281,10 +1185,6 @@ pub struct StructFieldDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Struct declarations are staged for semantic expansion"
-)]
 #[derive(Debug, Clone)]
 pub struct StructDecl {
     pub attrs: Vec<PipelineAttribute>,
@@ -1299,10 +1199,6 @@ pub struct StructDecl {
 /// `Point` effects are pure per-pixel functions that may not read neighbors.
 /// `Local(r)` effects may sample within a bounded radius.
 /// `Global` effects may read arbitrary coordinates (e.g. image-wide statistics).
-#[allow(
-    dead_code,
-    reason = "Locality class metadata is staged for effect type checking"
-)]
 #[derive(Debug, Clone)]
 pub enum LocalityClass {
     Point,
@@ -1316,7 +1212,7 @@ pub enum LocalityClass {
 /// One side of a rewrite composition rule: a single named effect call with
 /// named parameter holes that bind values from the LHS and carry them to the
 /// result pattern.
-#[allow(
+#[expect(
     dead_code,
     reason = "Rewrite pattern nodes are staged for the rewrite rule engine"
 )]
@@ -1330,7 +1226,7 @@ pub struct RewritePattern {
 
 /// The `lhs ∘ rhs` composition pattern on the left-hand side of a rewrite
 /// rule.  Written `rewrite <outer>(<args>) compose <inner>(<args>)`.
-#[allow(
+#[expect(
     dead_code,
     reason = "Rewrite composition nodes are staged for the rewrite rule engine"
 )]
@@ -1344,7 +1240,7 @@ pub struct RewriteComposition {
 }
 
 /// A complete rewrite rule: `rewrite <lhs> => <result> [when <guard>]`.
-#[allow(
+#[expect(
     dead_code,
     reason = "Rewrite rule nodes are staged for the rewrite rule engine"
 )]
@@ -1362,7 +1258,7 @@ pub struct RewriteRule {
 
 /// A user-defined effect declaration:
 /// `effect <name>(<params>) <locality> { <body> [<rewrite_rules>] }`
-#[allow(
+#[expect(
     dead_code,
     reason = "Effect declaration metadata is staged for semantic expansion"
 )]
@@ -1379,7 +1275,7 @@ pub struct EffectDecl {
 }
 
 /// Top-level `tags Domain { value, ... }` declaration.
-#[allow(
+#[expect(
     dead_code,
     reason = "Tag declarations are parsed as staged type-system vocabulary"
 )]
@@ -1392,7 +1288,7 @@ pub struct TagsDecl {
 }
 
 /// Top-level `axis_default: static|uniform` declaration.
-#[allow(
+#[expect(
     dead_code,
     reason = "Axis default mode is parsed for staged pipeline DSL support"
 )]
@@ -1404,7 +1300,7 @@ pub struct AxisDefaultDecl {
 }
 
 /// A single value in an axis domain, optionally carrying nested sub-axes.
-#[allow(
+#[expect(
     dead_code,
     reason = "Axis values are parsed for staged pipeline variant validation"
 )]
@@ -1416,7 +1312,7 @@ pub struct AxisValueDecl {
 }
 
 /// A nested sub-axis declared under a specific parent value.
-#[allow(
+#[expect(
     dead_code,
     reason = "Sub-axes are parsed for staged pipeline variant validation"
 )]
@@ -1429,10 +1325,6 @@ pub struct AxisSubAxisDecl {
 }
 
 /// Top-level `axis @known(mode) name: ...` declaration.
-#[allow(
-    dead_code,
-    reason = "Axis declarations are parsed for staged pipeline variant validation"
-)]
 #[derive(Debug, Clone)]
 pub struct AxisDecl {
     pub name: String,
@@ -1443,10 +1335,6 @@ pub struct AxisDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Axis domains are parsed for staged pipeline variant validation"
-)]
 #[derive(Debug, Clone)]
 pub enum AxisDomain {
     ValueSet(Vec<AxisValueDecl>),
@@ -1454,10 +1342,6 @@ pub enum AxisDomain {
 }
 
 /// Generic metadata attribute parsed from `@name(...)` or `@name`.
-#[allow(
-    dead_code,
-    reason = "Pipeline attribute metadata is parsed for staged checker/lowering support"
-)]
 #[derive(Debug, Clone)]
 pub struct PipelineAttribute {
     /// Checked expression arguments for resource-policy attributes.
@@ -1482,10 +1366,6 @@ pub fn find_attr<'a>(attrs: &'a [PipelineAttribute], name: &str) -> Option<&'a P
 }
 
 /// A staged binding-like declaration in a pass body.
-#[allow(
-    dead_code,
-    reason = "Pass bindings are parsed for staged pipeline attribute validation"
-)]
 #[derive(Debug, Clone)]
 pub struct PassBindingDecl {
     /// Compiler-owned logical input path, such as a resource's `values.count`.
@@ -1501,10 +1381,6 @@ pub struct PassBindingDecl {
 }
 
 /// A staged pass permutation declaration inside `permutations { ... }`.
-#[allow(
-    dead_code,
-    reason = "Pass permutation declarations are parsed for staged pipeline variant validation"
-)]
 #[derive(Debug, Clone)]
 pub struct PassPermutationDecl {
     pub name: String,
@@ -1518,10 +1394,6 @@ pub struct PassPermutationDecl {
 }
 
 /// A typed `require` clause in a staged pass invariant block.
-#[allow(
-    dead_code,
-    reason = "Pass requirement clauses are parsed for staged pipeline invariant validation"
-)]
 #[derive(Debug, Clone)]
 pub enum PassRequirementClause {
     Implication { guard: SExpr, constraint: SExpr },
@@ -1544,7 +1416,7 @@ impl PassRequirementClause {
 }
 
 /// A staged `require { ... }` pass invariant clause.
-#[allow(
+#[expect(
     dead_code,
     reason = "Pass requirement declarations are parsed for staged pipeline invariant validation"
 )]
@@ -1555,7 +1427,7 @@ pub struct PassRequirementDecl {
 }
 
 /// Parameter declaration captured from a staged pass hook signature.
-#[allow(
+#[expect(
     dead_code,
     reason = "Pass hook signatures are parsed for staged vertex contract validation"
 )]
@@ -1570,10 +1442,6 @@ pub struct PassFnHookParamDecl {
 }
 
 /// Top-level pass hook declaration, for example `fn vertex(v: Shaded) -> Surf { ... }`.
-#[allow(
-    dead_code,
-    reason = "Pass hook declarations are parsed for staged pass contract validation"
-)]
 #[derive(Debug, Clone)]
 pub struct PassFnHookDecl {
     pub attrs: Vec<PipelineAttribute>,
@@ -1609,10 +1477,6 @@ pub struct PassDispatchCase {
 }
 
 /// A staged pass reference entry in a pipeline block.
-#[allow(
-    dead_code,
-    reason = "Pipeline pass refs are parsed for staged attribute placement validation"
-)]
 #[derive(Debug, Clone)]
 pub struct PipelinePassRef {
     pub invocation: Option<Box<fresco_artifact::ManifestStyleInvocation>>,
@@ -1638,10 +1502,6 @@ pub struct EntryProperty {
 }
 
 /// Top-level `pass Name [for Material] { ... }` declaration.
-#[allow(
-    dead_code,
-    reason = "Pass declarations are parsed as staged pipeline DSL support"
-)]
 #[derive(Debug, Clone)]
 pub struct PassDecl {
     /// Compiler-linked service captures, validated against their renderer sources.
@@ -1674,10 +1534,6 @@ pub struct PassDecl {
 }
 
 /// Top-level `pipeline Name [for Material] { pass_a pass_b ... }` declaration.
-#[allow(
-    dead_code,
-    reason = "Pipeline declarations are parsed as staged pipeline DSL support"
-)]
 #[derive(Debug, Clone)]
 pub struct PipelineDecl {
     pub name: String,
@@ -1712,7 +1568,6 @@ impl Default for ResourceLayout {
     }
 }
 
-#[allow(dead_code, reason = "Program aggregates staged top-level declarations")]
 #[derive(Debug, Clone, Default)]
 pub struct Program {
     pub resource_layout: ResourceLayout,
@@ -1759,10 +1614,6 @@ pub enum RootEntryRef<'a> {
 }
 
 impl<'a> RootEntryRef<'a> {
-    #[allow(
-        dead_code,
-        reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-    )]
     pub fn as_normalized_root_entry(self) -> NormalizedRootEntry {
         match self {
             Self::Canvas(canvas) => canvas.as_normalized_root_entry(),
@@ -1770,7 +1621,7 @@ impl<'a> RootEntryRef<'a> {
         }
     }
 
-    #[allow(
+    #[expect(
         dead_code,
         reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
     )]
@@ -1781,7 +1632,7 @@ impl<'a> RootEntryRef<'a> {
         }
     }
 
-    #[allow(
+    #[expect(
         dead_code,
         reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
     )]
@@ -1802,7 +1653,7 @@ impl Program {
     }
 }
 
-#[allow(
+#[expect(
     dead_code,
     reason = "Top-level constants are retained for checker-time constant binding"
 )]
@@ -1836,20 +1687,12 @@ pub struct GlobalParamDecl {
     pub span: Span,
 }
 
-#[allow(
-    dead_code,
-    reason = "Pragma declarations are retained for compiler-context overrides"
-)]
 #[derive(Debug, Clone)]
 pub enum PragmaValue {
     Number(f64),
     Ident(String),
 }
 
-#[allow(
-    dead_code,
-    reason = "Pragma declarations are retained for compiler-context overrides"
-)]
 #[derive(Debug, Clone)]
 pub struct PragmaDecl {
     pub key: String,
@@ -1859,7 +1702,6 @@ pub struct PragmaDecl {
     pub span: Span,
 }
 
-#[allow(dead_code, reason = "Import spans are retained for richer diagnostics")]
 #[derive(Debug, Clone)]
 pub struct ImportDecl {
     pub path: String,
@@ -1882,7 +1724,7 @@ pub struct TextureChannelDef {
     pub channel_span: Span,
     pub semantic_name: String,
     pub decode: Option<TextureChannelDecode>,
-    #[allow(
+    #[expect(
         dead_code,
         reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
     )]
@@ -1890,7 +1732,7 @@ pub struct TextureChannelDef {
 }
 
 /// Top-level `texture_type Name { channel_defs }` declaration.
-#[allow(
+#[expect(
     dead_code,
     reason = "Texture type declarations are staged for semantic expansion"
 )]
