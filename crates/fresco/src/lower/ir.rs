@@ -553,103 +553,26 @@ impl IrBuilder {
                     unreachable!("checker validated array element type");
                 };
 
-                match elem_type {
-                    ArrayElemType::F32
-                    | ArrayElemType::I32
-                    | ArrayElemType::U32
-                    | ArrayElemType::Bool => {
-                        for index in 0..len {
-                            let elem_name = format!("{}__{index}", p.name);
-                            let h = function.arg(&elem_name, t.f32_);
-                            param_scalars.insert(elem_name, h);
+                if elem_type == ArrayElemType::Color {
+                    for index in 0..len {
+                        let elem_name = crate::hir::array_elem_slot(&p.name, index, "");
+                        let v = function.arg(&elem_name, t.v4);
+                        // Decompose into r,g,b,a components like single colors
+                        for (comp_idx, suffix) in (0_u32..).zip(elem_type.slot_suffixes()) {
+                            let component = function.expr(Ex::AccessIndex {
+                                base: v,
+                                index: comp_idx,
+                            });
+                            let slot = crate::hir::array_elem_slot(&p.name, index, suffix);
+                            param_scalars.insert(slot, component);
                         }
                     }
-                    ArrayElemType::Vec2 => {
-                        for index in 0..len {
-                            let x_name = format!("{}__{index}__x", p.name);
-                            let y_name = format!("{}__{index}__y", p.name);
-                            let hx = function.arg(&x_name, t.f32_);
-                            let hy = function.arg(&y_name, t.f32_);
-                            param_scalars.insert(x_name, hx);
-                            param_scalars.insert(y_name, hy);
-                        }
-                    }
-                    ArrayElemType::Vec3 => {
-                        for index in 0..len {
-                            let x_name = format!("{}__{index}__x", p.name);
-                            let y_name = format!("{}__{index}__y", p.name);
-                            let z_name = format!("{}__{index}__z", p.name);
-                            let hx = function.arg(&x_name, t.f32_);
-                            let hy = function.arg(&y_name, t.f32_);
-                            let hz = function.arg(&z_name, t.f32_);
-                            param_scalars.insert(x_name, hx);
-                            param_scalars.insert(y_name, hy);
-                            param_scalars.insert(z_name, hz);
-                        }
-                    }
-                    ArrayElemType::Vec4 => {
-                        for index in 0..len {
-                            let x_name = format!("{}__{index}__x", p.name);
-                            let y_name = format!("{}__{index}__y", p.name);
-                            let z_name = format!("{}__{index}__z", p.name);
-                            let w_name = format!("{}__{index}__w", p.name);
-                            let hx = function.arg(&x_name, t.f32_);
-                            let hy = function.arg(&y_name, t.f32_);
-                            let hz = function.arg(&z_name, t.f32_);
-                            let hw = function.arg(&w_name, t.f32_);
-                            param_scalars.insert(x_name, hx);
-                            param_scalars.insert(y_name, hy);
-                            param_scalars.insert(z_name, hz);
-                            param_scalars.insert(w_name, hw);
-                        }
-                    }
-                    ArrayElemType::Mat2 => {
-                        for index in 0..len {
-                            for i in 0..2 {
-                                for j in 0..2 {
-                                    let elem_name = format!("{}__{index}__{i}_{j}", p.name);
-                                    let h = function.arg(&elem_name, t.f32_);
-                                    param_scalars.insert(elem_name, h);
-                                }
-                            }
-                        }
-                    }
-                    ArrayElemType::Mat3 => {
-                        for index in 0..len {
-                            for i in 0..3 {
-                                for j in 0..3 {
-                                    let elem_name = format!("{}__{index}__{i}_{j}", p.name);
-                                    let h = function.arg(&elem_name, t.f32_);
-                                    param_scalars.insert(elem_name, h);
-                                }
-                            }
-                        }
-                    }
-                    ArrayElemType::Mat4 => {
-                        for index in 0..len {
-                            for i in 0..4 {
-                                for j in 0..4 {
-                                    let elem_name = format!("{}__{index}__{i}_{j}", p.name);
-                                    let h = function.arg(&elem_name, t.f32_);
-                                    param_scalars.insert(elem_name, h);
-                                }
-                            }
-                        }
-                    }
-                    ArrayElemType::Color => {
-                        for index in 0..len {
-                            let elem_name = format!("{}__{index}", p.name);
-                            let v = function.arg(&elem_name, t.v4);
-                            // Decompose into r,g,b,a components like single colors
-                            for (comp_idx, comp_name) in
-                                [(0_u32, "r"), (1, "g"), (2, "b"), (3, "a")]
-                            {
-                                let component = function.expr(Ex::AccessIndex {
-                                    base: v,
-                                    index: comp_idx,
-                                });
-                                param_scalars.insert(format!("{elem_name}.{comp_name}"), component);
-                            }
+                } else {
+                    for index in 0..len {
+                        for suffix in elem_type.slot_suffixes() {
+                            let slot = crate::hir::array_elem_slot(&p.name, index, suffix);
+                            let h = function.arg(&slot, t.f32_);
+                            param_scalars.insert(slot, h);
                         }
                     }
                 }

@@ -102,265 +102,26 @@ impl<'h> FnCtx<'h> {
             let inst_dy = self.ir.mul(inst_v, height);
             let inst_pos_x = self.ir.addx(min_x, inst_dx);
             let inst_pos_y = self.ir.addx(min_y, inst_dy);
-            let placeholder_age_norm = self.ir.lit(0.0);
-            self.scatter_instance_ctx.push(ScatterInstanceCtx {
+            let mut instance = ScatterInstanceCtx {
                 pos_x: inst_pos_x,
                 pos_y: inst_pos_y,
                 id: inst_id,
                 index01: inst_index01,
-                age_norm: placeholder_age_norm,
-            });
-            let inst_age_norm = if let Some(lifecycle) = lifecycle.as_ref() {
-                let respawn = self.sx_at(
-                    &Sx::Max(
-                        Box::new(lifecycle.respawn_every.clone()),
-                        Box::new(Sx::Lit(1.0e-6)),
-                    ),
-                    p,
-                );
-                let time_phase = self.ir.div(time, respawn);
-                let phase = self.ir.addx(time_phase, inst_index01);
-                self.ir.m1(Mf::Fract, phase)
-            } else {
-                self.ir.lit(0.5)
+                age_norm: self.ir.lit(0.0),
             };
-            let instance_visible = if let Some(lifecycle) = lifecycle.as_ref() {
-                let respawn = self.sx_at(
-                    &Sx::Max(
-                        Box::new(lifecycle.respawn_every.clone()),
-                        Box::new(Sx::Lit(1.0e-6)),
-                    ),
-                    p,
-                );
-                let lifetime = self.sx_at(
-                    &Sx::Clamp(
-                        Box::new(lifecycle.lifetime.clone()),
-                        Box::new(Sx::Lit(0.0)),
-                        Box::new(lifecycle.respawn_every.clone()),
-                    ),
-                    p,
-                );
-                let duty = self.ir.div(lifetime, respawn);
-                let is_visible = self.ir.bin(Bo::Less, inst_age_norm, duty);
-                self.ir.add(Ex::Select {
-                    condition: is_visible,
-                    accept: one,
-                    reject: zero,
-                })
-            } else {
-                one
-            };
+            // Unlike the bin path, the procedural path leaves the lifecycle
+            // placeholder context on the stack.
+            let (inst_age_norm, instance_visible) =
+                self.scatter_lifecycle(lifecycle.as_ref(), p, time, instance, zero, Some(one));
+            instance.age_norm = inst_age_norm;
 
-            let (rgb, a) = if let Some(&helper_fn) = self.scatter_body_fns.get(&scatter_layer_id) {
-                let call_args: Vec<Handle<Ex>> = {
-                    let mut args = vec![
-                        p,
-                        self.ir.px,
-                        self.ir.aa,
-                        self.ir.time,
-                        self.ir.delta,
-                        self.ir.res,
-                        inst_pos_x,
-                        inst_pos_y,
-                        inst_id,
-                        inst_index01,
-                        inst_age_norm,
-                    ];
-                    for param in &self.hir.params {
-                        if let Some((elem_ty_str, len)) =
-                            crate::hir::parse_array_param_type(&param.ty_name)
-                        {
-                            use crate::hir::ArrayElemType;
-
-                            let Some(elem_type) = ArrayElemType::from_str(elem_ty_str) else {
-                                unreachable!("checker validated array element type");
-                            };
-
-                            match elem_type {
-                                ArrayElemType::F32
-                                | ArrayElemType::I32
-                                | ArrayElemType::U32
-                                | ArrayElemType::Bool => {
-                                    for index in 0..len {
-                                        let elem_name = format!("{}__{index}", param.name);
-                                        args.push(
-                                            *self
-                                                .ir
-                                                .param_scalars
-                                                .get(&elem_name)
-                                                .expect("array param element must exist"),
-                                        );
-                                    }
-                                }
-                                ArrayElemType::Vec2 => {
-                                    for index in 0..len {
-                                        for component in ["x", "y"] {
-                                            let elem_name =
-                                                format!("{}__{index}__{component}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "vec2 array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Vec3 => {
-                                    for index in 0..len {
-                                        for component in ["x", "y", "z"] {
-                                            let elem_name =
-                                                format!("{}__{index}__{component}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "vec3 array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Vec4 => {
-                                    for index in 0..len {
-                                        for component in ["x", "y", "z", "w"] {
-                                            let elem_name =
-                                                format!("{}__{index}__{component}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "vec4 array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Mat2 => {
-                                    for index in 0..len {
-                                        for i in 0..2 {
-                                            for j in 0..2 {
-                                                let elem_name =
-                                                    format!("{}__{index}__{i}_{j}", param.name);
-                                                args.push(
-                                                    *self.ir.param_scalars.get(&elem_name).expect(
-                                                        "mat2 array param component must exist",
-                                                    ),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Mat3 => {
-                                    for index in 0..len {
-                                        for i in 0..3 {
-                                            for j in 0..3 {
-                                                let elem_name =
-                                                    format!("{}__{index}__{i}_{j}", param.name);
-                                                args.push(
-                                                    *self.ir.param_scalars.get(&elem_name).expect(
-                                                        "mat3 array param component must exist",
-                                                    ),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Mat4 => {
-                                    for index in 0..len {
-                                        for i in 0..4 {
-                                            for j in 0..4 {
-                                                let elem_name =
-                                                    format!("{}__{index}__{i}_{j}", param.name);
-                                                args.push(
-                                                    *self.ir.param_scalars.get(&elem_name).expect(
-                                                        "mat4 array param component must exist",
-                                                    ),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Color => {
-                                    for index in 0..len {
-                                        for suffix in ["r", "g", "b", "a"] {
-                                            let elem_name =
-                                                format!("{}__{index}.{suffix}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "color array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            continue;
-                        }
-                        match param.ty_name.as_str() {
-                            "f32" | "i32" | "u32" | "bool" => {
-                                args.push(
-                                    *self
-                                        .ir
-                                        .param_scalars
-                                        .get(&param.name)
-                                        .expect("param must exist"),
-                                );
-                            }
-                            "color" => {
-                                for suffix in ["r", "g", "b", "a"] {
-                                    args.push(
-                                        *self
-                                            .ir
-                                            .param_scalars
-                                            .get(&format!("{}.{suffix}", param.name))
-                                            .expect("color param component must exist"),
-                                    );
-                                }
-                            }
-                            _ => unreachable!("checker emitted unsupported param type"),
-                        }
-                    }
-                    args
-                };
-
-                let call_result = self.ir.add(Ex::CallResult(helper_fn));
-                self.ir.push_statement(naga::Statement::Call {
-                    function: helper_fn,
-                    arguments: call_args,
-                    result: Some(call_result),
-                });
-
-                let body_r = self.ir.add(Ex::AccessIndex {
-                    base: call_result,
-                    index: 0,
-                });
-                let body_g = self.ir.add(Ex::AccessIndex {
-                    base: call_result,
-                    index: 1,
-                });
-                let body_b = self.ir.add(Ex::AccessIndex {
-                    base: call_result,
-                    index: 2,
-                });
-                let body_a = self.ir.add(Ex::AccessIndex {
-                    base: call_result,
-                    index: 3,
-                });
-                let body_rgb = self.ir.add(Ex::Compose {
-                    ty: self.ir.types.v3,
-                    components: vec![body_r, body_g, body_b],
-                });
-                (body_rgb, body_a)
-            } else {
-                self.clear_point_sensitive_caches();
-
-                self.scatter_instance_ctx.push(ScatterInstanceCtx {
-                    pos_x: inst_pos_x,
-                    pos_y: inst_pos_y,
-                    id: inst_id,
-                    index01: inst_index01,
-                    age_norm: inst_age_norm,
-                });
-                let result = self.layer_color(body, p);
-                self.scatter_instance_ctx.pop();
-                result
-            };
+            let (rgb, a) = self.call_scatter_body(
+                scatter_layer_id,
+                body,
+                p,
+                instance,
+                Self::clear_point_sensitive_caches,
+            );
 
             let dx = self.ir.sub(px, inst_pos_x);
             let dy = self.ir.sub(py, inst_pos_y);
@@ -480,269 +241,23 @@ impl<'h> FnCtx<'h> {
         let inst_dy = self.ir.mul(inst_v, height);
         let inst_pos_x = self.ir.addx(min_x, inst_dx);
         let inst_pos_y = self.ir.addx(min_y, inst_dy);
-        let placeholder_age_norm = self.ir.lit(0.0);
-        self.scatter_instance_ctx.push(ScatterInstanceCtx {
+        let mut instance = ScatterInstanceCtx {
             pos_x: inst_pos_x,
             pos_y: inst_pos_y,
             id: inst_id,
             index01: inst_index01,
-            age_norm: placeholder_age_norm,
-        });
-        let inst_age_norm = if let Some(lifecycle) = lifecycle.as_ref() {
-            let respawn = self.sx_at(
-                &Sx::Max(
-                    Box::new(lifecycle.respawn_every.clone()),
-                    Box::new(Sx::Lit(1.0e-6)),
-                ),
-                p,
-            );
-            let time_phase = self.ir.div(time, respawn);
-            let phase = self.ir.addx(time_phase, inst_index01);
-            self.ir.m1(Mf::Fract, phase)
-        } else {
-            self.ir.lit(0.5)
+            age_norm: self.ir.lit(0.0),
         };
-        let instance_visible = if let Some(lifecycle) = lifecycle.as_ref() {
-            let respawn = self.sx_at(
-                &Sx::Max(
-                    Box::new(lifecycle.respawn_every.clone()),
-                    Box::new(Sx::Lit(1.0e-6)),
-                ),
-                p,
-            );
-            let lifetime = self.sx_at(
-                &Sx::Clamp(
-                    Box::new(lifecycle.lifetime.clone()),
-                    Box::new(Sx::Lit(0.0)),
-                    Box::new(lifecycle.respawn_every.clone()),
-                ),
-                p,
-            );
-            let duty = self.ir.div(lifetime, respawn);
-            let one = self.ir.lit(1.0);
-            let is_visible = self.ir.bin(Bo::Less, inst_age_norm, duty);
-            self.ir.add(Ex::Select {
-                condition: is_visible,
-                accept: one,
-                reject: zero,
-            })
-        } else {
-            self.ir.lit(1.0)
-        };
+        let (inst_age_norm, instance_visible) =
+            self.scatter_lifecycle(lifecycle.as_ref(), p, time, instance, zero, None);
         self.scatter_instance_ctx.pop();
+        instance.age_norm = inst_age_norm;
 
-        let (rgb, a) = if let Some(&helper_fn) = self.scatter_body_fns.get(&scatter_layer_id) {
-            let call_args: Vec<Handle<Ex>> =
-                {
-                    let mut args = vec![
-                        p,
-                        self.ir.px,
-                        self.ir.aa,
-                        self.ir.time,
-                        self.ir.delta,
-                        self.ir.res,
-                        inst_pos_x,
-                        inst_pos_y,
-                        inst_id,
-                        inst_index01,
-                        inst_age_norm,
-                    ];
-                    for param in &self.hir.params {
-                        if let Some((elem_ty_str, len)) =
-                            crate::hir::parse_array_param_type(&param.ty_name)
-                        {
-                            use crate::hir::ArrayElemType;
-
-                            let Some(elem_type) = ArrayElemType::from_str(elem_ty_str) else {
-                                unreachable!("checker validated array element type");
-                            };
-
-                            match elem_type {
-                                ArrayElemType::F32
-                                | ArrayElemType::I32
-                                | ArrayElemType::U32
-                                | ArrayElemType::Bool => {
-                                    for index in 0..len {
-                                        let elem_name = format!("{}__{index}", param.name);
-                                        args.push(
-                                            *self
-                                                .ir
-                                                .param_scalars
-                                                .get(&elem_name)
-                                                .expect("array param element must exist"),
-                                        );
-                                    }
-                                }
-                                ArrayElemType::Vec2 => {
-                                    for index in 0..len {
-                                        for component in ["x", "y"] {
-                                            let elem_name =
-                                                format!("{}__{index}__{component}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "vec2 array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Vec3 => {
-                                    for index in 0..len {
-                                        for component in ["x", "y", "z"] {
-                                            let elem_name =
-                                                format!("{}__{index}__{component}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "vec3 array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Vec4 => {
-                                    for index in 0..len {
-                                        for component in ["x", "y", "z", "w"] {
-                                            let elem_name =
-                                                format!("{}__{index}__{component}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "vec4 array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Mat2 => {
-                                    for index in 0..len {
-                                        for i in 0..2 {
-                                            for j in 0..2 {
-                                                let elem_name =
-                                                    format!("{}__{index}__{i}_{j}", param.name);
-                                                args.push(
-                                                    *self.ir.param_scalars.get(&elem_name).expect(
-                                                        "mat2 array param component must exist",
-                                                    ),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Mat3 => {
-                                    for index in 0..len {
-                                        for i in 0..3 {
-                                            for j in 0..3 {
-                                                let elem_name =
-                                                    format!("{}__{index}__{i}_{j}", param.name);
-                                                args.push(
-                                                    *self.ir.param_scalars.get(&elem_name).expect(
-                                                        "mat3 array param component must exist",
-                                                    ),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Mat4 => {
-                                    for index in 0..len {
-                                        for i in 0..4 {
-                                            for j in 0..4 {
-                                                let elem_name =
-                                                    format!("{}__{index}__{i}_{j}", param.name);
-                                                args.push(
-                                                    *self.ir.param_scalars.get(&elem_name).expect(
-                                                        "mat4 array param component must exist",
-                                                    ),
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                ArrayElemType::Color => {
-                                    for index in 0..len {
-                                        for suffix in ["r", "g", "b", "a"] {
-                                            let elem_name =
-                                                format!("{}__{index}.{suffix}", param.name);
-                                            args.push(
-                                                *self.ir.param_scalars.get(&elem_name).expect(
-                                                    "color array param component must exist",
-                                                ),
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            continue;
-                        }
-                        match param.ty_name.as_str() {
-                            "f32" | "i32" | "u32" | "bool" => {
-                                args.push(
-                                    *self
-                                        .ir
-                                        .param_scalars
-                                        .get(&param.name)
-                                        .expect("param must exist"),
-                                );
-                            }
-                            "color" => {
-                                for suffix in ["r", "g", "b", "a"] {
-                                    args.push(
-                                        *self
-                                            .ir
-                                            .param_scalars
-                                            .get(&format!("{}.{suffix}", param.name))
-                                            .expect("color param component must exist"),
-                                    );
-                                }
-                            }
-                            _ => unreachable!("checker emitted unsupported param type"),
-                        }
-                    }
-                    args
-                };
-
-            let call_result = self.ir.add(Ex::CallResult(helper_fn));
-            self.ir.push_statement(naga::Statement::Call {
-                function: helper_fn,
-                arguments: call_args,
-                result: Some(call_result),
+        let (rgb, a) =
+            self.call_scatter_body(scatter_layer_id, body, p, instance, |cx: &mut Self| {
+                cx.caches.sx_cache.clear();
+                cx.caches.sdf_cache.clear();
             });
-
-            let body_r = self.ir.add(Ex::AccessIndex {
-                base: call_result,
-                index: 0,
-            });
-            let body_g = self.ir.add(Ex::AccessIndex {
-                base: call_result,
-                index: 1,
-            });
-            let body_b = self.ir.add(Ex::AccessIndex {
-                base: call_result,
-                index: 2,
-            });
-            let body_a = self.ir.add(Ex::AccessIndex {
-                base: call_result,
-                index: 3,
-            });
-            let body_rgb = self.ir.add(Ex::Compose {
-                ty: self.ir.types.v3,
-                components: vec![body_r, body_g, body_b],
-            });
-            (body_rgb, body_a)
-        } else {
-            self.caches.sx_cache.clear();
-            self.caches.sdf_cache.clear();
-
-            self.scatter_instance_ctx.push(ScatterInstanceCtx {
-                pos_x: inst_pos_x,
-                pos_y: inst_pos_y,
-                id: inst_id,
-                index01: inst_index01,
-                age_norm: inst_age_norm,
-            });
-            let result = self.layer_color(body, p);
-            self.scatter_instance_ctx.pop();
-            result
-        };
 
         let dx = self.ir.sub(px, inst_pos_x);
         let dy = self.ir.sub(py, inst_pos_y);
@@ -794,6 +309,173 @@ impl<'h> FnCtx<'h> {
         });
 
         (self.ir.load(bin_rgb_ptr), self.ir.load(bin_alpha_ptr))
+    }
+
+    /// Push `placeholder` (whose `age_norm` is not yet known) as the active
+    /// scatter instance and evaluate the lifecycle age and visibility for it.
+    /// The placeholder stays pushed; callers decide when to pop it.
+    ///
+    /// `one` reuses an existing `1.0` literal; `None` emits a fresh literal at
+    /// its use.
+    fn scatter_lifecycle(
+        &mut self,
+        lifecycle: Option<&crate::hir::ScatterLifecycleParams>,
+        p: Handle<Ex>,
+        time: Handle<Ex>,
+        placeholder: ScatterInstanceCtx,
+        zero: Handle<Ex>,
+        one: Option<Handle<Ex>>,
+    ) -> (Handle<Ex>, Handle<Ex>) {
+        self.scatter_instance_ctx.push(placeholder);
+        let Some(lifecycle) = lifecycle else {
+            let age_norm = self.ir.lit(0.5);
+            let visible = one.unwrap_or_else(|| self.ir.lit(1.0));
+            return (age_norm, visible);
+        };
+        let respawn_sx = Sx::Max(
+            Box::new(lifecycle.respawn_every.clone()),
+            Box::new(Sx::Lit(1.0e-6)),
+        );
+        let respawn = self.sx_at(&respawn_sx, p);
+        let time_phase = self.ir.div(time, respawn);
+        let phase = self.ir.addx(time_phase, placeholder.index01);
+        let age_norm = self.ir.m1(Mf::Fract, phase);
+
+        // `sx_at` does not always hit its cache (cell-inset spans and
+        // uncacheable expressions re-emit), so the period is lowered again
+        // rather than reused.
+        let respawn = self.sx_at(&respawn_sx, p);
+        let lifetime = self.sx_at(
+            &Sx::Clamp(
+                Box::new(lifecycle.lifetime.clone()),
+                Box::new(Sx::Lit(0.0)),
+                Box::new(lifecycle.respawn_every.clone()),
+            ),
+            p,
+        );
+        let duty = self.ir.div(lifetime, respawn);
+        let one = one.unwrap_or_else(|| self.ir.lit(1.0));
+        let is_visible = self.ir.bin(Bo::Less, age_norm, duty);
+        let visible = self.ir.add(Ex::Select {
+            condition: is_visible,
+            accept: one,
+            reject: zero,
+        });
+        (age_norm, visible)
+    }
+
+    /// Evaluate one scatter instance's body: through the prebuilt scatter body
+    /// helper when one exists, otherwise inline after `reset_caches`.
+    fn call_scatter_body(
+        &mut self,
+        scatter_layer_id: LayerId,
+        body: LayerId,
+        p: Handle<Ex>,
+        instance: ScatterInstanceCtx,
+        reset_caches: fn(&mut Self),
+    ) -> (Handle<Ex>, Handle<Ex>) {
+        let Some(&helper_fn) = self.scatter_body_fns.get(&scatter_layer_id) else {
+            reset_caches(self);
+            self.scatter_instance_ctx.push(instance);
+            let result = self.layer_color(body, p);
+            self.scatter_instance_ctx.pop();
+            return result;
+        };
+        let call_args = self.scatter_body_call_args(p, instance);
+        let call_result = self.ir.add(Ex::CallResult(helper_fn));
+        self.ir.push_statement(naga::Statement::Call {
+            function: helper_fn,
+            arguments: call_args,
+            result: Some(call_result),
+        });
+
+        let body_r = self.ir.add(Ex::AccessIndex {
+            base: call_result,
+            index: 0,
+        });
+        let body_g = self.ir.add(Ex::AccessIndex {
+            base: call_result,
+            index: 1,
+        });
+        let body_b = self.ir.add(Ex::AccessIndex {
+            base: call_result,
+            index: 2,
+        });
+        let body_a = self.ir.add(Ex::AccessIndex {
+            base: call_result,
+            index: 3,
+        });
+        let body_rgb = self.ir.add(Ex::Compose {
+            ty: self.ir.types.v3,
+            components: vec![body_r, body_g, body_b],
+        });
+        (body_rgb, body_a)
+    }
+
+    /// Arguments for a scatter body helper call: ambient inputs, the instance,
+    /// then every canvas param flattened to its scalar slots.
+    fn scatter_body_call_args(
+        &self,
+        p: Handle<Ex>,
+        instance: ScatterInstanceCtx,
+    ) -> Vec<Handle<Ex>> {
+        let mut args = vec![
+            p,
+            self.ir.px,
+            self.ir.aa,
+            self.ir.time,
+            self.ir.delta,
+            self.ir.res,
+            instance.pos_x,
+            instance.pos_y,
+            instance.id,
+            instance.index01,
+            instance.age_norm,
+        ];
+        for param in &self.hir.params {
+            if let Some((elem_ty_str, len)) = crate::hir::parse_array_param_type(&param.ty_name) {
+                let Some(elem_type) = crate::hir::ArrayElemType::from_str(elem_ty_str) else {
+                    unreachable!("checker validated array element type");
+                };
+                for index in 0..len {
+                    for suffix in elem_type.slot_suffixes() {
+                        let slot = crate::hir::array_elem_slot(&param.name, index, suffix);
+                        args.push(
+                            *self
+                                .ir
+                                .param_scalars
+                                .get(&slot)
+                                .expect("array param slot must exist"),
+                        );
+                    }
+                }
+                continue;
+            }
+            match param.ty_name.as_str() {
+                "f32" | "i32" | "u32" | "bool" => {
+                    args.push(
+                        *self
+                            .ir
+                            .param_scalars
+                            .get(&param.name)
+                            .expect("param must exist"),
+                    );
+                }
+                "color" => {
+                    for suffix in ["r", "g", "b", "a"] {
+                        args.push(
+                            *self
+                                .ir
+                                .param_scalars
+                                .get(&format!("{}.{suffix}", param.name))
+                                .expect("color param component must exist"),
+                        );
+                    }
+                }
+                _ => unreachable!("checker emitted unsupported param type"),
+            }
+        }
+        args
     }
 
     fn sample_bound_texture(&mut self, tex_name: &str, p: Handle<Ex>) -> (Handle<Ex>, Handle<Ex>) {

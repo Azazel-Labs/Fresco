@@ -1,4 +1,5 @@
 use super::*;
+use crate::hir::array_elem_slot;
 
 impl Checker {
     pub(super) fn lookup(&self, name: &str) -> Option<Value> {
@@ -389,7 +390,8 @@ impl Checker {
                         };
 
                         values.push(ArrayElemValue::F32(value));
-                        runtime_values.push(Value::Scalar(Sx::Param(format!("{name}__{index}"))));
+                        runtime_values
+                            .push(Value::Scalar(Sx::Param(array_elem_slot(name, index, ""))));
                     }
                 }
 
@@ -413,7 +415,7 @@ impl Checker {
                         values.push(ArrayElemValue::I32(value));
                         // Decode the existing float transport at the typed expression boundary.
                         runtime_values.push(Value::Scalar(crate::typed_scalar::Scalar::cast(
-                            Sx::Param(format!("{name}__{index}")),
+                            Sx::Param(array_elem_slot(name, index, "")),
                             crate::typed_scalar::Kind::I32,
                         )));
                     }
@@ -439,7 +441,7 @@ impl Checker {
                         values.push(ArrayElemValue::U32(value));
                         // Decode the existing float transport at the typed expression boundary.
                         runtime_values.push(Value::Scalar(crate::typed_scalar::Scalar::cast(
-                            Sx::Param(format!("{name}__{index}")),
+                            Sx::Param(array_elem_slot(name, index, "")),
                             crate::typed_scalar::Kind::U32,
                         )));
                     }
@@ -454,7 +456,7 @@ impl Checker {
                         values.push(ArrayElemValue::Bool(value));
                         // Decode the existing float transport at the typed expression boundary.
                         runtime_values.push(Value::Scalar(crate::typed_scalar::Scalar::cast(
-                            Sx::Param(format!("{name}__{index}")),
+                            Sx::Param(array_elem_slot(name, index, "")),
                             crate::typed_scalar::Kind::Bool,
                         )));
                     }
@@ -473,8 +475,8 @@ impl Checker {
 
                         values.push(ArrayElemValue::Vec2((x, y)));
                         runtime_values.push(Value::Vec2((
-                            Sx::Param(format!("{name}__{index}__x")),
-                            Sx::Param(format!("{name}__{index}__y")),
+                            Sx::Param(array_elem_slot(name, index, "__x")),
+                            Sx::Param(array_elem_slot(name, index, "__y")),
                         )));
                     }
                 }
@@ -492,9 +494,9 @@ impl Checker {
 
                         values.push(ArrayElemValue::Vec3((x, y, z)));
                         runtime_values.push(Value::Vec3((
-                            Sx::Param(format!("{name}__{index}__x")),
-                            Sx::Param(format!("{name}__{index}__y")),
-                            Sx::Param(format!("{name}__{index}__z")),
+                            Sx::Param(array_elem_slot(name, index, "__x")),
+                            Sx::Param(array_elem_slot(name, index, "__y")),
+                            Sx::Param(array_elem_slot(name, index, "__z")),
                         )));
                     }
                 }
@@ -512,10 +514,10 @@ impl Checker {
 
                         values.push(ArrayElemValue::Vec4((x, y, z, w)));
                         runtime_values.push(Value::Vec4((
-                            Sx::Param(format!("{name}__{index}__x")),
-                            Sx::Param(format!("{name}__{index}__y")),
-                            Sx::Param(format!("{name}__{index}__z")),
-                            Sx::Param(format!("{name}__{index}__w")),
+                            Sx::Param(array_elem_slot(name, index, "__x")),
+                            Sx::Param(array_elem_slot(name, index, "__y")),
+                            Sx::Param(array_elem_slot(name, index, "__z")),
+                            Sx::Param(array_elem_slot(name, index, "__w")),
                         )));
                     }
                 }
@@ -539,12 +541,12 @@ impl Checker {
                         values.push(ArrayElemValue::Mat2(values_mat));
                         runtime_values.push(Value::Mat2((
                             (
-                                Sx::Param(format!("{name}__{index}__0_0")),
-                                Sx::Param(format!("{name}__{index}__0_1")),
+                                Sx::Param(array_elem_slot(name, index, "__0_0")),
+                                Sx::Param(array_elem_slot(name, index, "__0_1")),
                             ),
                             (
-                                Sx::Param(format!("{name}__{index}__1_0")),
-                                Sx::Param(format!("{name}__{index}__1_1")),
+                                Sx::Param(array_elem_slot(name, index, "__1_0")),
+                                Sx::Param(array_elem_slot(name, index, "__1_1")),
                             ),
                         )));
                     }
@@ -570,19 +572,19 @@ impl Checker {
                         values.push(ArrayElemValue::Mat3(values_mat));
                         runtime_values.push(Value::Mat3(Box::new((
                             (
-                                Sx::Param(format!("{name}__{index}__0_0")),
-                                Sx::Param(format!("{name}__{index}__0_1")),
-                                Sx::Param(format!("{name}__{index}__0_2")),
+                                Sx::Param(array_elem_slot(name, index, "__0_0")),
+                                Sx::Param(array_elem_slot(name, index, "__0_1")),
+                                Sx::Param(array_elem_slot(name, index, "__0_2")),
                             ),
                             (
-                                Sx::Param(format!("{name}__{index}__1_0")),
-                                Sx::Param(format!("{name}__{index}__1_1")),
-                                Sx::Param(format!("{name}__{index}__1_2")),
+                                Sx::Param(array_elem_slot(name, index, "__1_0")),
+                                Sx::Param(array_elem_slot(name, index, "__1_1")),
+                                Sx::Param(array_elem_slot(name, index, "__1_2")),
                             ),
                             (
-                                Sx::Param(format!("{name}__{index}__2_0")),
-                                Sx::Param(format!("{name}__{index}__2_1")),
-                                Sx::Param(format!("{name}__{index}__2_2")),
+                                Sx::Param(array_elem_slot(name, index, "__2_0")),
+                                Sx::Param(array_elem_slot(name, index, "__2_1")),
+                                Sx::Param(array_elem_slot(name, index, "__2_2")),
                             ),
                         ))));
                     }
@@ -629,28 +631,28 @@ impl Checker {
                         values.push(ArrayElemValue::Mat4(values_mat));
                         runtime_values.push(Value::Mat4(Box::new((
                             (
-                                Sx::Param(format!("{name}__{index}__0_0")),
-                                Sx::Param(format!("{name}__{index}__0_1")),
-                                Sx::Param(format!("{name}__{index}__0_2")),
-                                Sx::Param(format!("{name}__{index}__0_3")),
+                                Sx::Param(array_elem_slot(name, index, "__0_0")),
+                                Sx::Param(array_elem_slot(name, index, "__0_1")),
+                                Sx::Param(array_elem_slot(name, index, "__0_2")),
+                                Sx::Param(array_elem_slot(name, index, "__0_3")),
                             ),
                             (
-                                Sx::Param(format!("{name}__{index}__1_0")),
-                                Sx::Param(format!("{name}__{index}__1_1")),
-                                Sx::Param(format!("{name}__{index}__1_2")),
-                                Sx::Param(format!("{name}__{index}__1_3")),
+                                Sx::Param(array_elem_slot(name, index, "__1_0")),
+                                Sx::Param(array_elem_slot(name, index, "__1_1")),
+                                Sx::Param(array_elem_slot(name, index, "__1_2")),
+                                Sx::Param(array_elem_slot(name, index, "__1_3")),
                             ),
                             (
-                                Sx::Param(format!("{name}__{index}__2_0")),
-                                Sx::Param(format!("{name}__{index}__2_1")),
-                                Sx::Param(format!("{name}__{index}__2_2")),
-                                Sx::Param(format!("{name}__{index}__2_3")),
+                                Sx::Param(array_elem_slot(name, index, "__2_0")),
+                                Sx::Param(array_elem_slot(name, index, "__2_1")),
+                                Sx::Param(array_elem_slot(name, index, "__2_2")),
+                                Sx::Param(array_elem_slot(name, index, "__2_3")),
                             ),
                             (
-                                Sx::Param(format!("{name}__{index}__3_0")),
-                                Sx::Param(format!("{name}__{index}__3_1")),
-                                Sx::Param(format!("{name}__{index}__3_2")),
-                                Sx::Param(format!("{name}__{index}__3_3")),
+                                Sx::Param(array_elem_slot(name, index, "__3_0")),
+                                Sx::Param(array_elem_slot(name, index, "__3_1")),
+                                Sx::Param(array_elem_slot(name, index, "__3_2")),
+                                Sx::Param(array_elem_slot(name, index, "__3_3")),
                             ),
                         ))));
                     }
@@ -666,10 +668,10 @@ impl Checker {
                         // Store color as a runtime value similar to single color params
                         runtime_values.push(Value::ColorField {
                             rgba: [
-                                Sx::Param(format!("{name}__{index}.r")),
-                                Sx::Param(format!("{name}__{index}.g")),
-                                Sx::Param(format!("{name}__{index}.b")),
-                                Sx::Param(format!("{name}__{index}.a")),
+                                Sx::Param(array_elem_slot(name, index, ".r")),
+                                Sx::Param(array_elem_slot(name, index, ".g")),
+                                Sx::Param(array_elem_slot(name, index, ".b")),
+                                Sx::Param(array_elem_slot(name, index, ".a")),
                             ],
                             space: ColorSpace::Linear,
                         });

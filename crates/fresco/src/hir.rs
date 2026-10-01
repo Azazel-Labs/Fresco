@@ -1134,7 +1134,33 @@ pub enum ArrayElemType {
     Color,
 }
 
+/// Scalar slot name for one component of element `index` of array param
+/// `name`; `suffix` comes from [`ArrayElemType::slot_suffixes`].
+pub fn array_elem_slot(name: &str, index: usize, suffix: &str) -> String {
+    format!("{name}__{index}{suffix}")
+}
+
 impl ArrayElemType {
+    /// Suffixes naming each scalar slot of one element (see [`array_elem_slot`]),
+    /// in argument order; matrices are row-major.
+    pub const fn slot_suffixes(self) -> &'static [&'static str] {
+        match self {
+            Self::F32 | Self::I32 | Self::U32 | Self::Bool => &[""],
+            Self::Vec2 => &["__x", "__y"],
+            Self::Vec3 => &["__x", "__y", "__z"],
+            Self::Vec4 => &["__x", "__y", "__z", "__w"],
+            Self::Mat2 => &["__0_0", "__0_1", "__1_0", "__1_1"],
+            Self::Mat3 => &[
+                "__0_0", "__0_1", "__0_2", "__1_0", "__1_1", "__1_2", "__2_0", "__2_1", "__2_2",
+            ],
+            Self::Mat4 => &[
+                "__0_0", "__0_1", "__0_2", "__0_3", "__1_0", "__1_1", "__1_2", "__1_3", "__2_0",
+                "__2_1", "__2_2", "__2_3", "__3_0", "__3_1", "__3_2", "__3_3",
+            ],
+            Self::Color => &[".r", ".g", ".b", ".a"],
+        }
+    }
+
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "f32" => Some(Self::F32),
