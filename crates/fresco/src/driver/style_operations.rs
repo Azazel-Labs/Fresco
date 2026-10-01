@@ -1130,12 +1130,16 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             super::compute_operations::validate(program, pass)?;
             continue;
         }
-        let source = operation.raster.as_ref().and_then(SExpr::dotted_path).ok_or_else(|| {
-            fail(
-                &pass.span,
-                "draw operation requires raster geometry_parameter",
-            )
-        })?;
+        let source = operation
+            .raster
+            .as_ref()
+            .and_then(SExpr::dotted_path)
+            .ok_or_else(|| {
+                fail(
+                    &pass.span,
+                    "draw operation requires raster geometry_parameter",
+                )
+            })?;
         if !operation.inputs.iter().any(|p| {
             p.name == source
                 && (p.ty == "DrawRange" || program.resource_types.iter().any(|r| r.name == p.ty))

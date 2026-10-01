@@ -245,7 +245,11 @@ pub(super) fn bound_resource(
                 .iter()
                 .any(|a| a.name == "draw_data" && a.args.as_slice() == ["instance_id"])
                 || has_attr(&binding.attrs, "source")
-                || binding.value_signature.as_deref().map(compact_type).as_deref()
+                || binding
+                    .value_signature
+                    .as_deref()
+                    .map(compact_type)
+                    .as_deref()
                     != Some("uniform<u32>")
                 || compact_type(expected) != "draw_instance_id"
                 || step.bindings.contains_key(*binding_name)
