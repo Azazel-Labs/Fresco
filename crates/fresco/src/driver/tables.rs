@@ -75,11 +75,15 @@ pub(super) fn build(
                 if attributes.len() != 1 || field.default.is_some() {
                     return Err("table index cannot also declare a value".into());
                 }
-            } else if attributes.contains(&"schema_value".to_string())
-                || attributes.contains(&"property_value".to_string())
-                || attributes.contains(&"implementation_value".to_string())
-                || attributes.contains(&"implementation_settings_value".to_string())
-            {
+            } else if attributes.iter().any(|name| {
+                matches!(
+                    name.as_str(),
+                    "schema_value"
+                        | "property_value"
+                        | "implementation_value"
+                        | "implementation_settings_value"
+                )
+            }) {
                 if attributes.len() != 1 {
                     return Err("table field requires exactly one value source".into());
                 }

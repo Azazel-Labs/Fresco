@@ -72,52 +72,40 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
         })
         .cloned()
         .collect();
-    let mut compute_plans = Vec::new();
-    program.pipelines.retain(|pipeline| {
-        if pipeline.pipeline_type == "compute"
-            && pipeline
-                .material_name
+    let compute_plans: Vec<_> = program
+        .pipelines
+        .extract_if(.., |pipeline| {
+            pipeline.pipeline_type == "compute"
+                && pipeline
+                    .material_name
+                    .as_ref()
+                    .is_some_and(|name| compute_interfaces.contains(name))
+        })
+        .collect();
+    let compute_passes: Vec<_> = program
+        .passes
+        .extract_if(.., |pass| {
+            pass.material_name
                 .as_ref()
                 .is_some_and(|name| compute_interfaces.contains(name))
-        {
-            compute_plans.push(pipeline.clone());
-            false
-        } else {
-            true
-        }
-    });
-    let mut compute_passes = Vec::new();
-    program.passes.retain(|pass| {
-        if pass
-            .material_name
-            .as_ref()
-            .is_some_and(|name| compute_interfaces.contains(name))
-        {
-            compute_passes.push(pass.clone());
-            false
-        } else {
-            true
-        }
-    });
-    let mut retained = Vec::new();
-    for canvas in program.canvases.drain(..) {
-        if registrations.contains_key(&canvas.entry_kind) {
-            program.authored_entries.push(crate::ast::AuthoredEntry {
-                config: Vec::new(),
-                kind: canvas.entry_kind,
-                name: canvas.name,
-                name_span: canvas.name_span,
-                params: canvas.params,
-                return_ty: canvas.declared_return_ty,
-                body: canvas.body,
-                blocks: Vec::new(),
-                span: canvas.span,
-            });
-        } else {
-            retained.push(canvas);
-        }
+        })
+        .collect();
+    for canvas in program
+        .canvases
+        .extract_if(.., |canvas| registrations.contains_key(&canvas.entry_kind))
+    {
+        program.authored_entries.push(crate::ast::AuthoredEntry {
+            config: Vec::new(),
+            kind: canvas.entry_kind,
+            name: canvas.name,
+            name_span: canvas.name_span,
+            params: canvas.params,
+            return_ty: canvas.declared_return_ty,
+            body: canvas.body,
+            blocks: Vec::new(),
+            span: canvas.span,
+        });
     }
-    program.canvases = retained;
     for canvas in &program.canvases {
         if let Some(interface) = registrations.get(&canvas.entry_kind)
             && canvas.params.is_empty()

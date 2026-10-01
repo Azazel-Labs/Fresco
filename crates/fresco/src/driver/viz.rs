@@ -810,24 +810,20 @@ fn parse_entry_params(wgsl: &str, fn_name: &str) -> Vec<ParamDef> {
     let Some(start) = wgsl.find(&format!("fn {fn_name}")) else {
         return Vec::new();
     };
-    let Some(open_idx_rel) = wgsl[start..].find('(') else {
+    let Some((params_text, _)) = wgsl[start..]
+        .split_once('(')
+        .and_then(|(_, after_open)| after_open.split_once(')'))
+    else {
         return Vec::new();
     };
-    let open_idx = start + open_idx_rel + 1;
-    let Some(close_idx_rel) = wgsl[open_idx..].find(')') else {
-        return Vec::new();
-    };
-    let params_text = &wgsl[open_idx..open_idx + close_idx_rel];
     params_text
         .split(',')
         .map(str::trim)
         .filter(|part| !part.is_empty())
         .map(|part| {
-            let colon_idx = part.find(':');
-            let (name, ty) = match colon_idx {
-                Some(idx) => (part[..idx].trim(), part[idx + 1..].trim()),
-                None => ("", part),
-            };
+            let (name, ty) = part
+                .split_once(':')
+                .map_or(("", part), |(name, ty)| (name.trim(), ty.trim()));
             ParamDef {
                 name: name.to_string(),
                 ty: compact_type(ty),
@@ -867,8 +863,8 @@ fn detect_fresco_entry_function(wgsl: &str) -> Option<String> {
             .map(str::trim)
             .filter(|part| !part.is_empty())
             .map(|part| {
-                part.find(':')
-                    .map(|idx| compact_type(&part[idx + 1..]))
+                part.split_once(':')
+                    .map(|(_, ty)| compact_type(ty))
                     .unwrap_or_default()
             })
             .collect::<Vec<_>>();
