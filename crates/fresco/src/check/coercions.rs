@@ -115,12 +115,7 @@ impl Checker {
         let t0 = Instant::now();
         let out = match self.eval(e)? {
             Value::Error => None,
-            Value::Color { rgba, .. } => Some([
-                Sx::Lit(rgba[0]),
-                Sx::Lit(rgba[1]),
-                Sx::Lit(rgba[2]),
-                Sx::Lit(rgba[3]),
-            ]),
+            Value::Color { rgba, .. } => Some(rgba.map(Sx::Lit)),
             Value::ColorField { rgba, .. } => Some(rgba),
             Value::Gradient { kind, stops } => Some(hir::GradientSample::channels(kind, stops)),
             v => {
@@ -303,12 +298,7 @@ impl Checker {
 
     pub(super) fn as_color_source(&mut self, e: &SExpr) -> Option<ColorSource> {
         match self.as_fill_style(e)? {
-            FillStyle::Solid(color) => Some(ColorSource::Solid([
-                Sx::Lit(color[0]),
-                Sx::Lit(color[1]),
-                Sx::Lit(color[2]),
-                Sx::Lit(color[3]),
-            ])),
+            FillStyle::Solid(color) => Some(ColorSource::Solid(color.map(Sx::Lit))),
             FillStyle::Dynamic(rgba) => Some(ColorSource::Solid(rgba)),
             FillStyle::Gradient { kind, stops } => {
                 if matches!(

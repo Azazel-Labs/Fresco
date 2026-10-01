@@ -741,12 +741,7 @@ impl Checker {
     }
 
     pub(super) fn color_to_field(color: [f32; 4]) -> [Sx; 4] {
-        [
-            Sx::Lit(color[0]),
-            Sx::Lit(color[1]),
-            Sx::Lit(color[2]),
-            Sx::Lit(color[3]),
-        ]
+        color.map(Sx::Lit)
     }
 
     fn color_bin(op: BinOp, a: [Sx; 4], b: [Sx; 4]) -> Option<[Sx; 4]> {
@@ -1168,12 +1163,7 @@ impl Checker {
             }
             Value::Color { rgba, .. } => {
                 if let Some(ixs) = parse_swizzle(field, 4) {
-                    let comps = [
-                        Sx::Lit(rgba[0]),
-                        Sx::Lit(rgba[1]),
-                        Sx::Lit(rgba[2]),
-                        Sx::Lit(rgba[3]),
-                    ];
+                    let comps = rgba.map(Sx::Lit);
                     match ixs.as_slice() {
                         [i] => {
                             if *i == 3 {

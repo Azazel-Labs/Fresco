@@ -12,15 +12,6 @@ use crate::driver::pass_plan;
 use crate::hir::Sx;
 use crate::hir::{Hir, Layer, Locality, Xform};
 
-fn color_to_expr(color: [f32; 4]) -> [Sx; 4] {
-    [
-        Sx::Lit(color[0]),
-        Sx::Lit(color[1]),
-        Sx::Lit(color[2]),
-        Sx::Lit(color[3]),
-    ]
-}
-
 pub fn run(hir: &mut Hir) {
     // --- footprint propagation analysis (§3.8, §24.1) --------------------
     // Analyze the canvas_space transform chain and document how the footprint
@@ -44,7 +35,7 @@ pub fn run(hir: &mut Hir) {
                 hir.layers[i] = Layer::Soften {
                     shape,
                     radius,
-                    color: color_to_expr(color),
+                    color: color.map(Sx::Lit),
                 };
                 hir.notes.push(format!(
                     "rewrite: blur(r) ∘ fill(shape#{shape}) ⇒ soften — Sdf-conforming shape, analytic (§10.2, §17.1)"

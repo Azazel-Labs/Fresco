@@ -109,15 +109,6 @@ fn path_stroke_coverage(ctx: &mut Checker, path_id: usize, width: Sx) -> Sx {
     Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(edge))
 }
 
-fn color_to_expr(color: [f32; 4]) -> [Sx; 4] {
-    [
-        Sx::Lit(color[0]),
-        Sx::Lit(color[1]),
-        Sx::Lit(color[2]),
-        Sx::Lit(color[3]),
-    ]
-}
-
 fn premultiply_color(color: [Sx; 4], coverage: Sx) -> Layer {
     let [r, g, b, a] = color;
     Layer::ColorExpr {
@@ -189,7 +180,7 @@ fn stroke_path_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Val
 
     let layer = if let Some(color_expr) = bag.take_named("color") {
         match ctx.as_fill_style(color_expr)? {
-            FillStyle::Solid(color) => premultiply_color(color_to_expr(color), coverage),
+            FillStyle::Solid(color) => premultiply_color(color.map(Sx::Lit), coverage),
             FillStyle::Dynamic(rgba) => premultiply_color(rgba, coverage),
             FillStyle::Gradient { kind, stops } => {
                 premultiply_color(crate::hir::GradientSample::channels(kind, stops), coverage)

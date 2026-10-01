@@ -288,14 +288,7 @@ builtin! {
                 Value::Layer(ctx.hir.layer(Layer::Soften {
                     shape,
                     radius,
-                    color: override_color.unwrap_or_else(|| {
-                        [
-                            Sx::Lit(color[0]),
-                            Sx::Lit(color[1]),
-                            Sx::Lit(color[2]),
-                            Sx::Lit(color[3]),
-                        ]
-                    }),
+                    color: override_color.unwrap_or_else(|| color.map(Sx::Lit)),
                 }))
             }
             Layer::FillExpr { shape, r, g, b, a } => {
@@ -352,14 +345,7 @@ builtin! {
                     shape,
                     reach,
                     strength,
-                    color: ColorSource::Solid(override_color.unwrap_or_else(|| {
-                        [
-                            Sx::Lit(color[0]),
-                            Sx::Lit(color[1]),
-                            Sx::Lit(color[2]),
-                            Sx::Lit(color[3]),
-                        ]
-                    })),
+                    color: ColorSource::Solid(override_color.unwrap_or_else(|| color.map(Sx::Lit))),
                     falloff: GlowFalloff::Exp,
                     color_space: GlowColorSpace::Scene,
                 }))
