@@ -812,7 +812,7 @@ impl Checker {
         a * one_minus_t + b * t
     }
 
-    fn sx_hash2(ix: Sx, iy: Sx) -> Sx {
+    pub(crate) fn sx_hash2(ix: Sx, iy: Sx) -> Sx {
         let dot = ix * Sx::Lit(127.1) + iy * Sx::Lit(311.7);
         let n = Sx::Sin(Box::new(dot)) * Sx::Lit(43_758.547);
         Sx::Fract(Box::new(n))

@@ -524,12 +524,7 @@ impl Checker {
     }
 
     fn hash01(seed: u32) -> f32 {
-        let mut x = seed.wrapping_add(0x9E37_79B9);
-        x ^= x >> 16;
-        x = x.wrapping_mul(0x7FEB_352D);
-        x ^= x >> 15;
-        x = x.wrapping_mul(0x846C_A68B);
-        x ^= x >> 16;
+        let x = mix_u32(seed.wrapping_add(0x9E37_79B9));
         (x as f32) / (u32::MAX as f32)
     }
 

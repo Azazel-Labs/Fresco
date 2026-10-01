@@ -3450,13 +3450,17 @@ impl Checker {
     }
 
     fn scatter_rand_call_salt(call_span: &Span) -> u32 {
-        let mut x = (call_span.start as u32) ^ (call_span.end as u32).rotate_left(16) ^ 0x9E37_79B9;
-        x ^= x >> 16;
-        x = x.wrapping_mul(0x7FEB_352D);
-        x ^= x >> 15;
-        x = x.wrapping_mul(0x846C_A68B);
-        x ^ (x >> 16)
+        mix_u32((call_span.start as u32) ^ (call_span.end as u32).rotate_left(16) ^ 0x9E37_79B9)
     }
+}
+
+/// The xorshift-multiply finalizer shared by the checker's deterministic hashes.
+fn mix_u32(mut x: u32) -> u32 {
+    x ^= x >> 16;
+    x = x.wrapping_mul(0x7FEB_352D);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x846C_A68B);
+    x ^ (x >> 16)
 }
 
 #[derive(Debug, Clone)]

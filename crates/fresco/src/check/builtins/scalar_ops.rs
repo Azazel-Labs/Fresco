@@ -10,12 +10,6 @@ use crate::registry::{
     TypeId, TypeRef,
 };
 
-fn sx_hash2(ix: Sx, iy: Sx) -> Sx {
-    let dot = ix * Sx::Lit(127.1) + iy * Sx::Lit(311.7);
-    let n = Sx::Sin(Box::new(dot)) * Sx::Lit(43_758.547);
-    Sx::Fract(Box::new(n))
-}
-
 fn sx_worley2(px: Sx, py: Sx) -> Sx {
     let ix = Sx::Floor(Box::new(px.clone()));
     let iy = Sx::Floor(Box::new(py.clone()));
@@ -28,8 +22,8 @@ fn sx_worley2(px: Sx, py: Sx) -> Sx {
             let cell_x = ix.clone() + Sx::Lit(ox as f32);
             let cell_y = iy.clone() + Sx::Lit(oy as f32);
 
-            let jx = sx_hash2(cell_x.clone(), cell_y.clone());
-            let jy = sx_hash2(
+            let jx = Checker::sx_hash2(cell_x.clone(), cell_y.clone());
+            let jy = Checker::sx_hash2(
                 cell_x.clone() + Sx::Lit(19.19),
                 cell_y.clone() + Sx::Lit(73.73),
             );
@@ -468,15 +462,15 @@ pub fn hash_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Value>
 
     let value = ctx.eval(value_expr)?;
     let sx = match value {
-        Value::Scalar(v) => sx_hash2(v, salt),
+        Value::Scalar(v) => Checker::sx_hash2(v, salt),
         Value::Vec2((x, y)) => {
             let salted_y = y + salt * Sx::Lit(17.0);
-            sx_hash2(x, salted_y)
+            Checker::sx_hash2(x, salted_y)
         }
         Value::RepeatCell(cell) => {
             let (x, y) = cell.id;
             let salted_y = y + salt * Sx::Lit(17.0);
-            sx_hash2(x, salted_y)
+            Checker::sx_hash2(x, salted_y)
         }
         other => {
             let found = match other {
