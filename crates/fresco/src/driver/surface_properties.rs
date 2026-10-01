@@ -339,10 +339,7 @@ fn resolve_schema(
                     field.name
                 )));
             }
-            let engine_owned = field
-                .attrs
-                .iter()
-                .any(|(name, args)| name == "config" && args.iter().any(|arg| arg == "engine"));
+            let engine_owned = field.has_config_target("engine");
             let authored_value = authored.remove(&field.name);
             if engine_owned && authored_value.is_some() {
                 return Err(fail(format!(
@@ -454,11 +451,7 @@ fn resolve_schema(
                     id: 0,
                     available,
                     availability: Vec::new(),
-                    editable: !engine_owned
-                        && field
-                            .attrs
-                            .iter()
-                            .any(|(a, args)| a == "config" && args == &["editor"]),
+                    editable: !engine_owned && field.has_exact_config_target("editor"),
                 });
                 continue;
             }
@@ -613,10 +606,7 @@ fn resolve_schema(
                 }
             }
             {
-                let editor = field
-                    .attrs
-                    .iter()
-                    .any(|(name, args)| name == "config" && args.iter().any(|a| a == "editor"));
+                let editor = field.has_config_target("editor");
                 properties.push(EntryProperty {
                     editable: editor && !engine_owned,
                     block: Some(block_name.clone()),

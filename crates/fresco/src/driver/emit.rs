@@ -225,20 +225,6 @@ fn manifest_vertex_factories(
         .collect()
 }
 
-fn has_permutation_editor_config(permutation: &crate::ast::PassPermutationDecl) -> bool {
-    permutation.attrs.iter().any(|attr| {
-        if attr.name == "config_editor" {
-            return true;
-        }
-        if attr.name != "config" {
-            return false;
-        }
-        attr.args
-            .first()
-            .is_some_and(|arg| arg.eq_ignore_ascii_case("editor"))
-    })
-}
-
 fn pass_included_for_profile(pass_decl: &PassDecl, build_profile: BuildProfile) -> bool {
     if !has_attr(&pass_decl.attrs, "editor_only") {
         return true;
@@ -1344,7 +1330,11 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
                         pass_decl
                             .permutations
                             .iter()
-                            .filter(|perm| has_permutation_editor_config(perm))
+                            .filter(|perm| {
+                                perm.attrs
+                                    .iter()
+                                    .any(crate::ast::PipelineAttribute::is_editor_config)
+                            })
                             .map(move |perm| ManifestConfigAxis {
                                 pipeline: pipeline_decl.name.clone(),
                                 pass: pass_decl.name.clone(),

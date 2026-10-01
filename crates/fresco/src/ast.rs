@@ -629,6 +629,24 @@ pub struct TemplateConfigParamDecl {
     pub span: Span,
 }
 
+impl TemplateConfigParamDecl {
+    /// Whether some `@config(...)` attribute on this field lists `target`.
+    #[must_use]
+    pub fn has_config_target(&self, target: &str) -> bool {
+        self.attrs
+            .iter()
+            .any(|(name, args)| name == "config" && args.iter().any(|arg| arg == target))
+    }
+
+    /// Whether some `@config(...)` attribute on this field is exactly `@config(target)`.
+    #[must_use]
+    pub fn has_exact_config_target(&self, target: &str) -> bool {
+        self.attrs
+            .iter()
+            .any(|(name, args)| name == "config" && args.len() == 1 && args[0] == target)
+    }
+}
+
 #[expect(
     dead_code,
     reason = "Template declarations are staged for engine-facing lowering and instantiation"
@@ -1496,6 +1514,20 @@ impl PipelineAttribute {
     #[must_use]
     pub fn first_arg_is(&self, value: &str) -> bool {
         self.args.first().is_some_and(|arg| arg == value)
+    }
+
+    /// Whether this is `@config_editor` or `@config(editor, ...)` (case-insensitive).
+    // `check::attr_has_editor_config` duplicates this and can delegate here.
+    #[must_use]
+    pub fn is_editor_config(&self) -> bool {
+        match self.name.as_str() {
+            "config_editor" => true,
+            "config" => self
+                .args
+                .first()
+                .is_some_and(|arg| arg.eq_ignore_ascii_case("editor")),
+            _ => false,
+        }
     }
 }
 

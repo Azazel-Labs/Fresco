@@ -529,9 +529,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 let mut properties = Vec::new();
                 if let Some(schema) = schema {
                     for field in &schema.config_params {
-                        if !field.attrs.iter().any(|(name, args)| {
-                            name == "config" && args.iter().any(|arg| arg == "editor")
-                        }) {
+                        if !field.has_config_target("editor") {
                             continue;
                         }
                         let expression = Spanned {
