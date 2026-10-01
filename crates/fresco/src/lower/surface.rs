@@ -507,16 +507,34 @@ fn ensure_fresco_material_type(
     for channel in &material.material_channels {
         register_material_type(module, t, material, &channel.ty_name, &mut types);
     }
-    let mut members = Vec::new();
+    let fields = material
+        .material_channels
+        .iter()
+        .map(|channel| {
+            let ty = types[crate::check::strip_spatial_type_suffix(&channel.ty_name)];
+            (channel.name.clone(), ty)
+        })
+        .collect();
+    layout_struct(module, format!("FrescoMaterial_{}", material.name), fields)
+}
+
+/// Insert a struct whose `fields` are laid out in order, each at the next
+/// offset aligned for its type, with the span rounded up to the widest
+/// alignment.
+fn layout_struct(
+    module: &mut naga::Module,
+    name: String,
+    fields: Vec<(String, Handle<naga::Type>)>,
+) -> Handle<naga::Type> {
+    let mut members = Vec::with_capacity(fields.len());
     let mut offset = 0u32;
     let mut alignment = 1u32;
-    for channel in &material.material_channels {
-        let ty = types[crate::check::strip_spatial_type_suffix(&channel.ty_name)];
+    for (field_name, ty) in fields {
         let (align, size) = material_type_layout(module, ty);
         alignment = alignment.max(align);
         offset = offset.next_multiple_of(align);
         members.push(naga::StructMember {
-            name: Some(channel.name.clone()),
+            name: Some(field_name),
             ty,
             binding: None,
             offset,
@@ -525,7 +543,7 @@ fn ensure_fresco_material_type(
     }
     module.types.insert(
         naga::Type {
-            name: Some(format!("FrescoMaterial_{}", material.name)),
+            name: Some(name),
             inner: naga::TypeInner::Struct {
                 members,
                 span: offset.next_multiple_of(alignment),
@@ -610,36 +628,20 @@ fn register_material_type(
             .enumerate()
             .find(|(_, r)| r.name == name)
             .expect("checked record type");
-        let mut members = Vec::new();
-        let mut offset = 0u32;
-        let mut alignment = 1u32;
-        for field in &record.fields {
-            let ty = register_material_type(module, t, material, &field.ty_name, types);
-            let (align, size) = material_type_layout(module, ty);
-            alignment = alignment.max(align);
-            offset = offset.next_multiple_of(align);
-            members.push(naga::StructMember {
-                name: Some(field.name.clone()),
-                ty,
-                binding: None,
-                offset,
-            });
-            offset = offset.checked_add(size).expect("checked record size");
-        }
-        module.types.insert(
-            naga::Type {
-                name: Some(if material.context.contains_record(name) {
-                    name.to_string()
-                } else {
-                    format!("FrescoMaterial_{}_type_{index}", material.name)
-                }),
-                inner: naga::TypeInner::Struct {
-                    members,
-                    span: offset.next_multiple_of(alignment),
-                },
-            },
-            naga::Span::UNDEFINED,
-        )
+        let fields = record
+            .fields
+            .iter()
+            .map(|field| {
+                let ty = register_material_type(module, t, material, &field.ty_name, types);
+                (field.name.clone(), ty)
+            })
+            .collect();
+        let struct_name = if material.context.contains_record(name) {
+            name.to_string()
+        } else {
+            format!("FrescoMaterial_{}_type_{index}", material.name)
+        };
+        layout_struct(module, struct_name, fields)
     };
     types.insert(name.into(), ty);
     ty
