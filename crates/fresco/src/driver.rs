@@ -375,7 +375,7 @@ pub fn compile_source_with_context(
     context: &CompileContext,
 ) -> Result<CompileOutput, Vec<DiagnosticRecord>> {
     let emit_target =
-        EmitTarget::from_str(emit_target).map_err(|err| vec![emit_failure(filename, err)])?;
+        EmitTarget::from_str(emit_target).map_err(|err| vec![file_failure(filename, err)])?;
     let compiled =
         pipeline::compile_with_options(src, filename, true, context).map_err(flatten_file_diags)?;
     render_compiled_source(compiled, filename, emit_target, include_explain, context)
@@ -391,7 +391,7 @@ pub fn compile_virtual_with_context(
     context: &CompileContext,
 ) -> Result<CompileOutput, Vec<DiagnosticRecord>> {
     let emit_target =
-        EmitTarget::from_str(emit_target).map_err(|err| vec![emit_failure(entrypoint, err)])?;
+        EmitTarget::from_str(emit_target).map_err(|err| vec![file_failure(entrypoint, err)])?;
     let compiled = pipeline::compile_with_virtual_files(files, entrypoint, true, context)
         .map_err(flatten_file_diags)?;
     render_compiled_source(compiled, entrypoint, emit_target, include_explain, context)
@@ -405,7 +405,7 @@ fn render_compiled_source(
     context: &CompileContext,
 ) -> Result<CompileOutput, Vec<DiagnosticRecord>> {
     let emitted = emit::render(emit_target, context.build_profile, &compiled)
-        .map_err(|err| vec![emit_failure(filename, err)])?;
+        .map_err(|err| vec![file_failure(filename, err)])?;
     let explain = include_explain.then(|| {
         explain::render(
             &compiled.hirs,
@@ -489,13 +489,13 @@ fn render_compiled_bundle(
 ) -> Result<CompileBundleOutput, Vec<DiagnosticRecord>> {
     let emit_wgsl_start = Instant::now();
     let wgsl = emit::render(EmitTarget::Wgsl, context.build_profile, &compiled)
-        .map_err(|err| vec![emit_failure(filename, err)])?;
-    let emit_wgsl_ms = elapsed_ms(emit_wgsl_start);
+        .map_err(|err| vec![file_failure(filename, err)])?;
+    let emit_wgsl_ms = pipeline::elapsed_ms(emit_wgsl_start);
 
     let emit_manifest_start = Instant::now();
     let manifest = emit::render(EmitTarget::Manifest, context.build_profile, &compiled)
-        .map_err(|err| vec![emit_failure(filename, err)])?;
-    let emit_manifest_ms = elapsed_ms(emit_manifest_start);
+        .map_err(|err| vec![file_failure(filename, err)])?;
+    let emit_manifest_ms = pipeline::elapsed_ms(emit_manifest_start);
 
     let explain_start = Instant::now();
     let explain = include_explain.then(|| {
@@ -509,7 +509,7 @@ fn render_compiled_bundle(
         )
     });
     let explain_ms = if include_explain {
-        elapsed_ms(explain_start)
+        pipeline::elapsed_ms(explain_start)
     } else {
         0.0
     };
@@ -525,7 +525,7 @@ fn render_compiled_bundle(
             emit_wgsl_ms,
             emit_manifest_ms,
             explain_ms,
-            total_ms: elapsed_ms(total_start),
+            total_ms: pipeline::elapsed_ms(total_start),
         },
     })
 }
@@ -558,10 +558,6 @@ pub fn compile_bundle_virtual_with_context(
         .map_err(flatten_file_diags)?;
 
     render_compiled_bundle(compiled, entrypoint, include_explain, context, total_start)
-}
-
-fn elapsed_ms(start: Instant) -> f64 {
-    start.elapsed().as_secs_f64() * 1000.0
 }
 
 /// Result of a span type query (§21 rung 2).
@@ -697,10 +693,10 @@ pub fn compile_variant_with_files(
             .map_err(flatten_file_diags)?;
 
     let wgsl = emit::render(EmitTarget::Wgsl, context.build_profile, &compiled)
-        .map_err(|err| vec![emit_failure(filename, err)])?;
+        .map_err(|err| vec![file_failure(filename, err)])?;
 
     let manifest = emit::render(EmitTarget::Manifest, context.build_profile, &compiled)
-        .map_err(|err| vec![emit_failure(filename, err)])?;
+        .map_err(|err| vec![file_failure(filename, err)])?;
 
     Ok(VariantCompileOutput {
         wgsl,
@@ -743,7 +739,7 @@ pub fn compile_visualizer_with_files(
         &visualizer_spec,
         variant.entry_context.as_ref(),
     )
-    .map_err(|message| vec![visualizer_failure(filename, message)])?;
+    .map_err(|message| vec![file_failure(filename, message)])?;
     let metadata = viz::build_metadata(&visualizer_spec, expr_text);
 
     Ok(VisualizerCompileOutput {
@@ -3017,23 +3013,12 @@ fn flatten_file_diags(file_diags: Vec<pipeline::FileDiagnostics>) -> Vec<Diagnos
     out
 }
 
-fn emit_failure(filename: &str, err: emit::EmitError) -> DiagnosticRecord {
+/// An error diagnostic for `filename` that has no source span.
+fn file_failure(filename: &str, message: impl std::fmt::Display) -> DiagnosticRecord {
     DiagnosticRecord {
         file: filename.to_string(),
         severity: diag::Severity::Error.as_str().to_string(),
-        message: err.to_string(),
-        label: None,
-        help: None,
-        span_start: 0,
-        span_end: 0,
-    }
-}
-
-fn visualizer_failure(filename: &str, message: String) -> DiagnosticRecord {
-    DiagnosticRecord {
-        file: filename.to_string(),
-        severity: diag::Severity::Error.as_str().to_string(),
-        message,
+        message: message.to_string(),
         label: None,
         help: None,
         span_start: 0,

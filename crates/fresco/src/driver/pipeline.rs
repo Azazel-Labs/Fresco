@@ -504,7 +504,7 @@ pub fn expected_tokens_at_cursor(src: &str, cursor: usize) -> Vec<String> {
     expected.into_iter().collect()
 }
 
-fn elapsed_ms(start: Instant) -> f64 {
+pub(super) fn elapsed_ms(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
 }
 
