@@ -3258,17 +3258,17 @@ impl Checker {
             .collect();
 
         let Some(ret) = fn_decl.ret_ty.as_ref().and_then(|(name, span)| {
-            parse_local_fn_type(
+            parse_fn_type(FnTypeInputs {
                 name,
                 span,
-                &mut self.diags,
-                "return type",
-                None,
-                &self.enum_defs,
-                &self.struct_defs,
-                &type_param_names,
-                &self.interface_names,
-            )
+                diags: &mut self.diags,
+                context: "return type",
+                source_file: None,
+                enum_defs: &self.enum_defs,
+                struct_defs: &self.struct_defs,
+                type_params: &type_param_names,
+                interface_names: &self.interface_names,
+            })
         }) else {
             self.diags.push(
                     Diag::error(
@@ -3290,17 +3290,17 @@ impl Checker {
         let mut seen_param_names: HashMap<String, Span> = HashMap::new();
 
         for p in &fn_decl.params {
-            let Some(ty) = parse_local_fn_type(
-                &p.ty_name,
-                &p.ty_span,
-                &mut self.diags,
-                "parameter type",
-                None,
-                &self.enum_defs,
-                &self.struct_defs,
-                &type_param_names,
-                &self.interface_names,
-            ) else {
+            let Some(ty) = parse_fn_type(FnTypeInputs {
+                name: &p.ty_name,
+                span: &p.ty_span,
+                diags: &mut self.diags,
+                context: "parameter type",
+                source_file: None,
+                enum_defs: &self.enum_defs,
+                struct_defs: &self.struct_defs,
+                type_params: &type_param_names,
+                interface_names: &self.interface_names,
+            }) else {
                 bad_param = true;
                 continue;
             };
@@ -3393,178 +3393,6 @@ impl Checker {
         }
 
         entry.push(def);
-    }
-}
-
-/// Parse a type name for a local fn declaration parameter or return type.
-/// Handles simple types and canonical callable type strings (`fn(T1,T2)->T`).
-#[expect(
-    clippy::too_many_arguments,
-    reason = "This compiler boundary explicitly threads independent checking or lowering inputs."
-)]
-fn parse_local_fn_type(
-    name: &str,
-    span: &Span,
-    diags: &mut Vec<Diag>,
-    context: &str,
-    source_file: Option<&str>,
-    enum_defs: &HashMap<String, EnumDef>,
-    struct_defs: &HashMap<String, StructDef>,
-    type_params: &[String],
-    interface_names: &HashSet<String>,
-) -> Option<FnValueTy> {
-    let name = strip_spatial_type_suffix(name);
-    if let Some(resource) = crate::resource_type::shader_resource_type(name) {
-        return match resource {
-            Ok(resource) => Some(FnValueTy::ShaderResource(resource)),
-            Err(message) => {
-                let diagnostic = Diag::error(span.clone(), message).with_file_opt(source_file);
-                diags.push(diagnostic);
-                None
-            }
-        };
-    }
-    if let Some((element, length)) = hir::parse_array_param_type(name) {
-        if length == 0 {
-            diags.push(Diag::error(
-                span.clone(),
-                "function array types require a nonzero length",
-            ));
-            return None;
-        }
-        parse_local_fn_type(
-            element,
-            span,
-            diags,
-            "array element type",
-            source_file,
-            enum_defs,
-            struct_defs,
-            &[],
-            interface_names,
-        )?;
-        return Some(FnValueTy::Array(
-            name.chars().filter(|c| !c.is_whitespace()).collect(),
-        ));
-    }
-
-    if let Some(callable) = try_parse_callable_ty(name) {
-        let param_tys: Option<Vec<FnValueTy>> = callable
-            .0
-            .iter()
-            .map(|p| {
-                parse_local_fn_type(
-                    p,
-                    span,
-                    diags,
-                    "callable parameter type",
-                    source_file,
-                    enum_defs,
-                    struct_defs,
-                    type_params,
-                    interface_names,
-                )
-            })
-            .collect();
-        let param_tys = param_tys?;
-        let ret_ty = Box::new(parse_local_fn_type(
-            &callable.1,
-            span,
-            diags,
-            "callable return type",
-            source_file,
-            enum_defs,
-            struct_defs,
-            type_params,
-            interface_names,
-        )?);
-        return Some(FnValueTy::Callable {
-            params: param_tys,
-            ret: ret_ty,
-        });
-    }
-
-    if let Some((base, args)) = try_parse_type_application(name)
-        && base == "field"
-    {
-        if args.len() != 1 {
-            let d = Diag::error(
-                span.clone(),
-                format!(
-                    "`field<...>` expects exactly one type argument, found {}",
-                    args.len()
-                ),
-            )
-            .with_help("use `field<T>` with a single element type parameter")
-            .with_file_opt(source_file);
-            diags.push(d);
-            return None;
-        }
-        return parse_local_fn_type(
-            &args[0],
-            span,
-            diags,
-            context,
-            source_file,
-            enum_defs,
-            struct_defs,
-            type_params,
-            interface_names,
-        );
-    }
-
-    if let Some((base, _args)) = try_parse_type_application(name)
-        && base == "texture"
-    {
-        return Some(FnValueTy::Texture);
-    }
-
-    match name {
-        "f32" | "f64" | "half" | "i32" | "u32" | "signal" | "mask" | "coverage" | "delta"
-        | "bool" | "angle" | "length" => Some(FnValueTy::Scalar),
-        "vec2" | "uvec2" | "ivec2" | "bvec2" | "coord" | "resolution" => Some(FnValueTy::Vec2),
-        "vec3" | "uvec3" | "ivec3" | "bvec3" => Some(FnValueTy::Vec3),
-        "vec4" | "uvec4" | "ivec4" | "bvec4" => Some(FnValueTy::Vec4),
-        "mat2" => Some(FnValueTy::Mat2),
-        "mat3" => Some(FnValueTy::Mat3),
-        "mat4" => Some(FnValueTy::Mat4),
-        "coord_like" => Some(FnValueTy::CoordLike),
-        "color" => Some(FnValueTy::Color),
-        "shape" => Some(FnValueTy::Shape),
-        "layer" => Some(FnValueTy::Layer),
-        other => {
-            if type_params.iter().any(|param| param == other) {
-                return Some(FnValueTy::TypeVar(other.to_string()));
-            }
-            if interface_names.contains(other) {
-                let d = Diag::error(
-                    span.clone(),
-                    format!("interface `{other}` cannot be used as a value type in v1"),
-                )
-                .with_help(format!(
-                    "use a generic type parameter with an interface bound instead, e.g. `<T: {other}>`"
-                ))
-.with_file_opt(source_file);
-                diags.push(d);
-                return None;
-            }
-            if enum_defs.contains_key(other) {
-                return Some(FnValueTy::Enum(other.to_string()));
-            }
-            if struct_defs.contains_key(other) {
-                return Some(FnValueTy::Struct(other.to_string()));
-            }
-            let d = Diag::error(
-                span.clone(),
-                format!("unsupported function {context} `{other}`"),
-            )
-            .with_help(
-                "supported types are family-first: scalar aliases (f32/f64/half/i32/u32/bool/signal/delta/mask/coverage/angle/length), vector aliases (vec2/uvec2/coord/coord_like/resolution, vec3/uvec3, vec4/uvec4), matrix aliases (mat2/mat3/mat4), texture<T>, color, shape, layer, fixed-size arrays, records, or a defined enum",
-            )
-.with_file_opt(source_file);
-            diags.push(d);
-            None
-        }
     }
 }
 
