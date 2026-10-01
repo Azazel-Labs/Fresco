@@ -138,21 +138,13 @@ pub fn raster_contract(
         &mut Vec::new(),
         &method.params[0].ty_span,
     )?;
-    let mut context = EntryContext {
-        parameter: method.params[0].name.clone(),
-        interface: interface.name.clone(),
-        method: method_name.clone(),
+    entry_context(
+        method.params[0].name.clone(),
+        interface.name.clone(),
+        method_name.clone(),
         ty,
-        components: Vec::new(),
-        roles: std::collections::HashMap::new(),
-    };
-    collect_fields(
-        &context.ty,
-        &[],
-        &mut context.components,
-        &mut context.roles,
-    )?;
-    Ok(Some(context))
+    )
+    .map(Some)
 }
 
 pub fn struct_context(
@@ -162,10 +154,21 @@ pub fn struct_context(
     span: &Span,
 ) -> Result<EntryContext, Vec<Diag>> {
     let ty = resolve_struct(name, structs, &mut Vec::new(), span)?;
+    entry_context(parameter.into(), name.into(), "evaluate".into(), ty)
+}
+
+/// Build an entry context over `ty`, collecting its scalar components and
+/// semantic roles.
+fn entry_context(
+    parameter: String,
+    interface: String,
+    method: String,
+    ty: ContextStruct,
+) -> Result<EntryContext, Vec<Diag>> {
     let mut context = EntryContext {
-        parameter: parameter.into(),
-        interface: name.into(),
-        method: "evaluate".into(),
+        parameter,
+        interface,
+        method,
         ty,
         components: Vec::new(),
         roles: std::collections::HashMap::new(),
