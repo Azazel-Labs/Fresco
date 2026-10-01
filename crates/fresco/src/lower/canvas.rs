@@ -849,6 +849,52 @@ pub(super) fn lower_path_arc_sample_fn(
     ir.finish()
 }
 
+/// A user-helper expression viewed by how its components are produced.
+enum HelperValueShape<'e> {
+    /// Literal scalar or vector components.
+    Value(Vec<&'e Sx>),
+    /// Components read from named scalar slots.
+    Slots(&'e [String]),
+    /// A componentwise vector builtin over fixed-width operands.
+    Math(Mf, Vec<Vec<&'e Sx>>),
+}
+
+impl<'e> HelperValueShape<'e> {
+    fn of(value: &'e crate::hir::UserFnExpr) -> Self {
+        use crate::hir::{UserFnExpr, UserFnValue};
+        fn v2((x, y): &(Sx, Sx)) -> Vec<&Sx> {
+            vec![x, y]
+        }
+        fn v3((x, y, z): &(Sx, Sx, Sx)) -> Vec<&Sx> {
+            vec![x, y, z]
+        }
+        fn v4((x, y, z, w): &(Sx, Sx, Sx, Sx)) -> Vec<&Sx> {
+            vec![x, y, z, w]
+        }
+        match value {
+            UserFnExpr::Value(UserFnValue::Scalar(s)) => Self::Value(vec![s]),
+            UserFnExpr::Value(UserFnValue::Vec2(v)) => Self::Value(v2(v)),
+            UserFnExpr::Value(UserFnValue::Vec3(v)) => Self::Value(v3(v)),
+            UserFnExpr::Value(UserFnValue::Vec4(v)) => Self::Value(v4(v)),
+            UserFnExpr::SlotSwizzle2(slots) => Self::Slots(slots),
+            UserFnExpr::SlotSwizzle3(slots) => Self::Slots(slots),
+            UserFnExpr::SlotSwizzle4(slots) => Self::Slots(slots),
+            UserFnExpr::Normalize2(v) => Self::Math(Mf::Normalize, vec![v2(v)]),
+            UserFnExpr::Normalize3(v) => Self::Math(Mf::Normalize, vec![v3(v)]),
+            UserFnExpr::Normalize4(v) => Self::Math(Mf::Normalize, vec![v4(v)]),
+            UserFnExpr::Min2 { a, b } => Self::Math(Mf::Min, vec![v2(a), v2(b)]),
+            UserFnExpr::Min3 { a, b } => Self::Math(Mf::Min, vec![v3(a), v3(b)]),
+            UserFnExpr::Min4 { a, b } => Self::Math(Mf::Min, vec![v4(a), v4(b)]),
+            UserFnExpr::Max2 { a, b } => Self::Math(Mf::Max, vec![v2(a), v2(b)]),
+            UserFnExpr::Max3 { a, b } => Self::Math(Mf::Max, vec![v3(a), v3(b)]),
+            UserFnExpr::Max4 { a, b } => Self::Math(Mf::Max, vec![v4(a), v4(b)]),
+            UserFnExpr::Clamp2 { x, lo, hi } => Self::Math(Mf::Clamp, vec![v2(x), v2(lo), v2(hi)]),
+            UserFnExpr::Clamp3 { x, lo, hi } => Self::Math(Mf::Clamp, vec![v3(x), v3(lo), v3(hi)]),
+            UserFnExpr::Clamp4 { x, lo, hi } => Self::Math(Mf::Clamp, vec![v4(x), v4(lo), v4(hi)]),
+        }
+    }
+}
+
 struct UserHelperRuntimeCtx<'a, 'h> {
     cx: &'a mut FnCtx<'h>,
     helper: &'a UserFnHelper,
@@ -1036,37 +1082,31 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
             .collect()
     }
 
-    fn compose_vec2_from_sx(&mut self, v: &(Sx, Sx), p: Handle<Ex>) -> Handle<Ex> {
-        let (x, y) = v;
-        let xh = self.cx.native_scalar(x, p);
-        let yh = self.cx.native_scalar(y, p);
+    /// Compose `parts` into a vector whose scalar kind follows the first part.
+    fn compose_from_sx(&mut self, parts: &[&Sx], p: Handle<Ex>) -> Handle<Ex> {
+        let kind = parts[0].scalar_kind();
+        let components = parts
+            .iter()
+            .map(|part| self.cx.native_scalar(part, p))
+            .collect();
         self.cx.ir.add(Ex::Compose {
-            ty: vector_type_handle(x.scalar_kind(), 2, &self.cx.ir.types),
-            components: vec![xh, yh],
+            ty: vector_type_handle(kind, parts.len(), &self.cx.ir.types),
+            components,
         })
     }
 
-    fn compose_vec3_from_sx(&mut self, v: &(Sx, Sx, Sx), p: Handle<Ex>) -> Handle<Ex> {
-        let (x, y, z) = v;
-        let xh = self.cx.native_scalar(x, p);
-        let yh = self.cx.native_scalar(y, p);
-        let zh = self.cx.native_scalar(z, p);
-        self.cx.ir.add(Ex::Compose {
-            ty: vector_type_handle(x.scalar_kind(), 3, &self.cx.ir.types),
-            components: vec![xh, yh, zh],
-        })
-    }
-
-    fn compose_vec4_from_sx(&mut self, v: &(Sx, Sx, Sx, Sx), p: Handle<Ex>) -> Handle<Ex> {
-        let (x, y, z, w) = v;
-        let xh = self.cx.native_scalar(x, p);
-        let yh = self.cx.native_scalar(y, p);
-        let zh = self.cx.native_scalar(z, p);
-        let wh = self.cx.native_scalar(w, p);
-        self.cx.ir.add(Ex::Compose {
-            ty: vector_type_handle(x.scalar_kind(), 4, &self.cx.ir.types),
-            components: vec![xh, yh, zh, wh],
-        })
+    /// Apply a componentwise vector builtin to its composed operands.
+    fn vector_math(&mut self, fun: Mf, operands: &[Vec<&Sx>], p: Handle<Ex>) -> Handle<Ex> {
+        let composed: Vec<_> = operands
+            .iter()
+            .map(|operand| self.compose_from_sx(operand, p))
+            .collect();
+        match *composed.as_slice() {
+            [x] => self.cx.ir.m1(fun, x),
+            [a, b] => self.cx.ir.m2(fun, a, b),
+            [x, lo, hi] => self.cx.ir.m3(fun, x, lo, hi),
+            _ => unreachable!("helper vector builtins take one to three operands"),
+        }
     }
 
     fn expression_kind(value: &crate::hir::UserFnExpr) -> crate::typed_scalar::Kind {
@@ -1084,216 +1124,36 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
 
     fn value_components(&mut self, value: &crate::hir::UserFnExpr) -> Vec<Handle<Ex>> {
         let p = self.cx.ir.uv;
-        match value {
-            crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Scalar(s)) => {
-                vec![self.cx.native_scalar(s, p)]
-            }
-            crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Vec2((x, y))) => {
-                vec![self.cx.native_scalar(x, p), self.cx.native_scalar(y, p)]
-            }
-            crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Vec3((x, y, z))) => {
-                vec![
-                    self.cx.native_scalar(x, p),
-                    self.cx.native_scalar(y, p),
-                    self.cx.native_scalar(z, p),
-                ]
-            }
-            crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Vec4((x, y, z, w))) => {
-                vec![
-                    self.cx.native_scalar(x, p),
-                    self.cx.native_scalar(y, p),
-                    self.cx.native_scalar(z, p),
-                    self.cx.native_scalar(w, p),
-                ]
-            }
-            crate::hir::UserFnExpr::SlotSwizzle2(slots) => {
-                vec![
-                    self.cx.sx_at(&Sx::Param(slots[0].clone()), p),
-                    self.cx.sx_at(&Sx::Param(slots[1].clone()), p),
-                ]
-            }
-            crate::hir::UserFnExpr::SlotSwizzle3(slots) => {
-                vec![
-                    self.cx.sx_at(&Sx::Param(slots[0].clone()), p),
-                    self.cx.sx_at(&Sx::Param(slots[1].clone()), p),
-                    self.cx.sx_at(&Sx::Param(slots[2].clone()), p),
-                ]
-            }
-            crate::hir::UserFnExpr::SlotSwizzle4(slots) => {
-                vec![
-                    self.cx.sx_at(&Sx::Param(slots[0].clone()), p),
-                    self.cx.sx_at(&Sx::Param(slots[1].clone()), p),
-                    self.cx.sx_at(&Sx::Param(slots[2].clone()), p),
-                    self.cx.sx_at(&Sx::Param(slots[3].clone()), p),
-                ]
-            }
-            crate::hir::UserFnExpr::Normalize2(v) => {
-                let vec = self.compose_vec2_from_sx(v, p);
-                let normalized = self.cx.ir.m1(Mf::Normalize, vec);
-                self.vec_components(normalized, 2)
-            }
-            crate::hir::UserFnExpr::Normalize3(v) => {
-                let vec = self.compose_vec3_from_sx(v, p);
-                let normalized = self.cx.ir.m1(Mf::Normalize, vec);
-                self.vec_components(normalized, 3)
-            }
-            crate::hir::UserFnExpr::Normalize4(v) => {
-                let vec = self.compose_vec4_from_sx(v, p);
-                let normalized = self.cx.ir.m1(Mf::Normalize, vec);
-                self.vec_components(normalized, 4)
-            }
-            crate::hir::UserFnExpr::Min2 { a, b } => {
-                let av = self.compose_vec2_from_sx(a, p);
-                let bv = self.compose_vec2_from_sx(b, p);
-                let out = self.cx.ir.m2(Mf::Min, av, bv);
-                self.vec_components(out, 2)
-            }
-            crate::hir::UserFnExpr::Min3 { a, b } => {
-                let av = self.compose_vec3_from_sx(a, p);
-                let bv = self.compose_vec3_from_sx(b, p);
-                let out = self.cx.ir.m2(Mf::Min, av, bv);
-                self.vec_components(out, 3)
-            }
-            crate::hir::UserFnExpr::Min4 { a, b } => {
-                let av = self.compose_vec4_from_sx(a, p);
-                let bv = self.compose_vec4_from_sx(b, p);
-                let out = self.cx.ir.m2(Mf::Min, av, bv);
-                self.vec_components(out, 4)
-            }
-            crate::hir::UserFnExpr::Max2 { a, b } => {
-                let av = self.compose_vec2_from_sx(a, p);
-                let bv = self.compose_vec2_from_sx(b, p);
-                let out = self.cx.ir.m2(Mf::Max, av, bv);
-                self.vec_components(out, 2)
-            }
-            crate::hir::UserFnExpr::Max3 { a, b } => {
-                let av = self.compose_vec3_from_sx(a, p);
-                let bv = self.compose_vec3_from_sx(b, p);
-                let out = self.cx.ir.m2(Mf::Max, av, bv);
-                self.vec_components(out, 3)
-            }
-            crate::hir::UserFnExpr::Max4 { a, b } => {
-                let av = self.compose_vec4_from_sx(a, p);
-                let bv = self.compose_vec4_from_sx(b, p);
-                let out = self.cx.ir.m2(Mf::Max, av, bv);
-                self.vec_components(out, 4)
-            }
-            crate::hir::UserFnExpr::Clamp2 { x, lo, hi } => {
-                let xv = self.compose_vec2_from_sx(x, p);
-                let lv = self.compose_vec2_from_sx(lo, p);
-                let hv = self.compose_vec2_from_sx(hi, p);
-                let out = self.cx.ir.m3(Mf::Clamp, xv, lv, hv);
-                self.vec_components(out, 2)
-            }
-            crate::hir::UserFnExpr::Clamp3 { x, lo, hi } => {
-                let xv = self.compose_vec3_from_sx(x, p);
-                let lv = self.compose_vec3_from_sx(lo, p);
-                let hv = self.compose_vec3_from_sx(hi, p);
-                let out = self.cx.ir.m3(Mf::Clamp, xv, lv, hv);
-                self.vec_components(out, 3)
-            }
-            crate::hir::UserFnExpr::Clamp4 { x, lo, hi } => {
-                let xv = self.compose_vec4_from_sx(x, p);
-                let lv = self.compose_vec4_from_sx(lo, p);
-                let hv = self.compose_vec4_from_sx(hi, p);
-                let out = self.cx.ir.m3(Mf::Clamp, xv, lv, hv);
-                self.vec_components(out, 4)
+        match HelperValueShape::of(value) {
+            HelperValueShape::Value(parts) => parts
+                .into_iter()
+                .map(|part| self.cx.native_scalar(part, p))
+                .collect(),
+            HelperValueShape::Slots(slots) => slots
+                .iter()
+                .map(|slot| self.cx.sx_at(&Sx::Param(slot.clone()), p))
+                .collect(),
+            HelperValueShape::Math(fun, operands) => {
+                let width = operands[0].len();
+                let out = self.vector_math(fun, &operands, p);
+                self.vec_components(out, width)
             }
         }
     }
 
     fn value_vector(&mut self, value: &crate::hir::UserFnExpr, width: usize) -> Option<Handle<Ex>> {
         let p = self.cx.ir.uv;
-        match (width, value) {
-            (2, crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Vec2(v))) => {
-                Some(self.compose_vec2_from_sx(v, p))
+        match HelperValueShape::of(value) {
+            HelperValueShape::Value(parts) if width > 1 && parts.len() == width => {
+                Some(self.compose_from_sx(&parts, p))
             }
-            (3, crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Vec3(v))) => {
-                Some(self.compose_vec3_from_sx(v, p))
+            HelperValueShape::Slots(slots) if slots.len() == width => {
+                let params: Vec<Sx> = slots.iter().cloned().map(Sx::Param).collect();
+                let parts: Vec<&Sx> = params.iter().collect();
+                Some(self.compose_from_sx(&parts, p))
             }
-            (4, crate::hir::UserFnExpr::Value(crate::hir::UserFnValue::Vec4(v))) => {
-                Some(self.compose_vec4_from_sx(v, p))
-            }
-            (2, crate::hir::UserFnExpr::SlotSwizzle2(slots)) => Some(self.compose_vec2_from_sx(
-                &(Sx::Param(slots[0].clone()), Sx::Param(slots[1].clone())),
-                p,
-            )),
-            (3, crate::hir::UserFnExpr::SlotSwizzle3(slots)) => Some(self.compose_vec3_from_sx(
-                &(
-                    Sx::Param(slots[0].clone()),
-                    Sx::Param(slots[1].clone()),
-                    Sx::Param(slots[2].clone()),
-                ),
-                p,
-            )),
-            (4, crate::hir::UserFnExpr::SlotSwizzle4(slots)) => Some(self.compose_vec4_from_sx(
-                &(
-                    Sx::Param(slots[0].clone()),
-                    Sx::Param(slots[1].clone()),
-                    Sx::Param(slots[2].clone()),
-                    Sx::Param(slots[3].clone()),
-                ),
-                p,
-            )),
-            (2, crate::hir::UserFnExpr::Normalize2(v)) => {
-                let vec = self.compose_vec2_from_sx(v, p);
-                Some(self.cx.ir.m1(Mf::Normalize, vec))
-            }
-            (3, crate::hir::UserFnExpr::Normalize3(v)) => {
-                let vec = self.compose_vec3_from_sx(v, p);
-                Some(self.cx.ir.m1(Mf::Normalize, vec))
-            }
-            (4, crate::hir::UserFnExpr::Normalize4(v)) => {
-                let vec = self.compose_vec4_from_sx(v, p);
-                Some(self.cx.ir.m1(Mf::Normalize, vec))
-            }
-            (2, crate::hir::UserFnExpr::Min2 { a, b }) => {
-                let av = self.compose_vec2_from_sx(a, p);
-                let bv = self.compose_vec2_from_sx(b, p);
-                Some(self.cx.ir.m2(Mf::Min, av, bv))
-            }
-            (3, crate::hir::UserFnExpr::Min3 { a, b }) => {
-                let av = self.compose_vec3_from_sx(a, p);
-                let bv = self.compose_vec3_from_sx(b, p);
-                Some(self.cx.ir.m2(Mf::Min, av, bv))
-            }
-            (4, crate::hir::UserFnExpr::Min4 { a, b }) => {
-                let av = self.compose_vec4_from_sx(a, p);
-                let bv = self.compose_vec4_from_sx(b, p);
-                Some(self.cx.ir.m2(Mf::Min, av, bv))
-            }
-            (2, crate::hir::UserFnExpr::Max2 { a, b }) => {
-                let av = self.compose_vec2_from_sx(a, p);
-                let bv = self.compose_vec2_from_sx(b, p);
-                Some(self.cx.ir.m2(Mf::Max, av, bv))
-            }
-            (3, crate::hir::UserFnExpr::Max3 { a, b }) => {
-                let av = self.compose_vec3_from_sx(a, p);
-                let bv = self.compose_vec3_from_sx(b, p);
-                Some(self.cx.ir.m2(Mf::Max, av, bv))
-            }
-            (4, crate::hir::UserFnExpr::Max4 { a, b }) => {
-                let av = self.compose_vec4_from_sx(a, p);
-                let bv = self.compose_vec4_from_sx(b, p);
-                Some(self.cx.ir.m2(Mf::Max, av, bv))
-            }
-            (2, crate::hir::UserFnExpr::Clamp2 { x, lo, hi }) => {
-                let xv = self.compose_vec2_from_sx(x, p);
-                let lv = self.compose_vec2_from_sx(lo, p);
-                let hv = self.compose_vec2_from_sx(hi, p);
-                Some(self.cx.ir.m3(Mf::Clamp, xv, lv, hv))
-            }
-            (3, crate::hir::UserFnExpr::Clamp3 { x, lo, hi }) => {
-                let xv = self.compose_vec3_from_sx(x, p);
-                let lv = self.compose_vec3_from_sx(lo, p);
-                let hv = self.compose_vec3_from_sx(hi, p);
-                Some(self.cx.ir.m3(Mf::Clamp, xv, lv, hv))
-            }
-            (4, crate::hir::UserFnExpr::Clamp4 { x, lo, hi }) => {
-                let xv = self.compose_vec4_from_sx(x, p);
-                let lv = self.compose_vec4_from_sx(lo, p);
-                let hv = self.compose_vec4_from_sx(hi, p);
-                Some(self.cx.ir.m3(Mf::Clamp, xv, lv, hv))
+            HelperValueShape::Math(fun, operands) if operands[0].len() == width => {
+                Some(self.vector_math(fun, &operands, p))
             }
             _ => None,
         }
@@ -1373,18 +1233,9 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
                             self.bind_slots(name.clone(), slots.clone(), None);
                         }
                     } else {
+                        let kind = Self::expression_kind(init);
                         for (slot, init) in slots.iter().zip(init_values) {
                             if is_mutated {
-                                let kind = match &stmt {
-                                    crate::hir::UserFnStmt::Let {
-                                        init:
-                                            crate::hir::UserFnExpr::Value(
-                                                crate::hir::UserFnValue::Scalar(value),
-                                            ),
-                                        ..
-                                    } => value.scalar_kind(),
-                                    _ => crate::typed_scalar::Kind::F32,
-                                };
                                 let ty = scalar_type_handle(kind, &self.cx.ir.types);
                                 let ptr = self.cx.ir.local(slot, ty, None);
                                 self.cx.ir.bind_scalar_slot_ptr(slot.clone(), ptr);
