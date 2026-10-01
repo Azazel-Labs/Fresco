@@ -2150,11 +2150,11 @@ mod tests {
         );
 
         assert!(
-            prep_diags.iter().all(|diag| !diag.is_error()),
+            !crate::diag::has_errors(&prep_diags),
             "unexpected prep diagnostics: {prep_diags:?}"
         );
         assert!(
-            checker.diags.iter().all(|diag| !diag.is_error()),
+            !crate::diag::has_errors(&checker.diags),
             "unexpected checker diagnostics: {:?}",
             checker.diags
         );
