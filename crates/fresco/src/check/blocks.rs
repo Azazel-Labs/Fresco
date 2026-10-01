@@ -3245,7 +3245,6 @@ impl Checker {
     /// `self.fn_defs` and are available from the point of declaration forward (sequential
     /// evaluation naturally enforces this for inline-evaluated fn bodies).
     pub(super) fn register_local_fn_decl(&mut self, fn_decl: &FnDecl) {
-        let incoming_is_stdlib = fn_decl.source_file.starts_with("<stdlib:");
         let type_param_names: Vec<String> = fn_decl
             .type_params
             .iter()
@@ -3360,39 +3359,18 @@ impl Checker {
         };
 
         let entry = self.fn_defs.entry(fn_decl.name.clone()).or_default();
-
-        if !incoming_is_stdlib && entry.iter().all(|e| e.source_file.starts_with("<stdlib:")) {
-            entry.clear();
-        }
-
-        if entry.iter().any(|e| e.same_overload_signature(&def)) {
-            // If the existing entry has the same span it's a re-registration of the same local fn
-            // (the body is being evaluated multiple times across call sites). Silently update it
-            // so callers always see the latest def, without producing a spurious duplicate error.
-            if entry
-                .iter()
-                .any(|e| e.same_overload_signature(&def) && e.span == def.span)
+        if let Err(def) = register_fn_overload(entry, def) {
+            // A local fn body evaluated once per call site re-registers the same
+            // declaration; keep the latest def instead of reporting a duplicate.
+            if let Some(slot) = entry
+                .iter_mut()
+                .find(|e| e.same_overload_signature(&def) && e.span == def.span)
             {
-                // Replace the existing entry so it stays current.
-                if let Some(slot) = entry.iter_mut().find(|e| e.same_overload_signature(&def)) {
-                    *slot = def;
-                }
+                *slot = *def;
                 return;
             }
-            self.diags.push(
-                Diag::error(
-                    fn_decl.name_span.clone(),
-                    format!(
-                        "duplicate function declaration `{}` with matching overload signature",
-                        fn_decl.name,
-                    ),
-                )
-                .with_help("function overloads must differ by parameter type specialization, arity, or keyword-only placement"),
-            );
-            return;
+            self.diags.push(duplicate_overload_diag(fn_decl));
         }
-
-        entry.push(def);
     }
 }
 

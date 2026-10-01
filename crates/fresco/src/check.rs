@@ -2147,6 +2147,243 @@ pub(super) fn local_decl_expected_kind(
     }
 }
 
+/// The help text attached when a declared function has no usable return type.
+#[derive(Clone, Copy)]
+enum ReturnTypeHelp {
+    /// Short type list; also reported when the return type fails to parse.
+    Short,
+    /// Full type list; also reported when the return type fails to parse.
+    Full,
+    /// Full type list, reported only when the return type is absent.
+    FullWhenMissing,
+}
+
+impl ReturnTypeHelp {
+    fn missing_return_help(self, declared: bool) -> Option<&'static str> {
+        const SHORT: &str =
+            "supported types: f32, vec2, vec3, color, shape, layer, or a defined enum";
+        const FULL: &str = "supported types: f32, f64, half, i32, u32, bool, angle, length, vec2, coord, coord_like, resolution, vec3, vec4, mat2, mat3, mat4, color, shape, layer, signal, delta, mask, coverage, or a defined enum";
+        match self {
+            Self::Short => Some(SHORT),
+            Self::Full => Some(FULL),
+            Self::FullWhenMissing => (!declared).then_some(FULL),
+        }
+    }
+}
+
+/// Build the overload table for top-level function declarations, expanding
+/// union-typed parameters into one overload per alternative.
+fn build_fn_defs(
+    functions: &[FnDecl],
+    enum_defs: &HashMap<String, EnumDef>,
+    struct_defs: &HashMap<String, StructDef>,
+    interface_names: &HashSet<String>,
+    return_type_help: ReturnTypeHelp,
+    prep_diags: &mut Vec<Diag>,
+) -> HashMap<String, Vec<FnDef>> {
+    let mut fn_defs: HashMap<String, Vec<FnDef>> = HashMap::new();
+    for func in functions {
+        let type_param_names: Vec<String> = func
+            .type_params
+            .iter()
+            .map(|param| param.name.clone())
+            .collect();
+        let type_params: Vec<(String, Vec<String>)> = func
+            .type_params
+            .iter()
+            .map(|param| (param.name.clone(), param.bounds.clone()))
+            .collect();
+        let mut const_params: Vec<ConstTemplateParamDef> = Vec::new();
+        let mut template_name_set: HashSet<String> = type_param_names.iter().cloned().collect();
+        let mut bad_template = false;
+        for const_param in &func.const_params {
+            if !template_name_set.insert(const_param.name.clone()) {
+                prep_diags.push(
+                    Diag::error(
+                        const_param.name_span.clone(),
+                        format!(
+                            "duplicate template parameter `{}` in function `{}`",
+                            const_param.name, func.name
+                        ),
+                    )
+                    .with_file(func.source_file.clone())
+                    .with_help("template parameter names must be unique"),
+                );
+                bad_template = true;
+                continue;
+            }
+
+            let ty = match const_param.kind {
+                ConstTemplateKind::U32 => ConstTemplateParamTy::U32,
+                ConstTemplateKind::I32 => ConstTemplateParamTy::I32,
+            };
+            const_params.push(ConstTemplateParamDef {
+                name: const_param.name.clone(),
+                ty,
+            });
+        }
+        if bad_template {
+            continue;
+        }
+
+        let ret = func.ret_ty.as_ref().and_then(|(name, span)| {
+            parse_fn_type(FnTypeInputs {
+                name,
+                span,
+                diags: &mut *prep_diags,
+                context: "return type",
+                source_file: Some(func.source_file.as_str()),
+                enum_defs,
+                struct_defs,
+                type_params: &type_param_names,
+                interface_names,
+            })
+        });
+        let Some(ret) = ret else {
+            if let Some(help) = return_type_help.missing_return_help(func.ret_ty.is_some()) {
+                prep_diags.push(
+                    Diag::error(
+                        func.name_span.clone(),
+                        format!("function `{}` must declare a return type", func.name),
+                    )
+                    .with_file(func.source_file.clone())
+                    .with_help(help),
+                );
+            }
+            continue;
+        };
+
+        let mut param_options: Vec<Vec<FnParamDef>> = Vec::with_capacity(func.params.len());
+        let mut bad_param = false;
+        let mut seen_param_names: HashMap<String, Span> = HashMap::new();
+        for p in &func.params {
+            if seen_param_names.contains_key(&p.name) {
+                prep_diags.push(
+                    Diag::error(
+                        p.name_span.clone(),
+                        format!(
+                            "duplicate parameter `{}` in function `{}`",
+                            p.name, func.name
+                        ),
+                    )
+                    .with_file(func.source_file.clone())
+                    .with_label("parameter name redefined")
+                    .with_help(format!(
+                        "rename this parameter; `{}` was already declared earlier",
+                        p.name
+                    )),
+                );
+                bad_param = true;
+                continue;
+            }
+            seen_param_names.insert(p.name.clone(), p.name_span.clone());
+
+            let mut options = Vec::new();
+            for ty_name in split_decl_type_union(&p.ty_name) {
+                let Some(ty) = parse_fn_type(FnTypeInputs {
+                    name: &ty_name,
+                    span: &p.ty_span,
+                    diags: &mut *prep_diags,
+                    context: "parameter type",
+                    source_file: Some(func.source_file.as_str()),
+                    enum_defs,
+                    struct_defs,
+                    type_params: &type_param_names,
+                    interface_names,
+                }) else {
+                    bad_param = true;
+                    continue;
+                };
+                options.push(FnParamDef {
+                    is_context: p.is_context,
+                    name: p.name.clone(),
+                    ty,
+                    scalar_kind: crate::typed_scalar::Kind::element(&ty_name)
+                        .unwrap_or(crate::typed_scalar::Kind::F32),
+                    scalar_specialization: scalar_specialization_from_type_name(&ty_name),
+                    keyword_only: p.keyword_only,
+                });
+            }
+
+            if options.is_empty() {
+                bad_param = true;
+                continue;
+            }
+
+            param_options.push(options);
+        }
+        if bad_param {
+            continue;
+        }
+
+        let mut expanded_params: Vec<Vec<FnParamDef>> = vec![Vec::new()];
+        for options in param_options {
+            let mut next = Vec::new();
+            for base in &expanded_params {
+                for opt in &options {
+                    let mut branch = base.clone();
+                    branch.push(opt.clone());
+                    next.push(branch);
+                }
+            }
+            expanded_params = next;
+        }
+
+        for params in expanded_params {
+            let def = FnDef {
+                infer_return: false,
+                ret_kind: func
+                    .ret_ty
+                    .as_ref()
+                    .and_then(|(ty, _)| crate::typed_scalar::Kind::element(ty))
+                    .unwrap_or(crate::typed_scalar::Kind::F32),
+                params,
+                ret: ret.clone(),
+                is_internal: func.is_internal,
+                is_builtin: func.is_builtin,
+                source_file: func.source_file.clone(),
+                body: func.body.clone(),
+                span: func.span.clone(),
+                type_params: type_params.clone(),
+                const_params: const_params.clone(),
+                const_bindings: Vec::new(),
+            };
+
+            let entry = fn_defs.entry(func.name.clone()).or_default();
+            if register_fn_overload(entry, def).is_err() {
+                prep_diags.push(duplicate_overload_diag(func).with_file(func.source_file.clone()));
+            }
+        }
+    }
+    fn_defs
+}
+
+/// Add `def` to a function's overload set. A user declaration replaces an
+/// overload set made only of stdlib definitions. Returns the definition back
+/// when an overload with the same signature already exists.
+fn register_fn_overload(entry: &mut Vec<FnDef>, def: FnDef) -> Result<(), Box<FnDef>> {
+    if !is_stdlib_source(&def.source_file) && entry.iter().all(|e| is_stdlib_source(&e.source_file))
+    {
+        entry.clear();
+    }
+    if entry.iter().any(|e| e.same_overload_signature(&def)) {
+        return Err(Box::new(def));
+    }
+    entry.push(def);
+    Ok(())
+}
+
+fn duplicate_overload_diag(func: &FnDecl) -> Diag {
+    Diag::error(
+        func.name_span.clone(),
+        format!(
+            "duplicate function declaration `{}` with matching overload signature",
+            func.name,
+        ),
+    )
+    .with_help("function overloads must differ by parameter type specialization, arity, or keyword-only placement")
+}
+
 struct FnTypeInputs<'a> {
     name: &'a str,
     span: &'a Span,
