@@ -50,6 +50,43 @@ pub enum PrimitiveType {
     Length,
 }
 
+impl PrimitiveType {
+    /// Source spelling of the primitive type.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Expr => "expression",
+            Self::Path => "path",
+            Self::Contour => "contour",
+            Self::Shape => "shape",
+            Self::Layer => "layer",
+            Self::Scalar => "scalar",
+            Self::I32 => "i32",
+            Self::U32 => "u32",
+            Self::F64 => "f64",
+            Self::Half => "half",
+            Self::Vec2 => "vec2",
+            Self::Vec3 => "vec3",
+            Self::Vec4 => "vec4",
+            Self::Mat2 => "mat2",
+            Self::Mat3 => "mat3",
+            Self::Mat4 => "mat4",
+            Self::Color => "color",
+            Self::ColorField => "color_field",
+            Self::Coverage => "coverage",
+            Self::Mask => "mask",
+            Self::Gradient => "gradient",
+            Self::Bool => "bool",
+            Self::Coord => "coord",
+            Self::CoordLike => "coord_like",
+            Self::Signal => "signal",
+            Self::Delta => "delta",
+            Self::Resolution => "resolution",
+            Self::Angle => "angle",
+            Self::Length => "length",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TypeRef {
     Primitive(PrimitiveType),

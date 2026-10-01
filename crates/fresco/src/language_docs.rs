@@ -1008,61 +1008,46 @@ fn type_ref_enum_type(ty: &TypeRef) -> Option<String> {
 }
 
 fn builtin_arg_display_type(arg: &crate::registry::BuiltinArgDecl) -> String {
+    arg_display_type(arg, type_ref_name, true)
+}
+
+/// Display type for a builtin argument. `Expr` arguments are refined from the
+/// shapes their docs mention; with `infer_from_mentions`, docs that name scalar,
+/// vec2, and vec3 anywhere also count as accepting every width.
+fn arg_display_type(
+    arg: &crate::registry::BuiltinArgDecl,
+    type_name: fn(&TypeRef) -> String,
+    infer_from_mentions: bool,
+) -> String {
     match arg.ty {
         TypeRef::Primitive(PrimitiveType::Expr) => {
             let docs = arg.docs;
-            if docs.contains("scalar, vec2, vec3, or vec4")
-                || docs.contains("value (scalar, vec2, vec3, or vec4)")
-                || docs.contains("angle in radians (scalar, vec2, vec3, or vec4)")
-            {
+            if docs.contains("scalar, vec2, vec3, or vec4") {
                 "scalar | vec2 | vec3 | vec4".to_string()
             } else if docs.contains("vec2, vec3, or vec4") {
                 "vec2 | vec3 | vec4".to_string()
-            } else if docs.contains("scalar") && docs.contains("vec2") && docs.contains("vec3") {
+            } else if infer_from_mentions
+                && docs.contains("scalar")
+                && docs.contains("vec2")
+                && docs.contains("vec3")
+            {
                 "scalar | vec2 | vec3 | vec4".to_string()
             } else {
                 "expression".to_string()
             }
         }
         TypeRef::Primitive(PrimitiveType::Color) => "color | gradient".to_string(),
-        _ => type_ref_name(&arg.ty),
+        _ => type_name(&arg.ty),
     }
 }
 
 fn type_ref_name(ty: &TypeRef) -> String {
-    match ty {
-        TypeRef::Primitive(PrimitiveType::Expr) => "expression".to_string(),
-        TypeRef::Primitive(PrimitiveType::Path) => "path".to_string(),
-        TypeRef::Primitive(PrimitiveType::Contour) => "contour".to_string(),
-        TypeRef::Primitive(PrimitiveType::Shape) => "shape".to_string(),
-        TypeRef::Primitive(PrimitiveType::Layer) => "layer".to_string(),
-        TypeRef::Primitive(PrimitiveType::Scalar) => "scalar".to_string(),
-        TypeRef::Primitive(PrimitiveType::I32) => "i32".to_string(),
-        TypeRef::Primitive(PrimitiveType::U32) => "u32".to_string(),
-        TypeRef::Primitive(PrimitiveType::F64) => "f64".to_string(),
-        TypeRef::Primitive(PrimitiveType::Half) => "half".to_string(),
-        TypeRef::Primitive(PrimitiveType::Vec2) => "vec2".to_string(),
-        TypeRef::Primitive(PrimitiveType::Vec3) => "vec3".to_string(),
-        TypeRef::Primitive(PrimitiveType::Vec4) => "vec4".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mat2) => "mat2".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mat3) => "mat3".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mat4) => "mat4".to_string(),
-        TypeRef::Primitive(PrimitiveType::Color) => "color".to_string(),
-        TypeRef::Primitive(PrimitiveType::ColorField) => "color_field".to_string(),
-        TypeRef::Primitive(PrimitiveType::Coverage) => "coverage".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mask) => "mask".to_string(),
-        TypeRef::Primitive(PrimitiveType::Gradient) => "gradient".to_string(),
-        TypeRef::Primitive(PrimitiveType::Bool) => "bool".to_string(),
-        TypeRef::Primitive(PrimitiveType::Coord) => "coord".to_string(),
-        TypeRef::Primitive(PrimitiveType::CoordLike) => "coord_like".to_string(),
-        TypeRef::Primitive(PrimitiveType::Signal) => "signal".to_string(),
-        TypeRef::Primitive(PrimitiveType::Delta) => "delta".to_string(),
-        TypeRef::Primitive(PrimitiveType::Resolution) => "resolution".to_string(),
-        TypeRef::Primitive(PrimitiveType::Angle) => "angle".to_string(),
-        TypeRef::Primitive(PrimitiveType::Length) => "length".to_string(),
-        TypeRef::Named(id) => id.0.to_string(),
-        TypeRef::Enum(id) => id.0.to_string(),
+    match *ty {
+        TypeRef::Primitive(primitive) => primitive.name(),
+        TypeRef::Named(id) => id.0,
+        TypeRef::Enum(id) => id.0,
     }
+    .to_string()
 }
 
 fn builtin_category_from_signatures(signatures: &[DocBuiltinSignature]) -> &'static str {
@@ -1172,61 +1157,31 @@ fn param_docs_from_fn_docs(docs: &str, name: &str) -> Option<String> {
 /// collapse to the single `f32` bucket here, distinct from the more granular
 /// per-kind names `type_ref_name` uses for the main builtin reference table.
 fn stdlib_export_type_name(ty: &TypeRef) -> String {
-    match ty {
-        TypeRef::Primitive(PrimitiveType::Expr) => "expression".to_string(),
-        TypeRef::Primitive(PrimitiveType::Path) => "path".to_string(),
-        TypeRef::Primitive(PrimitiveType::Contour) => "contour".to_string(),
-        TypeRef::Primitive(PrimitiveType::Shape) => "shape".to_string(),
-        TypeRef::Primitive(PrimitiveType::Layer) => "layer".to_string(),
-        TypeRef::Primitive(PrimitiveType::Scalar)
-        | TypeRef::Primitive(PrimitiveType::I32)
-        | TypeRef::Primitive(PrimitiveType::U32)
-        | TypeRef::Primitive(PrimitiveType::F64)
-        | TypeRef::Primitive(PrimitiveType::Half)
-        | TypeRef::Primitive(PrimitiveType::Coverage)
-        | TypeRef::Primitive(PrimitiveType::Mask)
-        | TypeRef::Primitive(PrimitiveType::Signal)
-        | TypeRef::Primitive(PrimitiveType::Delta)
-        | TypeRef::Primitive(PrimitiveType::Angle)
-        | TypeRef::Primitive(PrimitiveType::Length) => "f32".to_string(),
-        TypeRef::Primitive(PrimitiveType::Vec2)
-        | TypeRef::Primitive(PrimitiveType::Coord)
-        | TypeRef::Primitive(PrimitiveType::CoordLike)
-        | TypeRef::Primitive(PrimitiveType::Resolution) => "vec2".to_string(),
-        TypeRef::Primitive(PrimitiveType::Vec3) => "vec3".to_string(),
-        TypeRef::Primitive(PrimitiveType::Vec4) => "vec4".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mat2) => "mat2".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mat3) => "mat3".to_string(),
-        TypeRef::Primitive(PrimitiveType::Mat4) => "mat4".to_string(),
-        TypeRef::Primitive(PrimitiveType::Color)
-        | TypeRef::Primitive(PrimitiveType::ColorField)
-        | TypeRef::Primitive(PrimitiveType::Gradient) => "color".to_string(),
-        TypeRef::Primitive(PrimitiveType::Bool) => "bool".to_string(),
-        TypeRef::Named(id) => id.0.to_string(),
-        TypeRef::Enum(id) => id.0.to_string(),
+    use PrimitiveType as P;
+    match *ty {
+        TypeRef::Primitive(
+            P::Scalar
+            | P::I32
+            | P::U32
+            | P::F64
+            | P::Half
+            | P::Coverage
+            | P::Mask
+            | P::Signal
+            | P::Delta
+            | P::Angle
+            | P::Length,
+        ) => "f32".to_string(),
+        TypeRef::Primitive(P::Vec2 | P::Coord | P::CoordLike | P::Resolution) => "vec2".to_string(),
+        TypeRef::Primitive(P::Color | P::ColorField | P::Gradient) => "color".to_string(),
+        _ => type_ref_name(ty),
     }
 }
 
 /// Arg-display mapping for the stdlib exports table; see
 /// `stdlib_export_type_name`.
 fn stdlib_export_arg_display_type(arg: &crate::registry::BuiltinArgDecl) -> String {
-    match arg.ty {
-        TypeRef::Primitive(PrimitiveType::Expr) => {
-            let docs = arg.docs;
-            if docs.contains("scalar, vec2, vec3, or vec4")
-                || docs.contains("value (scalar, vec2, vec3, or vec4)")
-                || docs.contains("angle in radians (scalar, vec2, vec3, or vec4)")
-            {
-                "scalar | vec2 | vec3 | vec4".to_string()
-            } else if docs.contains("vec2, vec3, or vec4") {
-                "vec2 | vec3 | vec4".to_string()
-            } else {
-                "expression".to_string()
-            }
-        }
-        TypeRef::Primitive(PrimitiveType::Color) => "color | gradient".to_string(),
-        _ => stdlib_export_type_name(&arg.ty),
-    }
+    arg_display_type(arg, stdlib_export_type_name, false)
 }
 
 fn prelude_exports(prelude: Option<crate::ast::Program>) -> Vec<DocStdlibExport> {
