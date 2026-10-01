@@ -2960,11 +2960,25 @@ pub enum Blend {
     Multiply,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Locality of an effect or layer, ordered from least to most demanding
+/// (`Point < Local < Global`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Locality {
     Point,
     Local,
     Global,
+}
+
+impl Locality {
+    /// Lowercase label used in diagnostics, notes, and stats output.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Point => "point",
+            Self::Local => "local",
+            Self::Global => "global",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

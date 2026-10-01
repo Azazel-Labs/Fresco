@@ -9,11 +9,8 @@
 //! intermediate render targets.
 
 use crate::hir::Sx;
+use crate::driver::pass_plan;
 use crate::hir::{Hir, Layer, Locality, Xform};
-
-fn is_synthetic_root_motion_blur(hir: &Hir, layer_id: usize) -> bool {
-    layer_id == hir.root && matches!(hir.layers[hir.root], Layer::MotionBlur { .. })
-}
 
 fn color_to_expr(color: [f32; 4]) -> [Sx; 4] {
     [
@@ -117,26 +114,15 @@ pub fn run(hir: &mut Hir) {
         .collect();
     hir.layer_locality = layer_marks;
 
-    let mut worst = Locality::Point;
-    for (idx, mark) in hir.layer_locality.iter().enumerate() {
-        if is_synthetic_root_motion_blur(hir, idx) {
-            continue;
-        }
-        worst = max_locality(worst, *mark);
-    }
-    let mut point_count = 0usize;
-    let mut local_count = 0usize;
-    let mut global_count = 0usize;
-    for (idx, mark) in hir.layer_locality.iter().enumerate() {
-        if is_synthetic_root_motion_blur(hir, idx) {
-            continue;
-        }
-        match mark {
-            Locality::Point => point_count += 1,
-            Locality::Local => local_count += 1,
-            Locality::Global => global_count += 1,
-        }
-    }
+    let worst = hir
+        .layer_locality
+        .iter()
+        .enumerate()
+        .filter(|(idx, _)| !pass_plan::is_synthetic_root_motion_blur(hir, *idx))
+        .map(|(_, mark)| *mark)
+        .max()
+        .unwrap_or(Locality::Point);
+    let (point_count, local_count, global_count) = pass_plan::locality_counts(hir);
     if analytic_shadows > 0 {
         hir.notes.push(format!(
             "rewrite: shadow lowered analytically ×{analytic_shadows} — soften(fill(translate(s))) (§10.2)"
@@ -172,23 +158,9 @@ pub fn run(hir: &mut Hir) {
         ));
         hir.notes.push(format!(
             "pass-plan(v0 estimate): {} pass(es) needed before full partitioner",
-            estimated_passes(point_count, local_count, global_count)
+            pass_plan::estimated_passes(point_count, local_count, global_count)
         ));
     }
-}
-
-fn estimated_passes(point_count: usize, local_count: usize, global_count: usize) -> usize {
-    let mut passes = 0usize;
-    if point_count > 0 {
-        passes += 1;
-    }
-    if local_count > 0 {
-        passes += 1;
-    }
-    if global_count > 0 {
-        passes += 1;
-    }
-    passes.max(1)
 }
 
 fn layer_locality(hir: &Hir, id: usize, memo: &mut [Option<Locality>]) -> Locality {
@@ -220,12 +192,9 @@ fn layer_locality(hir: &Hir, id: usize, memo: &mut [Option<Locality>]) -> Locali
             then_layer,
             else_layer,
             ..
-        } => max_locality(
-            layer_locality(hir, *then_layer, memo),
-            layer_locality(hir, *else_layer, memo),
-        ),
+        } => layer_locality(hir, *then_layer, memo).max(layer_locality(hir, *else_layer, memo)),
         Layer::Compose(entries) => entries.iter().fold(Locality::Point, |acc, (lid, _)| {
-            max_locality(acc, layer_locality(hir, *lid, memo))
+            acc.max(layer_locality(hir, *lid, memo))
         }),
         Layer::ScatterBins { body, .. } => layer_locality(hir, *body, memo),
         Layer::UserEffect { def_idx, inner, .. } => {
@@ -238,20 +207,12 @@ fn layer_locality(hir: &Hir, id: usize, memo: &mut [Option<Locality>]) -> Locali
             let inner_locality = inner
                 .map(|id| layer_locality(hir, id, memo))
                 .unwrap_or(Locality::Point);
-            max_locality(effect_locality, inner_locality)
+            effect_locality.max(inner_locality)
         }
     };
 
     memo[id] = Some(mark);
     mark
-}
-
-fn max_locality(a: Locality, b: Locality) -> Locality {
-    match (a, b) {
-        (Locality::Global, _) | (_, Locality::Global) => Locality::Global,
-        (Locality::Local, _) | (_, Locality::Local) => Locality::Local,
-        _ => Locality::Point,
-    }
 }
 
 /// Apply user-defined effect composition rewrite rules (§16.1, Phase 5).

@@ -888,7 +888,7 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
                             ManifestPass {
                                 id: p.id,
                                 stage: p.stage,
-                                locality: pass_plan::locality_label(p.locality).into(),
+                                locality: p.locality.as_str().into(),
                                 start_layer: p.start_layer,
                                 end_layer: p.end_layer,
                                 count: p.count,

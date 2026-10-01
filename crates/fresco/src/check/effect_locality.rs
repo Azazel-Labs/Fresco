@@ -243,15 +243,15 @@ impl Checker {
                 _ => hir::Locality::Point,
             };
 
-            if locality_exceeds(node_locality, declared) {
+            if node_locality > declared {
                 self.diags.push(
                     Diag::error(
                         span.clone(),
                         format!(
                             "effect body contains a `{}` operation but the effect is declared `{}`; \
                              effects may only call operations with equal or lower locality (cheapen-only law)",
-                            locality_name(node_locality),
-                            locality_name(declared)
+                            node_locality.as_str(),
+                            declared.as_str()
                         ),
                     )
                     .with_help("declare the effect with a higher locality, or remove the offending call"),
@@ -441,25 +441,6 @@ impl Checker {
             });
         }
         out
-    }
-}
-
-/// Returns `true` if `a` exceeds the allowed `limit` locality.
-fn locality_exceeds(a: hir::Locality, limit: hir::Locality) -> bool {
-    match limit {
-        hir::Locality::Point => {
-            matches!(a, hir::Locality::Local | hir::Locality::Global)
-        }
-        hir::Locality::Local => matches!(a, hir::Locality::Global),
-        hir::Locality::Global => false,
-    }
-}
-
-fn locality_name(l: hir::Locality) -> &'static str {
-    match l {
-        hir::Locality::Point => "point",
-        hir::Locality::Local => "local",
-        hir::Locality::Global => "global",
     }
 }
 

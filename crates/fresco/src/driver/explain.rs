@@ -170,7 +170,7 @@ pub fn render(hirs: &[Hir], stats: &[Stats], emit_for_stats: Option<EmitForStats
                 "pass {}  stage={}  locality={}  layers {}..={} ({} layer node(s)){}{}\n",
                 p.id,
                 p.stage,
-                pass_plan::locality_label(p.locality),
+                p.locality.as_str(),
                 p.start_layer,
                 p.end_layer,
                 p.count,

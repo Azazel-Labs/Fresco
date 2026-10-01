@@ -1,7 +1,7 @@
 use crate::hir::{EffectDef, Hir, Layer, Locality, Sx};
 use std::collections::{BTreeMap, BTreeSet};
 
-fn is_synthetic_root_motion_blur(hir: &Hir, layer_id: usize) -> bool {
+pub(crate) fn is_synthetic_root_motion_blur(hir: &Hir, layer_id: usize) -> bool {
     layer_id == hir.root && matches!(hir.layers[hir.root], Layer::MotionBlur { .. })
 }
 
@@ -167,7 +167,7 @@ pub fn build_for_hir(hir: &Hir) -> PassBuild {
         layer_stage[idx] = stage;
     }
 
-    let mut key_to_id = BTreeMap::<(usize, u8), usize>::new();
+    let mut key_to_id = BTreeMap::<(usize, Locality), usize>::new();
     let mut passes = Vec::<PassPlan>::new();
     let mut layer_to_pass = vec![usize::MAX; hir.layer_locality.len()];
 
@@ -180,7 +180,7 @@ pub fn build_for_hir(hir: &Hir) -> PassBuild {
         }
         let locality = hir.layer_locality[idx];
         let stage = layer_stage[idx];
-        let key = (stage, locality_order(locality));
+        let key = (stage, locality);
         let pass_id = if let Some(id) = key_to_id.get(&key) {
             *id
         } else {
@@ -367,14 +367,6 @@ pub fn estimated_passes(point_count: usize, local_count: usize, global_count: us
     passes.max(1)
 }
 
-pub fn locality_label(locality: Locality) -> &'static str {
-    match locality {
-        Locality::Point => "point",
-        Locality::Local => "local",
-        Locality::Global => "global",
-    }
-}
-
 fn build_pass_edges(
     hir: &Hir,
     layer_to_pass: &[usize],
@@ -440,14 +432,6 @@ fn reachable_layers_from_root(hir: &Hir) -> Vec<bool> {
     }
 
     reachable
-}
-
-fn locality_order(locality: Locality) -> u8 {
-    match locality {
-        Locality::Point => 0,
-        Locality::Local => 1,
-        Locality::Global => 2,
-    }
 }
 
 /// Estimate a blur radius in physical pixels from a scalar HIR expression.

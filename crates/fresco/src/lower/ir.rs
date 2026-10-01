@@ -333,14 +333,9 @@ impl FunctionBuilder {
                     .entry(tag.clone())
                     .or_insert(0) += 1;
                 if let Some(locality) = self.active_locality {
-                    let locality_label = match locality {
-                        Locality::Point => "point",
-                        Locality::Local => "local",
-                        Locality::Global => "global",
-                    };
                     let by_feature = self
                         .feature_instruction_counts_by_locality
-                        .entry(locality_label.to_string())
+                        .entry(locality.as_str().to_string())
                         .or_default();
                     *by_feature.entry(tag.clone()).or_insert(0) += 1;
                 }
