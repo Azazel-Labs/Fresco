@@ -377,42 +377,42 @@ impl Checker {
     /// their existing entry ABI arguments; absence of an engine is not a
     /// request to replace dynamic inputs with constants.
     pub(crate) fn runtime_time(&mut self) -> Sx {
-        if self.hir.entry_context.is_some() || self.evaluation_context.is_some() {
-            return match self.context_role("time", &(0..0)) {
-                Some(Value::Scalar(value)) => value,
-                None => Sx::Lit(0.0), // Poison after a missing-role diagnostic.
-                Some(_) => unreachable!("validated context role"),
-            };
-        }
-        if let Some(sx) = &self.runtime_channel_cache.time {
-            return sx.clone();
-        }
-        let sx = self
-            .eval_zero_arg_engine_fn("time")
-            .and_then(Value::into_scalar_sx)
-            .unwrap_or(Sx::EntryInput(hir::EntryInput::Time));
-        self.runtime_channel_cache.time = Some(sx.clone());
-        sx
+        self.runtime_scalar_channel("time", hir::EntryInput::Time, |cache| &mut cache.time)
     }
 
     /// The `delta_time` runtime value, resolved through the FR-authored
     /// `delta_time()` function; see [`Checker::runtime_time`].
     pub(crate) fn runtime_delta_time(&mut self) -> Sx {
+        self.runtime_scalar_channel("delta_time", hir::EntryInput::Delta, |cache| {
+            &mut cache.delta_time
+        })
+    }
+
+    /// Resolve a scalar runtime channel through the semantic context role when
+    /// an entry or evaluation context is active, otherwise through the
+    /// FR-authored zero-argument function `name`, falling back to the entry
+    /// ABI input. The non-context result is cached in `cache_slot`.
+    fn runtime_scalar_channel(
+        &mut self,
+        name: &str,
+        entry_input: hir::EntryInput,
+        cache_slot: fn(&mut RuntimeChannelCache) -> &mut Option<Sx>,
+    ) -> Sx {
         if self.hir.entry_context.is_some() || self.evaluation_context.is_some() {
-            return match self.context_role("delta_time", &(0..0)) {
+            return match self.context_role(name, &(0..0)) {
                 Some(Value::Scalar(value)) => value,
                 None => Sx::Lit(0.0), // Poison after a missing-role diagnostic.
                 Some(_) => unreachable!("validated context role"),
             };
         }
-        if let Some(sx) = &self.runtime_channel_cache.delta_time {
+        if let Some(sx) = cache_slot(&mut self.runtime_channel_cache) {
             return sx.clone();
         }
         let sx = self
-            .eval_zero_arg_engine_fn("delta_time")
+            .eval_zero_arg_engine_fn(name)
             .and_then(Value::into_scalar_sx)
-            .unwrap_or(Sx::EntryInput(hir::EntryInput::Delta));
-        self.runtime_channel_cache.delta_time = Some(sx.clone());
+            .unwrap_or(Sx::EntryInput(entry_input));
+        *cache_slot(&mut self.runtime_channel_cache) = Some(sx.clone());
         sx
     }
 
