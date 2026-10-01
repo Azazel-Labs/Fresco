@@ -600,17 +600,11 @@ fn order(
         }
         step.after.sort();
     }
-    let mut done = BTreeSet::new();
-    let mut ordered = Vec::new();
-    while ordered.len() < steps.len() {
-        let step = steps
-            .iter()
-            .find(|s| !done.contains(&s.name) && s.after.iter().all(|p| done.contains(p)))
-            .ok_or("technique has a dependency cycle or missing predecessor")?;
-        done.insert(step.name.clone());
-        ordered.push(step.clone());
-    }
-    *steps = ordered;
+    *steps = super::recipes::order_by_after(steps, |step| &step.name, |step| &step.after)
+        .ok_or("technique has a dependency cycle or missing predecessor")?
+        .into_iter()
+        .cloned()
+        .collect();
     Ok(())
 }
 
@@ -658,15 +652,9 @@ fn validate_imports(techniques: &[ManifestTechnique]) -> Result<(), String> {
             return Err("duplicate technique name".into());
         }
     }
-    let mut done = BTreeSet::new();
-    while done.len() < techniques.len() {
-        let name = dependencies
-            .iter()
-            .find(|(name, after)| !done.contains(*name) && after.iter().all(|p| done.contains(p)))
-            .map(|(name, _)| name.clone())
-            .ok_or("cycle between technique output dependencies")?;
-        done.insert(name);
-    }
+    let dependencies: Vec<_> = dependencies.into_iter().collect();
+    super::recipes::order_by_after(&dependencies, |(name, _)| name, |(_, after)| after)
+        .ok_or("cycle between technique output dependencies")?;
     Ok(())
 }
 

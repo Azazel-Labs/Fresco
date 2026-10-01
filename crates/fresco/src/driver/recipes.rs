@@ -262,19 +262,42 @@ pub(super) fn reflect(
     if steps.is_empty() {
         return Err("renderer recipe has no executable steps".into());
     }
-    let mut ordered = Vec::new();
-    let mut done = BTreeSet::new();
-    while ordered.len() < steps.len() {
-        let Some(step) = steps.iter().find(|step| {
-            !done.contains(&step.name) && step.after.iter().all(|name| done.contains(name))
-        }) else {
-            return Err("recipe has a cycle or an undefined dependency".into());
-        };
-        done.insert(step.name.clone());
-        ordered.push(step.clone());
-    }
+    let ordered: Vec<_> = order_by_after(&steps, |step| &step.name, |step| &step.after)
+        .ok_or("recipe has a cycle or an undefined dependency")?
+        .into_iter()
+        .cloned()
+        .collect();
     fresco_artifact::validate_transparent_queues(&ordered)?;
     Ok((resources, ordered))
+}
+
+/// Orders `items` so each follows every item named in its `after` list.
+///
+/// Each round picks the first remaining item, in slice order, whose
+/// predecessors are all placed. Returns `None` on a cycle, an undefined
+/// predecessor, or a duplicate name.
+pub(super) fn order_by_after<'a, T, A>(
+    items: &'a [T],
+    name: impl Fn(&'a T) -> &'a str,
+    after: impl Fn(&'a T) -> A,
+) -> Option<Vec<&'a T>>
+where
+    A: IntoIterator,
+    A::Item: AsRef<str>,
+{
+    let mut done = BTreeSet::new();
+    let mut ordered = Vec::with_capacity(items.len());
+    while ordered.len() < items.len() {
+        let next = items.iter().find(|item| {
+            !done.contains(name(item))
+                && after(item)
+                    .into_iter()
+                    .all(|predecessor| done.contains(predecessor.as_ref()))
+        })?;
+        done.insert(name(next));
+        ordered.push(next);
+    }
+    Some(ordered)
 }
 
 /// Check executable references against the same entries used to emit WGSL.
