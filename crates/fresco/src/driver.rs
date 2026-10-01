@@ -1069,22 +1069,22 @@ canvas blur_badge(uv: coord, time: signal) -> color {
         let manifest: Value =
             serde_json::from_str(&bundle.manifest).expect("manifest should parse as JSON");
 
-        let canvases = manifest
-            .get("canvases")
+        let raster_entries = manifest
+            .get("raster_entries")
             .and_then(Value::as_array)
-            .expect("manifest canvases should be an array");
+            .expect("manifest raster_entries should be an array");
 
-        for canvas in canvases {
+        for raster in raster_entries {
             let plan: fresco_artifact::ManifestPassPlan =
-                serde_json::from_value(canvas["pass_plan"].clone())
+                serde_json::from_value(raster["pass_plan"].clone())
                     .expect("runtime pass contract must decode compiler output");
             assert_eq!(
                 serde_json::to_value(&plan).unwrap(),
-                canvas["pass_plan"],
+                raster["pass_plan"],
                 "pass contract must preserve bindings, targets, kernel values, and omitted fields"
             );
 
-            let passes = canvas
+            let passes = raster
                 .get("pass_plan")
                 .and_then(|p| p.get("passes"))
                 .and_then(Value::as_array)
@@ -1191,10 +1191,10 @@ canvas second(ctx: CanvasContext) -> color {
             serde_json::from_str(&bundle.manifest).unwrap();
         let module = naga::front::wgsl::parse_str(&bundle.wgsl).unwrap();
         let mut bindings = std::collections::BTreeSet::new();
-        for canvas in &manifest.canvases {
-            assert_eq!(canvas.storage_params.len(), 1);
-            assert_eq!(canvas.path_buffers.len(), 1);
-            let path = &canvas.path_buffers[0];
+        for raster in &manifest.raster_entries {
+            assert_eq!(raster.storage_params.len(), 1);
+            assert_eq!(raster.path_buffers.len(), 1);
+            let path = &raster.path_buffers[0];
             let data = path
                 .data
                 .as_ref()
@@ -1264,11 +1264,11 @@ canvas second(ctx: CanvasContext) -> color {
             let roundtrip: fresco_artifact::ManifestPathBuffer =
                 serde_json::from_str(&serde_json::to_string(path).unwrap()).unwrap();
             assert_eq!(roundtrip.data, path.data);
-            for binding in canvas
+            for binding in raster
                 .storage_params
                 .iter()
                 .map(|p| (p.group, p.binding))
-                .chain(canvas.path_buffers.iter().map(|p| (p.group, p.binding)))
+                .chain(raster.path_buffers.iter().map(|p| (p.group, p.binding)))
             {
                 assert!(
                     bindings.insert(binding),
@@ -1307,7 +1307,7 @@ canvas second(ctx: CanvasContext) -> color {
         .unwrap();
         let manifest: fresco_artifact::ManifestRoot =
             serde_json::from_str(&bundle.manifest).unwrap();
-        assert!(manifest.canvases[0].path_buffers.is_empty());
+        assert!(manifest.raster_entries[0].path_buffers.is_empty());
         assert!(!bundle.wgsl.contains("fresco_path_buf_"));
     }
 
@@ -1330,10 +1330,10 @@ canvas arrays(ctx: CanvasContext) -> color {
             .expect("authored stages must bind storage and instance parameters together");
         let manifest: fresco_artifact::ManifestRoot =
             serde_json::from_str(&bundle.manifest).unwrap();
-        let canvas = &manifest.canvases[0];
-        let pass = canvas.engine_pass.as_ref().unwrap();
+        let raster = &manifest.raster_entries[0];
+        let pass = raster.engine_pass.as_ref().unwrap();
         let module = naga::front::wgsl::parse_str(&bundle.wgsl).unwrap();
-        for def in &canvas.storage_params {
+        for def in &raster.storage_params {
             assert_ne!(
                 (def.group, def.binding),
                 (pass.instance_uniform_group, pass.instance_uniform_binding)
@@ -1355,24 +1355,24 @@ canvas arrays(ctx: CanvasContext) -> color {
                 ));
             }
         }
-        assert_eq!(canvas.storage_params.len(), 2);
+        assert_eq!(raster.storage_params.len(), 2);
     }
 
     #[test]
     fn engine_authored_fullscreen_pass_emits_executable_stages_per_instance() {
         let bundle = executable_fullscreen_bundle("v.uv");
         let manifest: Value = serde_json::from_str(&bundle.manifest).expect("manifest JSON");
-        let canvases = manifest["canvases"].as_array().expect("canvas array");
-        assert_eq!(canvases.len(), 2);
-        for canvas in canvases {
-            let name = canvas["name"].as_str().expect("canvas name");
-            let pass = &canvas["engine_pass"];
+        let raster_entries = manifest["raster_entries"].as_array().expect("canvas array");
+        assert_eq!(raster_entries.len(), 2);
+        for raster in raster_entries {
+            let name = raster["name"].as_str().expect("canvas name");
+            let pass = &raster["engine_pass"];
             for key in ["vertex_entry", "fragment_entry"] {
                 let entry = pass[key].as_str().expect("engine pass stage entry");
                 assert!(bundle.wgsl.contains(&format!("fn {entry}(")));
             }
             assert!(bundle.wgsl.contains(&format!("fresco_{name}(")));
-            assert_eq!(canvas["params"][0]["name"], "gain");
+            assert_eq!(raster["params"][0]["name"], "gain");
             assert_eq!(pass["vertex_count"], 3);
             assert_eq!(pass["instance_uniform_group"], 0);
             assert_eq!(pass["instance_uniform_binding"], 0);
@@ -1389,9 +1389,9 @@ canvas arrays(ctx: CanvasContext) -> color {
                 .wgsl
                 .contains("@group(3) @binding(0)\nvar<uniform> frame")
         );
-        assert_eq!(canvases[0]["global_uniforms"][0]["name"], "frame");
-        assert_eq!(canvases[0]["global_uniforms"][0]["group"], 3);
-        assert_eq!(canvases[0]["global_uniforms"][0]["binding"], 0);
+        assert_eq!(raster_entries[0]["global_uniforms"][0]["name"], "frame");
+        assert_eq!(raster_entries[0]["global_uniforms"][0]["group"], 3);
+        assert_eq!(raster_entries[0]["global_uniforms"][0]["binding"], 0);
     }
 
     #[test]
@@ -1445,7 +1445,7 @@ canvas arrays(ctx: CanvasContext) -> color {
         let bundle = compile_bundle_virtual(&files, "main.fr", false)
             .expect("compile-known fullscreen variants compile");
         let manifest: Value = serde_json::from_str(&bundle.manifest).expect("manifest JSON");
-        let variants = manifest["canvases"][0]["engine_pass"]["variants"]
+        let variants = manifest["raster_entries"][0]["engine_pass"]["variants"]
             .as_array()
             .expect("engine-pass variants");
         assert_eq!(variants.len(), 2);
@@ -2587,7 +2587,7 @@ surface implicit_surface(sp: surf) -> material {
             ),
         ]);
         compile_bundle_virtual(&files, "main.fr", false)
-            .expect("effects imported by the engine entry must be available to canvases");
+            .expect("effects imported by the engine entry must be available to raster entries");
     }
 
     #[test]

@@ -582,7 +582,7 @@ fn color_params_and_optional_scalar_ranges_compile_and_emit_manifest_defaults() 
     let stdout = manifest.emitted;
     let parsed: Value =
         serde_json::from_str(&stdout).expect("expected manifest JSON to deserialize");
-    let params = parsed["canvases"][0]["params"]
+    let params = parsed["raster_entries"][0]["params"]
         .as_array()
         .expect("expected canvas params array");
     let accent = params
@@ -672,7 +672,7 @@ fn typed_scalar_and_bool_params_emit_manifest_defaults() {
     let stdout = manifest.emitted;
     let parsed: Value =
         serde_json::from_str(&stdout).expect("expected manifest JSON to deserialize");
-    let params = parsed["canvases"][0]["params"]
+    let params = parsed["raster_entries"][0]["params"]
         .as_array()
         .expect("expected canvas params array");
     let steps = params
@@ -728,7 +728,7 @@ fn param_type_info_is_present_in_manifest() {
     let stdout = manifest.emitted;
     let parsed: Value =
         serde_json::from_str(&stdout).expect("expected manifest JSON to deserialize");
-    let params = parsed["canvases"][0]["params"]
+    let params = parsed["raster_entries"][0]["params"]
         .as_array()
         .expect("expected canvas params array");
 
@@ -788,10 +788,10 @@ fn dynamic_array_param_type_has_no_size() {
     let parsed: Value =
         serde_json::from_str(&stdout).expect("expected manifest JSON to deserialize");
 
-    let params = parsed["canvases"][0]["params"]
+    let params = parsed["raster_entries"][0]["params"]
         .as_array()
         .expect("expected canvas params array");
-    let storage_params = parsed["canvases"][0]["storage_params"]
+    let storage_params = parsed["raster_entries"][0]["storage_params"]
         .as_array()
         .expect("expected storage_params array");
 
@@ -873,7 +873,7 @@ fn dynamic_array_non_empty_default_populates_manifest() {
     let parsed: Value =
         serde_json::from_str(&manifest.emitted).expect("expected manifest JSON to deserialize");
 
-    let params = parsed["canvases"][0]["params"]
+    let params = parsed["raster_entries"][0]["params"]
         .as_array()
         .expect("expected canvas params array");
     let param = params
@@ -2381,7 +2381,7 @@ fn integer_parameter_metadata_preserves_exact_defaults() {
     let output =
         driver::compile_source(input, common::TEST_SOURCE_PATH, "manifest", false).unwrap();
     let manifest: Value = serde_json::from_str(&output.emitted).unwrap();
-    let params = manifest["canvases"][0]["params"].as_array().unwrap();
+    let params = manifest["raster_entries"][0]["params"].as_array().unwrap();
     let find = |name| params.iter().find(|param| param["name"] == name).unwrap();
     assert_eq!(find("identity")["default"], 16777217u32);
     assert_eq!(find("signed")["default"], -16777217i32);

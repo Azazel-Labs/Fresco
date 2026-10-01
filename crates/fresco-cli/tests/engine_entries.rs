@@ -49,7 +49,7 @@ fn engine_vocabulary_can_rename_entries_and_blocks() {
                 .unwrap_or_else(|errors| panic!("{kind}: {errors:?}"));
         assert_valid_wgsl(&output.wgsl, Capabilities::all());
         let manifest: serde_json::Value = serde_json::from_str(&output.manifest).unwrap();
-        assert_eq!(manifest["canvases"][0]["name"], "demo");
+        assert_eq!(manifest["raster_entries"][0]["name"], "demo");
         assert!(output.wgsl.contains("fresco_demo"));
     }
 }

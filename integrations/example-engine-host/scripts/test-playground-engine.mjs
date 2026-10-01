@@ -82,7 +82,7 @@ try {
   await open("canvas probe(ctx: CanvasContext) -> color { param points: array<vec3> = [vec3(0,1,0)]; rgba(points[0].x, points[0].y, points[0].z, 1) }");
   const arrayGreen=await capture();
   const reflected=JSON.parse(await page.locator("#manifest").textContent());
-  assert.deepEqual(reflected.canvases[0].params[0].default.values,[[0,1,0]],"manifest panel preserves structured WASM defaults");
+  assert.deepEqual(reflected.raster_entries[0].params[0].default.values,[[0,1,0]],"manifest panel preserves structured WASM defaults");
   assert.equal(Number(await page.getByRole("textbox",{name:"points[0].1",exact:true}).inputValue()),1);
   const pointX=page.getByRole("textbox",{name:"points[0].0",exact:true});
   await pointX.fill("1");await pointX.press("Enter");await frames();

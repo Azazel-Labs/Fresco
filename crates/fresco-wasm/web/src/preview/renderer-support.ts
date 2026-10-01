@@ -6,7 +6,7 @@ export function normalizeManifestAssetPath(path) {
     .replace(/^examples\//, "");
 }
 
-export function canvasNameFromEntryFunction(fnName) {
+export function entryNameFromEntryFunction(fnName) {
   return String(fnName || "")
     .replace(/^fresco_/, "")
     .replace(/_pass\d+$/, "");

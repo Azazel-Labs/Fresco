@@ -1,5 +1,6 @@
 use fresco_artifact::{
-    ManifestCanvas, ManifestPathData, ManifestPathSegment, PATH_SEGMENT_LAYOUT, PATH_SEGMENT_STRIDE,
+    ManifestPathData, ManifestPathSegment, ManifestRasterEntry, PATH_SEGMENT_LAYOUT,
+    PATH_SEGMENT_STRIDE,
 };
 use fresco_example_engine::runtime::{paths::PathBuffers, storage::StorageLimits};
 use serde_json::json;
@@ -13,8 +14,8 @@ fn limits() -> StorageLimits {
     }
 }
 
-fn canvas() -> ManifestCanvas {
-    let mut canvas: ManifestCanvas =
+fn canvas() -> ManifestRasterEntry {
+    let mut canvas: ManifestRasterEntry =
         serde_json::from_value(json!({"name":"probe", "pass_plan":{}, "path_buffers":[{
             "name":"path_0","group":2,"binding":0,"segments":2
         }]}))
@@ -144,7 +145,7 @@ fn authored_path_example_contains_every_byte_needed_by_an_independent_host() {
     );
     let output = fresco::driver::compile_bundle_virtual(&files, "main.fr", false).unwrap();
     let manifest: fresco_artifact::ManifestRoot = serde_json::from_str(&output.manifest).unwrap();
-    let canvas = &manifest.canvases[0];
+    let canvas = &manifest.raster_entries[0];
     assert_eq!(canvas.path_buffers.len(), 1);
     assert_eq!(canvas.storage_params.len(), 1);
     let buffer = &canvas.path_buffers[0];

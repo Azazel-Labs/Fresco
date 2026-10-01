@@ -43,10 +43,10 @@ pub(super) fn serialize_success(value: &impl ManifestResponse) -> Result<JsValue
         ],
         &["build_profile"],
     )?;
-    let canvases = Reflect::get(&manifest, &JsValue::from_str("canvases"))?;
-    for canvas in Array::from(&canvases) {
+    let raster_entries = Reflect::get(&manifest, &JsValue::from_str("raster_entries"))?;
+    for entry in Array::from(&raster_entries) {
         materialize(
-            &canvas,
+            &entry,
             &[
                 "global_uniforms",
                 "storage_params",

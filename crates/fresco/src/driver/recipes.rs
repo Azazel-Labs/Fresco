@@ -302,7 +302,7 @@ where
 
 /// Check executable references against the same entries used to emit WGSL.
 pub(super) fn validate<D, N>(root: &fresco_artifact::ManifestRoot<D, N>) -> Result<(), String> {
-    if !root.canvases.is_empty() && root.surfaces.is_empty() {
+    if !root.raster_entries.is_empty() && root.surfaces.is_empty() {
         return Ok(());
     }
     for recipe in root.renderers.iter().filter(|r| r.selected) {

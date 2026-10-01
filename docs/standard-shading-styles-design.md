@@ -693,7 +693,7 @@ The local `offscreen --transparency-only` GPU probe interleaves ordinary and
 contributed transparency at swapped view depths, reverses primary ownership, and
 compares all three renderers. The full MeadowFur and mixed-scene probes below also
 pass in all three renderers.
-Queue semantics use artifact schema version 12, so older hosts reject these
+Queue semantics were introduced in artifact schema version 12, so older hosts reject these
 manifests instead of silently ignoring cross-node ordering.
 
 Generated vertex substitution is implemented as

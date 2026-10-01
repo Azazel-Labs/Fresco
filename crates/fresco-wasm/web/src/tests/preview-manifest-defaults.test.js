@@ -30,7 +30,7 @@ fn fresco_bar_chart(
 `;
 
     const manifest = {
-      canvases: [
+      raster_entries: [
         {
           name: "bar_chart",
           params: [
@@ -86,7 +86,7 @@ fn fresco_bar_chart(
 `;
 
     const manifest = {
-      canvases: [
+      raster_entries: [
         {
           name: "bar_chart",
           params: [
@@ -135,7 +135,7 @@ fn fresco_bar_chart(
 `;
 
     const manifest = {
-      canvases: [
+      raster_entries: [
         {
           name: "bar_chart",
           params: [
@@ -181,7 +181,7 @@ fn fresco_TestDynamicArray(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32
 `;
 
     const manifest = {
-      canvases: [
+      raster_entries: [
         {
           name: "TestDynamicArray",
           params: [
@@ -224,7 +224,7 @@ fn fresco_Mixed(
 `;
 
     const manifest = {
-      canvases: [
+      raster_entries: [
         {
           name: "Mixed",
           params: [

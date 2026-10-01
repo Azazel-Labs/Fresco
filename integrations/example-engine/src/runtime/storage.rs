@@ -2,7 +2,7 @@
 //! Unlike the instance parameter block, vec3 elements have a 16-byte stride.
 use std::collections::BTreeSet;
 
-use fresco_artifact::{ManifestCanvas, ManifestParam, ManifestStorageParam};
+use fresco_artifact::{ManifestParam, ManifestRasterEntry, ManifestStorageParam};
 use serde_json::{Map, Value};
 
 use super::RuntimeError;
@@ -17,7 +17,7 @@ pub struct StorageLimits {
 }
 
 pub(crate) fn validate_canvas_storage_count(
-    canvas: &ManifestCanvas,
+    canvas: &ManifestRasterEntry,
     limits: StorageLimits,
 ) -> Result<(), RuntimeError> {
     let count = canvas

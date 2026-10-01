@@ -115,7 +115,7 @@ async function frame(now) {
 }
 
 async function install(result, id) {
-  const entries = [...(result.manifest?.canvases ?? []), ...(result.manifest?.surfaces ?? [])];
+  const entries = [...(result.manifest?.raster_entries ?? []), ...(result.manifest?.surfaces ?? [])];
   if (entries.length !== 1) throw new Error("This host requires exactly one canvas or surface entry.");
   const artifact = {
     wgsl: result.wgsl,

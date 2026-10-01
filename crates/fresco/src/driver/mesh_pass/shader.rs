@@ -2,7 +2,7 @@
 use super::*;
 use crate::ast::has_attr;
 use fresco_artifact::{
-    ManifestGpuBinding, ManifestGpuProgram, ManifestRasterEntry, ManifestStageOutput,
+    ManifestGpuBinding, ManifestGpuProgram, ManifestStageEntry, ManifestStageOutput,
 };
 
 pub(in crate::driver) fn build(
@@ -541,7 +541,7 @@ pub(in crate::driver) fn emit(
             {
                 return Err("GPU entry does not match its pass stage".into());
             }
-            entries.push(ManifestRasterEntry {
+            entries.push(ManifestStageEntry {
                 function: hook.name.clone(),
                 entry: aliases[&hook.name].clone(),
                 stage: stage.into(),

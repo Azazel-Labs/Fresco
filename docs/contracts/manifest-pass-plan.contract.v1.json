@@ -4,7 +4,7 @@
   "title": "Fresco manifest pass-plan contract",
   "type": "object",
   "required": [
-    "canvases"
+    "raster_entries"
   ],
   "properties": {
     "build_profile": {
@@ -15,7 +15,7 @@
         "runtime"
       ]
     },
-    "canvases": {
+    "raster_entries": {
       "type": "array",
       "items": {
         "type": "object",

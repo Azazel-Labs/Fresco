@@ -228,7 +228,7 @@ export class ExampleEngineRenderer extends PreviewController {
     return this.enqueueEngineChange(async () => {
       if (revision !== this.revision) return;
       try {
-        const entries = [...manifest.canvases, ...(manifest.surfaces ?? []).filter(s => s.name !== "fresco_scene_ground")];
+        const entries = [...manifest.raster_entries, ...(manifest.surfaces ?? []).filter(s => s.name !== "fresco_scene_ground")];
         // Preview selection is host policy. Match the existing playground's
         // surface preference; Rust still receives an explicit entry to execute.
         const preferredSurface = chooseManifestPreviewSurface(manifest);

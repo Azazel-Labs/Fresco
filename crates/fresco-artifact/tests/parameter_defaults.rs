@@ -89,7 +89,7 @@ fn shared_parameter_records_preserve_producer_precision_and_reader_types() {
 #[test]
 fn parameter_transport_generics_do_not_leak_into_browser_contracts() {
     use fresco_artifact::{
-        ManifestCanvas, ManifestParam, ManifestRoot, ManifestSurface, ManifestSurfaceParam,
+        ManifestParam, ManifestRasterEntry, ManifestRoot, ManifestSurface, ManifestSurfaceParam,
     };
     use ts_rs::{Config, TS};
     for declaration in [
@@ -104,7 +104,7 @@ fn parameter_transport_generics_do_not_leak_into_browser_contracts() {
     }
     for declaration in [
         <ManifestRoot as TS>::decl(&Config::default()),
-        <ManifestCanvas as TS>::decl(&Config::default()),
+        <ManifestRasterEntry as TS>::decl(&Config::default()),
         <ManifestSurface as TS>::decl(&Config::default()),
     ] {
         assert!(!declaration.contains("<D"));

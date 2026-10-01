@@ -21,7 +21,7 @@ const api = {
   }) {
     const compiled = compile_fresco_bundle({ ...JSON.parse(example_engine_sources_json()), ...files }, entrypoint, false);
     if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics));
-    const entries = [...compiled.manifest.canvases, ...compiled.manifest.surfaces];
+    const entries = [...compiled.manifest.raster_entries, ...compiled.manifest.surfaces];
     if (entries.length !== 1) throw new Error("README capture requires exactly one entry");
     const entry = entries[0];
     const assets = new Map<string, Uint8Array>();

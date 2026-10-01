@@ -179,7 +179,7 @@ fn real_compiler_defaults_use_the_same_host_parameter_contract() {
         }
     ));
     let root: fresco_artifact::ManifestRoot = serde_json::from_str(&output.manifest).unwrap();
-    let set = ParameterSet::new(root.canvases[0].params.clone()).unwrap();
+    let set = ParameterSet::new(root.raster_entries[0].params.clone()).unwrap();
     assert_eq!(
         &floats(&set)[..15],
         &[

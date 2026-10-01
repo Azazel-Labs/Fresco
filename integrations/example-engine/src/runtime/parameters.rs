@@ -3,7 +3,7 @@
 //! rounding a requested integer would change the authored program's inputs.
 use std::collections::BTreeSet;
 
-use fresco_artifact::{ManifestCanvas, ManifestParam};
+use fresco_artifact::{ManifestParam, ManifestRasterEntry};
 use serde_json::{Map, Value};
 
 use super::RuntimeError;
@@ -49,7 +49,7 @@ pub struct CanvasParameters {
 }
 
 impl CanvasParameters {
-    pub fn new(canvas: &ManifestCanvas, limits: StorageLimits) -> Result<Self, RuntimeError> {
+    pub fn new(canvas: &ManifestRasterEntry, limits: StorageLimits) -> Result<Self, RuntimeError> {
         super::storage::validate_canvas_storage_count(canvas, limits)?;
         Ok(Self {
             instance: ParameterSet::for_canvas(canvas)?,
@@ -124,7 +124,7 @@ fn element(ty: &str) -> Option<(Scalar, usize)> {
 
 impl ParameterSet {
     /// Instance parameters only; reflected storage arrays use StorageSet.
-    pub fn for_canvas(canvas: &ManifestCanvas) -> Result<Self, RuntimeError> {
+    pub fn for_canvas(canvas: &ManifestRasterEntry) -> Result<Self, RuntimeError> {
         Self::new(
             canvas
                 .params

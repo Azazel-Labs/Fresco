@@ -201,11 +201,11 @@ const api = {
     await renderer.device.queue.onSubmittedWorkDone();
     requireHealthy();
     return { adapter: adapterDetails, diagnostics: compiled.diagnostics,
-      enginePass: compiled.manifest.canvases[0]?.engine_pass || null,
+      enginePass: compiled.manifest.raster_entries[0]?.engine_pass || null,
       meshPass: compiled.manifest.surfaces[0]?.mesh_passes?.[0] || null,
       technique: compiled.manifest.techniques.find(t => t.metadata.engine === "particle") || null,
       simulation: compiled.manifest.gpu_programs.find(p => p.metadata.capacity) || null,
-      uniforms: (compiled.manifest.canvases[0] || compiled.manifest.surfaces[0]).global_uniforms };
+      uniforms: (compiled.manifest.raster_entries[0] || compiled.manifest.surfaces[0]).global_uniforms };
   },
 
   // Generic authored-module replacement; failed compilation never reaches installation.
@@ -221,7 +221,7 @@ const api = {
   },
 
   async selectVariant(selection: Record<string, string> | null) {
-    if (!installedArtifact || !installedArtifact.manifest?.canvases?.length) throw new Error("Canvas artifact required");
+    if (!installedArtifact || !installedArtifact.manifest?.raster_entries?.length) throw new Error("Canvas artifact required");
     renderer.setEnginePassVariant(selection);
     await renderer.setShader(installedArtifact.wgsl, installedArtifact.manifest);
     requireHealthy();

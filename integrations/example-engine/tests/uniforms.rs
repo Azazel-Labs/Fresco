@@ -267,7 +267,12 @@ fn bundled_engine_frame_contract_packs_time_and_resized_resolution() {
     files.insert("main.fr".into(), "canvas probe(ctx: CanvasContext) -> color { rgba(ctx.uv.x + time(), ctx.uv.y, delta_time(), 1.0) }".into());
     let artifact = fresco::driver::compile_bundle_virtual(&files, "main.fr", false).unwrap();
     let root: ManifestRoot = serde_json::from_str(&artifact.manifest).unwrap();
-    let definitions = root.canvases.into_iter().next().unwrap().global_uniforms;
+    let definitions = root
+        .raster_entries
+        .into_iter()
+        .next()
+        .unwrap()
+        .global_uniforms;
     assert_eq!(definitions.len(), 1);
     let mut set = UniformSet::new(definitions, LIMITS).unwrap();
     for frame in [

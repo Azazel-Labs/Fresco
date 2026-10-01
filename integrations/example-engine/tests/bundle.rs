@@ -23,7 +23,7 @@ fn embedded_profile_compiles_a_canvas_without_filesystem_discovery() {
     let output = fresco::driver::compile_bundle_virtual(&files, "main.fr", false)
         .expect("embedded canvas contract");
     let manifest: serde_json::Value = serde_json::from_str(&output.manifest).unwrap();
-    assert_eq!(manifest["canvases"][0]["name"], "probe");
+    assert_eq!(manifest["raster_entries"][0]["name"], "probe");
     assert!(output.wgsl.contains("@vertex"));
     assert!(output.wgsl.contains("@fragment"));
     assert!(!output.wgsl.contains("pbr_direct_response"));
@@ -49,9 +49,9 @@ fn complete_artifacts_round_trip_through_shared_runtime_schema() {
         let encoded = serde_json::to_string(&shared).unwrap();
         assert_eq!(serde_json::from_str::<Value>(&encoded).unwrap(), emitted);
         assert!(shared.build_profile.is_some());
-        for canvas in &shared.canvases {
+        for canvas in &shared.raster_entries {
             assert!(canvas.engine_pass.is_some());
-            let record = &emitted["canvases"][0];
+            let record = &emitted["raster_entries"][0];
             for absent in ["textures", "sampler", "path_buffers", "storage_params"] {
                 assert!(record.get(absent).is_none(), "omit unused {absent}");
             }
@@ -869,7 +869,7 @@ fn preview_scene_content_is_opt_in_and_uses_ordinary_material_contracts() {
             .iter()
             .find(|s| s.name == "fresco_scene_ground");
         assert_eq!(ground.is_some(), scene);
-        assert_eq!(manifest.canvases.len(), 1);
+        assert_eq!(manifest.raster_entries.len(), 1);
         if let Some(ground) = ground {
             assert_eq!(ground.material_ty, "standard");
             assert!(!ground.mesh_passes.is_empty());

@@ -21,7 +21,7 @@ assert(Object.keys(files).length > 1, "profile must include imported modules");
 const demo = readFileSync(new URL("../demo.fr", import.meta.url), "utf8");
 const result = compile_fresco_bundle({ ...files, "main.fr": demo }, "main.fr", false);
 assert(result.ok, JSON.stringify(result.diagnostics));
-assert.equal(result.manifest.canvases[0].name, "demo");
+assert.equal(result.manifest.raster_entries[0].name, "demo");
 assert(result.wgsl.includes("@vertex"));
 assert(result.wgsl.includes("@fragment"));
 const emitter = readFileSync(new URL("../../../examples/50) particles/drifting_sparks.fr", import.meta.url), "utf8");
@@ -35,10 +35,10 @@ assert.equal(particles.manifest.gpu_programs.find(p => p.metadata.capacity).meta
 assert(particles.wgsl.includes("@compute"));
 // Browser responses retain collection fields even when the file format omits them.
 for (const response of [result, particles]) {
-  for (const key of ["canvases", "surfaces", "pipelines", "vertex_factories", "config_axes"]) {
+  for (const key of ["raster_entries", "surfaces", "pipelines", "vertex_factories", "config_axes"]) {
     assert(Array.isArray(response.manifest[key]), `browser manifest requires array ${key}`);
   }
-  for (const canvas of response.manifest.canvases) {
+  for (const canvas of response.manifest.raster_entries) {
     for (const key of ["params", "global_uniforms", "storage_params", "textures", "path_buffers"]) {
       assert(Array.isArray(canvas[key]), `browser canvas requires array ${key}`);
     }
@@ -90,7 +90,7 @@ const styleSettings = readFileSync(new URL("../../example-engine/tests/fixtures/
 for (const renderer of ["forward", "forward-plus", "deferred"]) {
   const styled = compile_fresco_bundle({ ...files, "main.fr": styleSettings, "fresco.config.json": JSON.stringify({ renderer }) }, "main.fr", false);
   assert(styled.ok, JSON.stringify(styled.diagnostics));
-  assert.equal(styled.manifest.schema_version, 12);
+  assert.equal(styled.manifest.schema_version, 13);
   const [first, second] = styled.manifest.surfaces.map(surface => surface.settings.implementations[0]);
   assert.equal(first.id, second.id, "one style must share executable dispatch");
   assert.notEqual(first.settings_offset, second.settings_offset, "materials need independent records");

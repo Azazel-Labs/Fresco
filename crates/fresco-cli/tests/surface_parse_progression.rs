@@ -358,8 +358,8 @@ surface my_mat(sp: surf) -> material {
     );
     assert!(success, "mixed manifest should compile, got:\n{manifest}");
     assert!(
-        manifest.contains("\"canvases\""),
-        "manifest missing canvases:\n{manifest}"
+        manifest.contains("\"raster_entries\""),
+        "manifest missing raster_entries:\n{manifest}"
     );
     assert!(
         manifest.contains("\"preview\""),

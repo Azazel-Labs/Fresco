@@ -6,7 +6,7 @@ function isGeneratedHelperFunctionName(name: unknown): boolean {
   return /_scatter_l\d+$/.test(String(name || ""));
 }
 
-function isCanvasEntrySignature(types: string[]): boolean {
+function isStandaloneRasterEntrySignature(types: string[]): boolean {
   const normalizedTypes = types.map((type) => normalizeTypeName(type));
   return (
     (normalizedTypes.length >= 3 && normalizedTypes[0] === "vec2<f32>" && normalizedTypes[1] === "f32" && normalizedTypes[2] === "vec2<f32>") ||
@@ -36,7 +36,7 @@ export function detectFrescoEntryFunction(wgsl: unknown): string | null {
   }
 
   const preferred = candidates.find((candidate) =>
-    !isGeneratedHelperFunctionName(candidate.name) && isCanvasEntrySignature(candidate.types)
+    !isGeneratedHelperFunctionName(candidate.name) && isStandaloneRasterEntrySignature(candidate.types)
   );
   if (preferred) {
     return preferred.name;

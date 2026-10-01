@@ -1,5 +1,5 @@
 import {
-  canvasNameFromEntryFunction,
+  entryNameFromEntryFunction,
   normalizeManifestAssetPath,
   normalizeManifestParamDefault,
 } from "./renderer-support";
@@ -95,10 +95,10 @@ export function parseManifestStorageParams(manifest, fnName) {
     return [];
   }
 
-  const canvasName = canvasNameFromEntryFunction(fnName);
-  const canvases = Array.isArray(manifest.canvases) ? manifest.canvases : [];
-  const canvas = canvases.find((entry) => entry.name === canvasName) || canvases[0];
-  const storageParams = Array.isArray(canvas?.storage_params) ? canvas.storage_params : [];
+  const entryName = entryNameFromEntryFunction(fnName);
+  const rasterEntries = Array.isArray(manifest.raster_entries) ? manifest.raster_entries : [];
+  const rasterEntry = rasterEntries.find((entry) => entry.name === entryName) || rasterEntries[0];
+  const storageParams = Array.isArray(rasterEntry?.storage_params) ? rasterEntry.storage_params : [];
   return storageParams.map((param) => ({
     name: String(param.name || ""),
     type: String(param.type || ""),
@@ -109,13 +109,13 @@ export function parseManifestStorageParams(manifest, fnName) {
   }));
 }
 
-export function parseManifestCanvasName(manifest) {
+export function parseManifestRasterEntryName(manifest) {
   if (!manifest || typeof manifest !== "object") {
     return "";
   }
-  const canvases = Array.isArray(manifest.canvases) ? manifest.canvases : [];
-  const canvasName = String(canvases[0]?.name || "").trim();
-  return canvasName;
+  const rasterEntries = Array.isArray(manifest.raster_entries) ? manifest.raster_entries : [];
+  const entryName = String(rasterEntries[0]?.name || "").trim();
+  return entryName;
 }
 
 export function resolveEntryFunctionName({
@@ -129,8 +129,8 @@ export function resolveEntryFunctionName({
   hasFunctionSignature: (fnName: string) => boolean;
   detectEntryFunction: (wgslText: string) => string;
 }) {
-  const manifestCanvasName = parseManifestCanvasName(manifest);
-  const manifestFnName = manifestCanvasName ? `fresco_${manifestCanvasName}` : "";
+  const manifestEntryName = parseManifestRasterEntryName(manifest);
+  const manifestFnName = manifestEntryName ? `fresco_${manifestEntryName}` : "";
   if (manifestFnName && hasFunctionSignature(manifestFnName)) {
     return manifestFnName;
   }
@@ -149,10 +149,10 @@ export function parseManifestParams(manifest, fnName) {
     return [];
   }
 
-  const canvasName = canvasNameFromEntryFunction(fnName);
-  const canvases = Array.isArray(manifest.canvases) ? manifest.canvases : [];
-  const canvas = canvases.find((entry) => entry.name === canvasName) || canvases[0];
-  const params = Array.isArray(canvas?.params) ? canvas.params : [];
+  const entryName = entryNameFromEntryFunction(fnName);
+  const rasterEntries = Array.isArray(manifest.raster_entries) ? manifest.raster_entries : [];
+  const rasterEntry = rasterEntries.find((entry) => entry.name === entryName) || rasterEntries[0];
+  const params = Array.isArray(rasterEntry?.params) ? rasterEntry.params : [];
   return params.map((param) => ({
     name: param.name,
     type: param.type,
@@ -169,7 +169,7 @@ export function parseManifestTextures(manifest, fnName) {
     return [];
   }
 
-  const entryName = canvasNameFromEntryFunction(fnName);
+  const entryName = entryNameFromEntryFunction(fnName);
   const surfaces = Array.isArray(manifest.surfaces) ? manifest.surfaces : [];
   const surface = surfaces.find((entry) => entry.name === entryName) || surfaces[0];
   const surfaceTextures = Array.isArray(surface?.textures) ? surface.textures : [];
@@ -187,9 +187,9 @@ export function parseManifestTextures(manifest, fnName) {
       .sort((a, b) => a.binding - b.binding);
   }
 
-  const canvases = Array.isArray(manifest.canvases) ? manifest.canvases : [];
-  const canvas = canvases.find((entry) => entry.name === entryName) || canvases[0];
-  const textures = Array.isArray(canvas?.textures) ? canvas.textures : [];
+  const rasterEntries = Array.isArray(manifest.raster_entries) ? manifest.raster_entries : [];
+  const rasterEntry = rasterEntries.find((entry) => entry.name === entryName) || rasterEntries[0];
+  const textures = Array.isArray(rasterEntry?.textures) ? rasterEntry.textures : [];
   return textures
     .map((entry) => ({
       name: String(entry?.name || "").trim(),

@@ -50,17 +50,17 @@ path buffer: recompile the source to obtain the payload. Runtime preparation
 checks the layout version, stride, segment count, finite values, and device limits.
 
 The compiler and runtime now share the complete manifest schema, including root,
-canvas, and surface containers. `driver/emit.rs` assembles these public artifact
+raster entry (`raster_entries`), and surface containers. `driver/emit.rs` assembles these public artifact
 records directly; it no longer owns a parallel serialized manifest schema.
-Complete canvas, mesh, and emitter artifacts are tested through serialization
+Complete raster entry, mesh, and emitter artifacts are tested through serialization
 and deserialization, including omission of unused optional resources.
 Typed parameter defaults now use shared `ManifestParamDefault` and
 `ManifestArrayDefault` records. The producer retains f32 scalar/color values until
 serialization; readers still interpret the JSON default using the parameter's
 declared type, since an untagged JSON number cannot identify its shader type.
 
-Root, canvas, and surface containers carry the same producer/consumer type
-parameters as their parameter records. Canvas and surface parameters use shared
+Root, raster entry, and surface containers carry the same producer/consumer type
+parameters as their parameter records. Raster entry and surface parameters use shared
 `ManifestParam<D, N>` and
 `ManifestSurfaceParam<D, N>` records. Producers instantiate them with
 `ManifestParamDefault` and `f32`, preserving the compiler's decimal serialization.
@@ -71,6 +71,6 @@ ranges; Rust transport parameters do not appear in the browser API.
 
 Manifest JSON omits unused optional resources. The WASM response adapter preserves
 the browser API's materialized empty collections (for example,
-`canvas.global_uniforms = []`) after serialization. This transport normalization
+`raster_entries[i].global_uniforms = []`) after serialization. This transport normalization
 uses the shared manifest; it does not select engine resources or provide missing
 shader bindings. Generated-WASM checks cover this distinction.

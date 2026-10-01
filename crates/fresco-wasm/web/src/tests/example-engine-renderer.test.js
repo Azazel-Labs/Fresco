@@ -5,7 +5,7 @@ function deferred() { let resolve; const promise = new Promise(r => { resolve = 
 function renderer() {
   const result = new ExampleEngineRenderer({ dataset: {}, style: {} }, { textureOptionsForName: () => ({ options: [], defaultUrl: "" }) });
   result.gpuReady = true;
-  result.installed = { wgsl: "shader", manifest: { canvases: [] }, entry: "probe", assets: new Map() };
+  result.installed = { wgsl: "shader", manifest: { raster_entries: [] }, entry: "probe", assets: new Map() };
   result.engine = { render_async: vi.fn().mockResolvedValue(true), buffer_views: () => "[]", set_buffer_view: vi.fn(), supports_lighting_environment: () => true, set_lighting_environment: vi.fn(), cancel_pending: vi.fn(), reset_playback: vi.fn(), install_with_assets: vi.fn().mockResolvedValue(true), parameter_values_json: () => "{}" };
   return result;
 }
@@ -92,7 +92,7 @@ describe("Rust playground adapter", () => {
     expect(host.bufferView).toBe("shaded");
     expect(host.engine.set_buffer_view).toHaveBeenLastCalledWith("shaded");
     host.engine.buffer_views = () => "[]";
-    await host.setShader("canvas", { canvases: [{ name: "canvas" }] });
+    await host.setShader("canvas", { raster_entries: [{ name: "canvas" }] });
     expect(host.bufferViews).toEqual([]);
   });
   it("keeps the current buffer view when the engine rejects a selection", async () => {
@@ -164,7 +164,7 @@ describe("Rust playground adapter", () => {
     expect(host.drawFrame()).toBe(false);
   });
   const multiSurface = () => ({
-    canvases: [],
+    raster_entries: [],
     surfaces: [
       { name: "plain", material_ty: "unlit", params: [{ name: "gain", type: "f32", default: 0.25 }] },
       { name: "lit", material_ty: "standard", params: [{ name: "gain", type: "f32", default: 0.75 }] },
@@ -283,7 +283,7 @@ describe("Rust playground adapter", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => bytes.promise }));
     const replacing = host.setTextureSelection("paint", "/paint.png");
     await Promise.resolve();
-    host.stageShader("new shader", { canvases: [] });
+    host.stageShader("new shader", { raster_entries: [] });
     bytes.resolve(new ArrayBuffer(4)); await replacing;
     expect(host.engine.install_with_assets).not.toHaveBeenCalled();
     expect(host.stagedShader.wgsl).toBe("new shader");
@@ -294,13 +294,13 @@ describe("Rust playground adapter", () => {
     host.paramDefs = [{ name: "gain", type: "f32", callType: "f32", default: 1, min: null, max: null }];
     host.paramValues.set("gain", 0.25); host.touchedParamNames.add("gain");
     host.engine.parameter_values_json = () => '{"gain":0.25}';
-    await host.setShader("updated shader", { canvases: [{ name: "probe", params: [{ name: "gain", type: "f32", default: 1 }] }] });
+    await host.setShader("updated shader", { raster_entries: [{ name: "probe", params: [{ name: "gain", type: "f32", default: 1 }] }] });
     expect(host.engine.install_with_assets.mock.calls[0][4]).toBe('{"gain":0.25}');
     expect(host.paramValues.get("gain")).toBe(0.25);
   });
   it("reflects style controls, updates them live, and preserves edits only for the same style", async () => {
     const host = renderer();
-    const manifest = symbol => ({ canvases: [], surfaces: [{ name: "probe", material_ty: "standard", settings: { implementations: [{ name: "style", symbol, parameters: [{ name: "gain", type: "f32", default: 0.5, min: 0, max: 1 }] }] } }] });
+    const manifest = symbol => ({ raster_entries: [], surfaces: [{ name: "probe", material_ty: "standard", settings: { implementations: [{ name: "style", symbol, parameters: [{ name: "gain", type: "f32", default: 0.5, min: 0, max: 1 }] }] } }] });
     const values = { "style.gain": 0.5 };
     host.engine.parameter_values_json = () => JSON.stringify(values);
     host.engine.update_parameters = vi.fn(async json => { Object.assign(values, JSON.parse(json)); return true; });
@@ -327,7 +327,7 @@ describe("Rust playground adapter", () => {
     const values = {"style.seed": 4294967295, "style.offset": -2147483648, "style.enabled": true};
     host.engine.parameter_values_json = () => JSON.stringify(values);
     host.engine.update_parameters = vi.fn(async json => { Object.assign(values, JSON.parse(json)); return true; });
-    await host.setShader("exact settings", {canvases: [], surfaces: [{name: "probe", material_ty: "standard", settings: {implementations: [{name: "style", symbol: "Exact", parameters: [
+    await host.setShader("exact settings", {raster_entries: [], surfaces: [{name: "probe", material_ty: "standard", settings: {implementations: [{name: "style", symbol: "Exact", parameters: [
       {name: "seed", type: "u32", default: 4294967295}, {name: "offset", type: "i32", default: -2147483648}, {name: "enabled", type: "bool", default: true}
     ]}]}}]});
     expect(host.paramDefs.map(def => def.default)).toEqual([4294967295, -2147483648, true]);
@@ -389,7 +389,7 @@ describe("Rust playground adapter", () => {
     host.setParamValue({ name: "red", type: "f32" }, 0.25);
     host.setParamValue({ name: "green", type: "f32" }, 0.75);
     await Promise.resolve();
-    host.stageShader("new shader", { canvases: [] });
+    host.stageShader("new shader", { raster_entries: [] });
     first.resolve(true); await host.parameterUpdates;
     expect(host.engine.update_parameters).toHaveBeenCalledTimes(1);
     expect(host.onParamValueChanged).not.toHaveBeenCalled();
@@ -400,11 +400,11 @@ describe("Rust playground adapter", () => {
     let values = { points: [[0, 1, 0]] };
     host.engine.parameter_values_json = () => JSON.stringify(values);
     host.engine.update_parameters = vi.fn(async json => { values = JSON.parse(json); return true; });
-    const manifest = { canvases: [{ name: "probe", params: [{ name: "points", type: "array<vec3>",
+    const manifest = { raster_entries: [{ name: "probe", params: [{ name: "points", type: "array<vec3>",
       default: new Map([["type", "vec3"], ["values", [[0, 1, 0]]]]) }] }] };
     await host.setShader("shader", manifest);
     const installed = JSON.parse(host.engine.install_with_assets.mock.calls[0][1]);
-    expect(installed.canvases[0].params[0].default).toEqual({ type: "vec3", values: [[0, 1, 0]] });
+    expect(installed.raster_entries[0].params[0].default).toEqual({ type: "vec3", values: [[0, 1, 0]] });
     expect(host.paramValues.get("points")).toEqual([0, 1, 0]);
     host.setParamValue(host.paramDefs[0], [1, 0, 0, 0, 0, 1]);
     await host.parameterUpdates;
@@ -440,7 +440,7 @@ describe("Rust playground adapter", () => {
     host.onRuntimeDiagnostic = vi.fn();
     vi.stubGlobal("fetch", vi.fn().mockReturnValue(response.promise));
     const replacement = host.setTextureSelection("paint", "/slow.png");
-    host.stageShader("new shader", { canvases: [] });
+    host.stageShader("new shader", { raster_entries: [] });
     response.resolve({ ok: false, status: 404 }); await replacement;
     expect(host.onRuntimeDiagnostic).not.toHaveBeenCalled();
     expect(host.stagedShader.wgsl).toBe("new shader");
@@ -454,7 +454,7 @@ describe("Rust playground adapter", () => {
     host.engine.install_with_assets.mockReturnValueOnce(installation.promise);
     host.engine.update_parameters = vi.fn(async json => { Object.assign(values, JSON.parse(json)); return true; });
     host.onParamDefsChanged = vi.fn();
-    const preparing = host.setShader("replacement", { canvases: [{ name: "probe", params: [def] }] });
+    const preparing = host.setShader("replacement", { raster_entries: [{ name: "probe", params: [def] }] });
     await Promise.resolve();
     host.setParamValue(def, 0.25);
     await Promise.resolve();
@@ -488,10 +488,10 @@ describe("Rust playground adapter", () => {
     vi.stubGlobal("fetch", vi.fn((url, { signal }) => new Promise((resolve, reject) => {
       signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
     })));
-    const obsolete = host.setShader("obsolete", { canvases: [{ name: "probe", textures: [{ name: "paint" }] }] });
+    const obsolete = host.setShader("obsolete", { raster_entries: [{ name: "probe", textures: [{ name: "paint" }] }] });
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-    host.stageShader("new", { canvases: [{ name: "probe" }] });
-    const newest = host.setShader("new", { canvases: [{ name: "probe" }] });
+    host.stageShader("new", { raster_entries: [{ name: "probe" }] });
+    const newest = host.setShader("new", { raster_entries: [{ name: "probe" }] });
     await Promise.all([obsolete, newest]);
     expect(host.engine.install_with_assets).toHaveBeenCalledOnce();
     expect(host.engine.install_with_assets.mock.calls[0][0]).toBe("new");
@@ -532,7 +532,7 @@ describe("Rust playground adapter", () => {
     const host = renderer();
     host.setPlaybackRate(-1); host.setPlaybackLoopDuration(2);
     host.onPlaybackCapabilitiesChanged = vi.fn();
-    await host.setShader("particles", { canvases: [], surfaces: [{ name: "probe" }], techniques: [{ surface: "probe", metadata: { engine: "particle" } }] });
+    await host.setShader("particles", { raster_entries: [], surfaces: [{ name: "probe" }], techniques: [{ surface: "probe", metadata: { engine: "particle" } }] });
     expect(host.renderMode).toBe("particles");
     expect(host.playbackRate).toBe(1);
     expect(host.playbackLoopSeconds).toBe(0);
@@ -540,7 +540,7 @@ describe("Rust playground adapter", () => {
     expect(host.onPlaybackCapabilitiesChanged).toHaveBeenCalledOnce();
     host.lastTickMs = 100; host.drawFrame({ nowMs: 200 });
     expect(host.engine.render_async).toHaveBeenLastCalledWith(0.1, 0.1);
-    await host.setShader("canvas", { canvases: [{ name: "probe" }] });
+    await host.setShader("canvas", { raster_entries: [{ name: "probe" }] });
     expect(host.onPlaybackCapabilitiesChanged).toHaveBeenCalledTimes(2);
     host.setPlaybackRate(-1);
     expect(host.playbackRate).toBe(-1);

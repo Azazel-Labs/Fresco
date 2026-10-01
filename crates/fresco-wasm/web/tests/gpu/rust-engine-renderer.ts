@@ -63,7 +63,7 @@ export class RustEngineRenderer extends PreviewController {
   }
 
   async setShader(wgsl: string, manifest: ManifestRoot | null = null, parameters?: Record<string, unknown>, entryName?: string) {
-    const entries = manifest ? [...manifest.canvases, ...manifest.surfaces] : [];
+    const entries = manifest ? [...manifest.raster_entries, ...manifest.surfaces] : [];
     const candidates = entryName ? entries.filter(entry => entry.name === entryName)
       : entries.filter(entry => entry.name !== "fresco_scene_ground");
     if (!manifest || candidates.length !== 1) throw new Error("Rust test adapter requires an unambiguous entry");

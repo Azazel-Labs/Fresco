@@ -3,7 +3,7 @@ use super::{
     RuntimeError, mesh_geometry::MeshGeometry, raster_state::RasterState, resources::Resource,
 };
 use fresco_artifact::{
-    ManifestGpuProgram, ManifestRasterEntry, ManifestRecipeStep, ManifestRenderer, ManifestRoot,
+    ManifestGpuProgram, ManifestRecipeStep, ManifestRenderer, ManifestRoot, ManifestStageEntry,
     ManifestSurface,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -47,7 +47,7 @@ impl Plan {
     pub fn new(
         manifest: &ManifestRoot,
         surface: &ManifestSurface,
-        mesh_entries: &BTreeMap<String, &[ManifestRasterEntry]>,
+        mesh_entries: &BTreeMap<String, &[ManifestStageEntry]>,
         output_format: wgpu::TextureFormat,
         limits: &wgpu::Limits,
     ) -> Result<Self, RuntimeError> {
@@ -212,7 +212,7 @@ impl Plan {
                     .get(&declaration.pass)
                     .ok_or_else(|| invalid("recipe mesh program missing"))?
             };
-            let entry = |name: &str, stage: &str| -> Result<&ManifestRasterEntry, RuntimeError> {
+            let entry = |name: &str, stage: &str| -> Result<&ManifestStageEntry, RuntimeError> {
                 let candidates: Vec<_> = entries
                     .iter()
                     .filter(|e| e.function == name && e.stage == stage)

@@ -31,7 +31,7 @@ try {
     let short, buffered;
     try { short = await compile(1); buffered = await compile(33); }
     finally { worker.terminate(); }
-    const path = buffered.manifest.canvases[0].path_buffers[0];
+    const path = buffered.manifest.raster_entries[0].path_buffers[0];
     if (!path || path.data.rows.length !== 66) throw Error("Expected the reflected 66-segment path");
     const declaration = new RegExp(`@group\\(${path.group}\\) @binding\\(${path.binding}\\)\\s*var<storage(?:, read)?> (\\w+): array<FrescoPathSeg, 66>;`);
     const match = buffered.wgsl.match(declaration);
@@ -41,7 +41,7 @@ try {
     const rows = path.data.rows.map(row => `FrescoPathSeg(${[row.p0,row.p1,row.p2,row.p3].map(vector).join(",")},${scalar(row.s0)},${scalar(row.len)},${row.kind}u,${scalar(row.mid_u)},0f)`);
     const constant = buffered.wgsl.replace(declaration, `const ${match[1]}: array<FrescoPathSeg, 66> = array<FrescoPathSeg, 66>(${rows.join(",")});`);
     const inlineManifest = structuredClone(buffered.manifest);
-    inlineManifest.canvases[0].path_buffers = [];
+    inlineManifest.raster_entries[0].path_buffers = [];
     const loop2 = code => {
       if (!code.includes(">= 66u")) throw Error("Path loop bound changed");
       return code.replace(">= 66u", ">= 2u");

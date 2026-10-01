@@ -27,8 +27,8 @@ test("behavior canary: imports, context, controls, arrays, composition, time, re
   await page.goto("/tests/gpu/");
   await page.waitForFunction(() => window.gpuTest);
   const manifest = await page.evaluate(() => window.gpuTest.initCanary());
-  expect(manifest.canvases[0].params.map(param => param.name)).toEqual(["gain", "levels"]);
-  expect(manifest.canvases[0].engine_pass).toBeTruthy();
+  expect(manifest.raster_entries[0].params.map(param => param.name)).toEqual(["gain", "levels"]);
+  expect(manifest.raster_entries[0].engine_pass).toBeTruthy();
   const render = (name, time, delta = 0, size = 256) => page.evaluate(
     args => window.gpuTest.frame(...args), [name, time, delta, size, size],
   );

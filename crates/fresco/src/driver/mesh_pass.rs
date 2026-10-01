@@ -25,7 +25,7 @@ pub(super) struct MeshStage {
         std::collections::BTreeMap<String, fresco_artifact::ManifestDrawComputeBinding>,
     /// Bindings from the actual material-specialized pass used for shader emission.
     pub bindings: Vec<crate::ast::PassBindingDecl>,
-    pub entries: Vec<fresco_artifact::ManifestRasterEntry>,
+    pub entries: Vec<fresco_artifact::ManifestStageEntry>,
     pub variants: Vec<MeshVariant>,
     pub pass: String,
     pub factory: String,

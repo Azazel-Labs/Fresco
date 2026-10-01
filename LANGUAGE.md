@@ -7,7 +7,7 @@ from it. Use this document for semantics and composition, the
 signatures, and the linked sources for complete executable examples.
 
 **Reviewed against implementation: 2026-09-23**, through shading-style phases 1–8
-and executable artifact schema **12**. Historical proposals are not implicitly
+and executable artifact schema **13**. Historical proposals are not implicitly
 part of today's language.
 
 - **Language** means compiler-owned syntax and semantics.
@@ -1544,7 +1544,10 @@ fully unified IR owning all behavior.
 
 Artifacts describe stages, layouts/bindings, properties, implementations/settings,
 resources, and applicable graph execution. Shader and metadata are a matched pair.
-Current executable schema **12** is defined in `crates/fresco-artifact`.
+Current executable schema **13** is defined in `crates/fresco-artifact`.
+Schema 13 renamed the root `canvases` list to `raster_entries` (record type
+`ManifestRasterEntry`); each record describes one raster entry, the resolved
+color-result root entry of any registered or standalone entry kind.
 Versions 2–6 in older guides describe earlier milestones, not versions to hardcode.
 
 Hosts supply compatible resources, upload inputs, create described pipelines,

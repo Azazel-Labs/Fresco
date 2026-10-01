@@ -1,7 +1,7 @@
 //! Typed, explicitly bound raster functions. Engine code owns evaluation order.
 use super::*;
 use crate::ast::{attr_arg, attrs_named, has_attr};
-use fresco_artifact::{ManifestRasterEntry, ManifestStageOutput};
+use fresco_artifact::{ManifestStageEntry, ManifestStageOutput};
 
 fn canonical(name: &str) -> String {
     match crate::check::strip_spatial_type_suffix(name) {
@@ -1165,7 +1165,7 @@ pub(super) fn emit(
             functions.names[index],
             args.join(", ")
         );
-        entries.push(ManifestRasterEntry {
+        entries.push(ManifestStageEntry {
             function: hook.name.clone(),
             entry,
             stage: stage.clone(),

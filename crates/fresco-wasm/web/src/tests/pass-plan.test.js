@@ -13,7 +13,7 @@ import {
 // ---------------------------------------------------------------------------
 
 const SINGLE_PASS_MANIFEST = {
-  canvases: [{
+  raster_entries: [{
     name: "sunset",
     params: [],
     pass_plan: {
@@ -30,7 +30,7 @@ const SINGLE_PASS_MANIFEST = {
 };
 
 const INLINE_TAPS_MANIFEST = {
-  canvases: [{
+  raster_entries: [{
     name: "blur_badge",
     params: [],
     pass_plan: {
@@ -53,7 +53,7 @@ const INLINE_TAPS_MANIFEST = {
 };
 
 const SEPARABLE_HV_MANIFEST = {
-  canvases: [{
+  raster_entries: [{
     name: "hazy",
     params: [],
     pass_plan: {
@@ -76,7 +76,7 @@ const SEPARABLE_HV_MANIFEST = {
 };
 
 const DOWNSAMPLE_MANIFEST = {
-  canvases: [{
+  raster_entries: [{
     name: "bloom",
     params: [],
     pass_plan: {
@@ -110,7 +110,7 @@ describe("parseManifestPassPlan", () => {
   });
 
   it("returns null when pass_plan is absent", () => {
-    const manifest = { canvases: [{ name: "foo", params: [] }] };
+    const manifest = { raster_entries: [{ name: "foo", params: [] }] };
     expect(parseManifestPassPlan(manifest, "fresco_foo")).toBeNull();
   });
 

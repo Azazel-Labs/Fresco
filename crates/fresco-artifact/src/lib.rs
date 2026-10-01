@@ -12,7 +12,7 @@ mod transparent;
 pub mod types;
 pub use transparent::validate_transparent_queues;
 
-pub const SCHEMA_VERSION: u32 = 12;
+pub const SCHEMA_VERSION: u32 = 13;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
@@ -35,7 +35,7 @@ pub struct ManifestRoot<D = serde_json::Value, N = f64> {
     pub tables: Vec<ManifestTable>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build_profile: Option<String>,
-    pub canvases: Vec<ManifestCanvas<D, N>>,
+    pub raster_entries: Vec<ManifestRasterEntry<D, N>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub surfaces: Vec<ManifestSurface<D, N>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -60,7 +60,7 @@ pub struct ManifestGpuProgram {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surface: Option<String>,
     pub pass: String,
-    pub entries: Vec<ManifestRasterEntry>,
+    pub entries: Vec<ManifestStageEntry>,
     pub bindings: Vec<ManifestGpuBinding>,
     pub workgroup_size: Option<[u32; 3]>,
 }
@@ -458,9 +458,11 @@ pub struct ManifestStageOutput {
     pub ty: String,
 }
 
+/// One shader-stage entry point (for example vertex or fragment) of a raster
+/// GPU program, with its declared stage outputs.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
-pub struct ManifestRasterEntry {
+pub struct ManifestStageEntry {
     pub function: String,
     pub entry: String,
     pub stage: String,
@@ -475,7 +477,7 @@ pub struct ManifestRasterEntry {
 )]
 pub struct ManifestMeshVariant {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub entries: Vec<ManifestRasterEntry>,
+    pub entries: Vec<ManifestStageEntry>,
     pub factory: String,
 }
 
@@ -499,7 +501,7 @@ pub struct ManifestMeshPass {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bindings: Vec<ManifestVertexFactoryBinding>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub entries: Vec<ManifestRasterEntry>,
+    pub entries: Vec<ManifestStageEntry>,
     #[serde(default)]
     pub variants: Vec<ManifestMeshVariant>,
     pub pass: String,
@@ -777,6 +779,9 @@ pub struct ManifestSurfaceParam<D = serde_json::Value, N = f64> {
     pub max: Option<N>,
 }
 
+/// Manifest record for one raster entry: a resolved single-body root entry
+/// whose body produces a color (a `canvas` or any engine-registered
+/// `@entry` kind with a color result), listed under `raster_entries`.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[cfg_attr(feature = "typescript", derive(ts_rs::TS))]
 #[cfg_attr(
@@ -785,7 +790,7 @@ pub struct ManifestSurfaceParam<D = serde_json::Value, N = f64> {
 )]
 #[cfg_attr(feature = "typescript", ts(concrete(D = serde_json::Value, N = f64), bound = "N: ts_rs::TS"))]
 #[serde(bound(deserialize = "D: Deserialize<'de>, N: Deserialize<'de>"))]
-pub struct ManifestCanvas<D = serde_json::Value, N = f64> {
+pub struct ManifestRasterEntry<D = serde_json::Value, N = f64> {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub global_uniforms: Vec<ManifestGlobalUniform>,
     pub name: String,

@@ -1,7 +1,7 @@
 //! Initialize compiler-owned path geometry without a compiler or source filesystem.
 use std::collections::BTreeSet;
 
-use fresco_artifact::{ManifestCanvas, PATH_SEGMENT_LAYOUT, PATH_SEGMENT_STRIDE};
+use fresco_artifact::{ManifestRasterEntry, PATH_SEGMENT_LAYOUT, PATH_SEGMENT_STRIDE};
 
 use super::RuntimeError;
 use super::storage::{StorageLimits, validate_canvas_storage_count};
@@ -32,7 +32,7 @@ fn invalid(name: &str, reason: impl Into<String>) -> RuntimeError {
 }
 
 impl PathBuffers {
-    pub fn new(canvas: &ManifestCanvas, limits: StorageLimits) -> Result<Self, RuntimeError> {
+    pub fn new(canvas: &ManifestRasterEntry, limits: StorageLimits) -> Result<Self, RuntimeError> {
         validate_canvas_storage_count(canvas, limits)?;
         let mut bindings: BTreeSet<_> = canvas
             .engine_pass

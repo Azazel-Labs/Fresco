@@ -12,7 +12,7 @@ const CONTRACT = JSON.parse(readFileSync(CONTRACT_PATH, "utf8"));
 describe("manifest pass-plan contract", () => {
   it("accepts a valid manifest pass_plan shape", () => {
     const manifest = {
-      canvases: [{
+      raster_entries: [{
         name: "demo",
         pass_plan: {
           passes: [{
@@ -42,7 +42,7 @@ describe("manifest pass-plan contract", () => {
 
   it("rejects missing pass_plan contract fields", () => {
     const manifest = {
-      canvases: [{
+      raster_entries: [{
         name: "demo",
         pass_plan: {
           passes: [{ id: 0, stage: 0, locality: "point" }],
@@ -61,7 +61,7 @@ describe("manifest pass-plan contract", () => {
 
   it("accepts surface uv-channel requirement metadata", () => {
     const manifest = {
-      canvases: [{
+      raster_entries: [{
         name: "demo",
         pass_plan: {
           passes: [{
@@ -103,7 +103,7 @@ describe("manifest pass-plan contract", () => {
 
   it("accepts optional surface vertex-stage requirement metadata", () => {
     const manifest = {
-      canvases: [{
+      raster_entries: [{
         name: "demo",
         pass_plan: {
           passes: [{
@@ -148,7 +148,7 @@ describe("manifest pass-plan contract", () => {
   it("accepts optional config axis metadata and build profile", () => {
     const manifest = {
       build_profile: "runtime",
-      canvases: [{
+      raster_entries: [{
         name: "demo",
         pass_plan: {
           passes: [{

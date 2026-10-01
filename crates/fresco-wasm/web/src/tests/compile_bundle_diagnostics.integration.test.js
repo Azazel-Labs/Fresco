@@ -125,7 +125,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
     const result = compile_fresco_bundle(Object.fromEntries(files), "main.fr", false);
     expect(result.ok, JSON.stringify(result.diagnostics)).toBe(true);
     expect(result.wgsl).toContain("frame.time");
-    expect(result.manifest.canvases[0].global_uniforms).toEqual([{
+    expect(result.manifest.raster_entries[0].global_uniforms).toEqual([{
       name: "frame", type: "FrameGlobals", group: 3, binding: 0, byte_size: 16,
       fields: [
         { name: "time", type: "f32", offset: 0, components: 1, scalar_type: "f32" },
@@ -177,7 +177,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
       .replace("t.draw(", "t.paint("));
     const result = compile_fresco_bundle(Object.fromEntries(files), "main.fr", false);
     expect(result.ok, JSON.stringify(result.diagnostics)).toBe(true);
-    expect(result.manifest.canvases[0].name).toBe("sample");
+    expect(result.manifest.raster_entries[0].name).toBe("sample");
     expect(result.wgsl).toContain("fresco_sample");
   });
 
@@ -199,7 +199,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
       + "\nfn brighten(value: f32, gain: f32) -> f32 { return value + gain }\n");
     const result = compile_fresco_bundle(Object.fromEntries(files), "main.fr", false);
     expect(result.ok, JSON.stringify(result.diagnostics)).toBe(true);
-    expect(result.manifest.canvases[0].name).toBe("sample");
+    expect(result.manifest.raster_entries[0].name).toBe("sample");
     files.set("main.fr", source.replace("gain: 0.25", "gain: vec2(0.25)"));
     const invalid = compile_fresco_bundle(Object.fromEntries(files), "main.fr", false);
     expect(invalid.ok).toBe(false);
@@ -212,7 +212,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
     expect(result.ok, JSON.stringify(result.diagnostics)).toBe(true);
     expect(result.wgsl).toContain("sin(t)");
     expect(result.wgsl).toContain("sin(entry_time)");
-    expect(result.manifest.canvases[0].global_uniforms).toEqual([]);
+    expect(result.manifest.raster_entries[0].global_uniforms).toEqual([]);
   });
 
 });

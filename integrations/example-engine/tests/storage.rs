@@ -192,7 +192,7 @@ fn actual_engine_artifact_supplies_storage_defaults_and_separate_uniform_paramet
     );
     let output = fresco::driver::compile_bundle_virtual(&files, "main.fr", false).unwrap();
     let manifest: fresco_artifact::ManifestRoot = serde_json::from_str(&output.manifest).unwrap();
-    let canvas = &manifest.canvases[0];
+    let canvas = &manifest.raster_entries[0];
     let set = StorageSet::new(
         &canvas.params,
         canvas.storage_params.clone(),

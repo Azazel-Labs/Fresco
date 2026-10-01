@@ -34,11 +34,11 @@ struct ParamDef {
 
 #[derive(Debug, Deserialize)]
 struct ManifestRoot {
-    canvases: Vec<ManifestCanvas>,
+    raster_entries: Vec<ManifestRasterEntry>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ManifestCanvas {
+struct ManifestRasterEntry {
     name: String,
     params: Vec<ManifestParam>,
 }
@@ -68,9 +68,9 @@ pub(crate) fn build_shaders(
         .ok()
         .and_then(|manifest| {
             manifest
-                .canvases
+                .raster_entries
                 .first()
-                .map(|canvas| format!("fresco_{}", canvas.name))
+                .map(|entry| format!("fresco_{}", entry.name))
         })
         .or_else(|| detect_fresco_entry_function(variant_wgsl))
         .ok_or_else(|| "no fresco entry function found".to_string())?;
@@ -786,13 +786,13 @@ fn parse_manifest_params(manifest_text: &str, fn_name: &str) -> Vec<ParamDef> {
         return Vec::new();
     };
     let entry_name = fn_name.strip_prefix("fresco_").unwrap_or(fn_name);
-    let canvas = manifest
-        .canvases
+    let raster = manifest
+        .raster_entries
         .iter()
         .find(|entry| entry.name == entry_name)
-        .or_else(|| manifest.canvases.first());
+        .or_else(|| manifest.raster_entries.first());
 
-    canvas
+    raster
         .map(|entry| {
             entry
                 .params
@@ -991,7 +991,7 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>, gain: f32, tint: vec4<f
 }
 "#;
         let manifest = r#"{
-  "canvases": [
+  "raster_entries": [
     {
       "name": "demo",
       "params": [

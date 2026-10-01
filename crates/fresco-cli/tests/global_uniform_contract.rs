@@ -24,7 +24,7 @@ canvas sample(uv: coord) -> color {
     let output = compile_source_bundle(source, common::TEST_SOURCE_PATH, false)
         .unwrap_or_else(|diags| panic!("{diags:?}"));
     let manifest: Value = serde_json::from_str(&output.manifest).unwrap();
-    let uniform = &manifest["canvases"][0]["global_uniforms"][0];
+    let uniform = &manifest["raster_entries"][0]["global_uniforms"][0];
     assert_eq!(uniform["byte_size"], 48);
     let fields = uniform["fields"].as_array().unwrap();
     assert_eq!(
@@ -84,7 +84,7 @@ canvas sample(uv: coord, t: signal) -> color {
     assert!(output.wgsl.contains("clock.seconds"));
     let manifest: Value = serde_json::from_str(&output.manifest).unwrap();
     assert_eq!(
-        manifest["canvases"][0]["global_uniforms"][0]["name"],
+        manifest["raster_entries"][0]["global_uniforms"][0]["name"],
         "clock"
     );
 }
@@ -153,7 +153,7 @@ canvas animated(uv: coord, t: signal, dt: delta, viewport: resolution) -> color 
         "resolution must come from the entry context"
     );
     let manifest: Value = serde_json::from_str(&output.manifest).unwrap();
-    assert!(manifest["canvases"][0]["global_uniforms"].is_null());
+    assert!(manifest["raster_entries"][0]["global_uniforms"].is_null());
 }
 
 #[test]

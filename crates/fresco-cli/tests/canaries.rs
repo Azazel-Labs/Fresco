@@ -55,7 +55,7 @@ fn contracts(module: &Module, manifest: &Value) -> Result<(), String> {
             Err(message.to_string())
         }
     };
-    let canvas = &manifest["canvases"][0];
+    let canvas = &manifest["raster_entries"][0];
     let pass = &canvas["engine_pass"];
     let root_name = format!(
         "fresco_{}",
@@ -477,20 +477,20 @@ fn mutation_canary_proves_contract_checks_reject_corrupted_compiler_output() {
     let (_, module, manifest) = compile(&files());
     contracts(&module, &manifest).expect("positive control");
     let mut missing_stage = manifest.clone();
-    missing_stage["canvases"][0]["engine_pass"]["fragment_entry"] =
+    missing_stage["raster_entries"][0]["engine_pass"]["fragment_entry"] =
         Value::String("nonexistent".into());
     assert!(
         contracts(&module, &missing_stage).is_err(),
         "surviving mutant: wrong stage metadata"
     );
     let mut missing_binding = manifest.clone();
-    missing_binding["canvases"][0]["global_uniforms"][0]["binding"] = Value::from(999);
+    missing_binding["raster_entries"][0]["global_uniforms"][0]["binding"] = Value::from(999);
     assert!(
         contracts(&module, &missing_binding).is_err(),
         "surviving mutant: wrong resource binding"
     );
     let mut leaked_control = manifest.clone();
-    leaked_control["canvases"][0]["params"]
+    leaked_control["raster_entries"][0]["params"]
         .as_array_mut()
         .expect("params")
         .push(serde_json::json!({"name": "hidden_context"}));

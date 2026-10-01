@@ -47,7 +47,7 @@ describe("surface artifact forwarding and inspector metadata", () => {
   it("submits compiler stages unchanged without synthesizing a lighting wrapper", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "crate_side",
         material_ty: "pbr",
@@ -98,7 +98,7 @@ fn fresco_crate_side(
   it("does not synthesize tangent-space normal-map logic", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "crate_side",
         material_ty: "pbr",
@@ -162,7 +162,7 @@ fn fresco_crate_side(
   it("uses a manifest-selected Fresco lighting entry when present", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "crate_side",
         material_ty: "pbr",
@@ -220,7 +220,7 @@ fn fresco_crate_side(
   it("does not invent values for manifest lighting runtime bindings", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "crate_side",
         material_ty: "pbr",
@@ -278,7 +278,7 @@ fn fresco_crate_side(
   it("uses manifest render_policy over material_ty for runtime surface selection", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "crate_side",
         material_ty: "pbr",
@@ -330,7 +330,7 @@ fn fresco_crate_side(
     const renderer = createAdapter();
     renderer.setActiveSurfaceName("mat_b");
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [
         {
           name: "mat_a",
@@ -417,7 +417,7 @@ fn fresco_mat_b(
   it("prefers the surface whose material has a lighting-tagged pipeline when no surface is selected", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [
         {
           name: "plain_surface",
@@ -493,7 +493,7 @@ fn fresco_lit_surface(
   it("selects forward-plus or clustered authored lighting variant from manifest metadata", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "clustered_surface",
         material_ty: "pbr",
@@ -612,7 +612,7 @@ fn clustered_16_32_16_(
   it("applies forward_plus tie-break ordering using slices, tile size, then light count", async () => {
     const renderer = createAdapter();
     const manifest = {
-      canvases: [],
+      raster_entries: [],
       surfaces: [{
         name: "fp_surface",
         material_ty: "pbr",

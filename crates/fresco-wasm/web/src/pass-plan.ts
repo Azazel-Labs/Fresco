@@ -22,28 +22,28 @@ export type PassPlan = {
   targets: ManifestIntermediateTarget[];
 };
 
-function canvasNameFromEntryFunction(fnName: string | null | undefined): string {
+function entryNameFromEntryFunction(fnName: string | null | undefined): string {
   return String(fnName || "")
     .replace(/^fresco_/, "")
     .replace(/_pass\d+$/, "");
 }
 
 /**
- * Select the pass_plan section from a manifest object for a given canvas.
+ * Select the pass_plan section from a manifest object for a given raster entry.
  *
  * @param manifest - The full manifest object from wasm compile result.
  * @param fnName - The WGSL entry function name (e.g. "fresco_foo").
- * @returns The pass plan object, or null if the manifest/canvas data is absent.
+ * @returns The pass plan object, or null if the manifest or raster entry data is absent.
  */
 export function parseManifestPassPlan(manifest: ManifestRoot | null | undefined, fnName: string | null | undefined): PassPlan | null {
   if (!manifest || typeof manifest !== "object") {
     return null;
   }
 
-  const canvasName = canvasNameFromEntryFunction(fnName);
-  const canvases = Array.isArray(manifest.canvases) ? manifest.canvases : [];
-  const canvas = canvases.find((entry) => entry.name === canvasName) || canvases[0];
-  const plan = canvas?.pass_plan;
+  const entryName = entryNameFromEntryFunction(fnName);
+  const rasterEntries = Array.isArray(manifest.raster_entries) ? manifest.raster_entries : [];
+  const rasterEntry = rasterEntries.find((entry) => entry.name === entryName) || rasterEntries[0];
+  const plan = rasterEntry?.pass_plan;
   if (!plan || !Array.isArray(plan.passes)) {
     return null;
   }

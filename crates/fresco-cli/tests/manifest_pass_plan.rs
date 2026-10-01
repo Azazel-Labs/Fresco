@@ -60,8 +60,8 @@ fn manifest_emit_stdout_is_valid_json_object() {
         serde_json::from_str(&manifest).expect("manifest stdout must be valid JSON");
     assert!(parsed.is_object(), "manifest stdout must be a JSON object");
     assert!(
-        parsed.get("canvases").is_some(),
-        "manifest JSON must include top-level `canvases`"
+        parsed.get("raster_entries").is_some(),
+        "manifest JSON must include top-level `raster_entries`"
     );
 }
 
@@ -96,7 +96,7 @@ fn manifest_single_pass_has_fused_strategy_and_no_targets() {
     // No intermediate targets for a single-pass all-point program.
     let parsed: serde_json::Value =
         serde_json::from_str(&manifest).expect("manifest must be valid JSON");
-    let targets = &parsed["canvases"][0]["pass_plan"]["targets"];
+    let targets = &parsed["raster_entries"][0]["pass_plan"]["targets"];
     assert!(
         targets.as_array().is_none_or(Vec::is_empty),
         "expected no intermediate targets for single-pass program\nmanifest:\n{manifest}"
@@ -269,7 +269,7 @@ fn manifest_multi_pass_program_has_intermediate_targets() {
 
     let parsed: serde_json::Value =
         serde_json::from_str(&manifest).expect("manifest must be valid JSON");
-    let passes = parsed["canvases"][0]["pass_plan"]["passes"]
+    let passes = parsed["raster_entries"][0]["pass_plan"]["passes"]
         .as_array()
         .expect("manifest pass list must be an array for multi-pass programs");
     assert!(
@@ -310,7 +310,7 @@ fn manifest_includes_path_buffers_for_threshold_paths() {
     let manifest = normalize(&output.stdout);
     let parsed: serde_json::Value =
         serde_json::from_str(&manifest).expect("manifest must be valid JSON");
-    let buffers = parsed["canvases"][0]["path_buffers"]
+    let buffers = parsed["raster_entries"][0]["path_buffers"]
         .as_array()
         .expect("expected path_buffers array for threshold path");
     assert_eq!(

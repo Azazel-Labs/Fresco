@@ -181,7 +181,7 @@ impl CanvasRenderer {
             reason: reason.into(),
         };
         let mut selected = manifest
-            .canvases
+            .raster_entries
             .iter()
             .filter(|canvas| canvas.name == entry);
         let canvas = selected

@@ -101,7 +101,7 @@ fn validates_real_compiler_plans_for_point_and_local_effects() {
         );
         let compiled = fresco::driver::compile_bundle_virtual(&files, "main.fr", false).unwrap();
         let manifest: ManifestRoot = serde_json::from_str(&compiled.manifest).unwrap();
-        let source = &manifest.canvases[0].pass_plan;
+        let source = &manifest.raster_entries[0].pass_plan;
         let validated = ValidatedPassPlan::new(source).unwrap();
         assert_eq!(validated.passes().count(), source.passes.len());
         if body.contains("blur") {

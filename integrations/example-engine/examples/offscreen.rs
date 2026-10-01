@@ -358,7 +358,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
     );
     // A library helper is not an executable canvas contract.
     let mut helper_only = manifest.clone();
-    helper_only.canvases[0].engine_pass = None;
+    helper_only.raster_entries[0].engine_pass = None;
     assert!(
         CanvasRenderer::prepare(
             device.clone(),
@@ -374,8 +374,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
     assert!(renderer.render(frame, &view)?);
     assert_eq!(readback(&device, &queue, &texture)?, first);
     let mut unsupported = manifest.clone();
-    let extra_pass = unsupported.canvases[0].pass_plan.passes[0].clone();
-    unsupported.canvases[0].pass_plan.passes.push(extra_pass);
+    let extra_pass = unsupported.raster_entries[0].pass_plan.passes[0].clone();
+    unsupported.raster_entries[0]
+        .pass_plan
+        .passes
+        .push(extra_pass);
     assert!(
         CanvasRenderer::prepare(
             device.clone(),
@@ -554,7 +557,7 @@ async fn verify_paths(
         let reference = fresco::driver::compile_bundle_virtual(&files, "main.fr", false)
             .map_err(|errors| format!("constant path: {errors:#?}"))?;
         let reference_manifest: ManifestRoot = serde_json::from_str(&reference.manifest)?;
-        assert!(reference_manifest.canvases[0].path_buffers.is_empty());
+        assert!(reference_manifest.raster_entries[0].path_buffers.is_empty());
         let mut reference_renderer = CanvasRenderer::prepare(
             device.clone(),
             queue.clone(),
@@ -578,7 +581,7 @@ async fn verify_paths(
         let buffered = fresco::driver::compile_bundle_virtual(&files, "main.fr", false)
             .map_err(|errors| format!("buffered path: {errors:#?}"))?;
         let mut manifest: ManifestRoot = serde_json::from_str(&buffered.manifest)?;
-        assert_eq!(manifest.canvases[0].path_buffers[0].segments, 66);
+        assert_eq!(manifest.raster_entries[0].path_buffers[0].segments, 66);
         let mut renderer = CanvasRenderer::prepare(
             device.clone(),
             queue.clone(),
@@ -595,7 +598,7 @@ async fn verify_paths(
             "buffered and constant representations of identical geometry must match"
         );
         let mut incomplete = manifest.clone();
-        incomplete.canvases[0].path_buffers[0].data = None;
+        incomplete.raster_entries[0].path_buffers[0].data = None;
         assert!(
             CanvasRenderer::prepare(
                 device.clone(),
@@ -613,7 +616,7 @@ async fn verify_paths(
 
         // Reflect a non-default group/binding and then resize an array while the
         // static path buffer stays installed in the candidate's resource set.
-        let path = &mut manifest.canvases[0].path_buffers[0];
+        let path = &mut manifest.raster_entries[0].path_buffers[0];
         let old = (path.group, path.binding);
         path.group = 1;
         path.binding = 7;
@@ -848,7 +851,7 @@ async fn verify_intermediate_targets(
     let artifact = fresco::driver::compile_bundle_virtual(&files, "main.fr", false)
         .map_err(|errors| format!("compile failed: {errors:#?}"))?;
     let manifest: ManifestRoot = serde_json::from_str(&artifact.manifest)?;
-    let mut plan = manifest.canvases[0].pass_plan.clone();
+    let mut plan = manifest.raster_entries[0].pass_plan.clone();
     assert!(!plan.targets.is_empty());
     let id = plan.targets[0].id;
     for target in &mut plan.targets {
@@ -1030,11 +1033,11 @@ async fn verify_textures(
     // Move reflected texture/sampler bindings and the corresponding shader
     // declarations together. Runtime binding locations must follow the artifact.
     let mut module = naga::front::wgsl::parse_str(&output.wgsl)?;
-    let def = &mut manifest.canvases[0].textures[0];
+    let def = &mut manifest.raster_entries[0].textures[0];
     let old_texture = (def.group, def.binding);
     def.group = 2;
     def.binding = 7;
-    let sampler = manifest.canvases[0].sampler.as_mut().unwrap();
+    let sampler = manifest.raster_entries[0].sampler.as_mut().unwrap();
     let old_sampler = (sampler.group, sampler.binding);
     sampler.group = 1;
     sampler.binding = 5;

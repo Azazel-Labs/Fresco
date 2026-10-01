@@ -369,7 +369,9 @@ pub fn example_engine_sources_json() -> String {
 /// Compile a multi-file Fresco program supplied as a virtual file system.
 /// `files` must be a JS object mapping virtual path strings to source strings
 /// (e.g. `{ "main.fr": "...", "lib.fr": "..." }`).  `entrypoint` must be one
-/// of those keys and must contain at least one `canvas` definition.
+/// of those keys. It may declare entries (engine-registered `@entry` kinds,
+/// standalone raster entries, or surfaces) or only helpers; entry-free
+/// sources compile but produce no previewable root entry.
 #[wasm_bindgen]
 pub fn compile_fresco_bundle(files: JsValue, entrypoint: &str, include_explain: bool) -> JsValue {
     let files: HashMap<String, String> = match serde_wasm_bindgen::from_value(files) {
@@ -918,7 +920,7 @@ mod tests {
         ManifestGlobalUniform::export_all(cfg).expect("failed to export ManifestGlobalUniform");
         ManifestGlobalUniformField::export_all(cfg)
             .expect("failed to export ManifestGlobalUniformField");
-        <ManifestCanvas as TS>::export_all(cfg).expect("failed to export ManifestCanvas");
+        <ManifestRasterEntry as TS>::export_all(cfg).expect("failed to export ManifestRasterEntry");
         ManifestEnginePass::export_all(cfg).expect("failed to export ManifestEnginePass");
         ManifestEnginePassVariant::export_all(cfg)
             .expect("failed to export ManifestEnginePassVariant");

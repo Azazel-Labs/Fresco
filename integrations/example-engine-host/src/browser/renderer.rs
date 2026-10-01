@@ -1,5 +1,5 @@
 //! Entry selection and shared-renderer dispatch; no browser or compiler logic.
-use fresco_artifact::{ManifestCanvas, ManifestRoot, ManifestSurface, ManifestTexture};
+use fresco_artifact::{ManifestRasterEntry, ManifestRoot, ManifestSurface, ManifestTexture};
 use fresco_example_engine::{
     profile::{FrameInputs, camera::OrbitCamera, preview::PreviewShape},
     runtime::{
@@ -21,13 +21,13 @@ pub(super) enum Renderer {
 }
 
 enum Entry<'a> {
-    Canvas(&'a ManifestCanvas),
+    Canvas(&'a ManifestRasterEntry),
     Mesh(&'a ManifestSurface),
 }
 
 fn select<'a>(manifest: &'a ManifestRoot, name: &str) -> Result<Entry<'a>, String> {
     let mut entries = manifest
-        .canvases
+        .raster_entries
         .iter()
         .filter(|entry| entry.name == name)
         .map(Entry::Canvas)

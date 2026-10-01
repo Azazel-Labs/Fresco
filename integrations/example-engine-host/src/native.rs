@@ -125,7 +125,7 @@ pub fn compile(options: &Options) -> Result<PreparedArtifact, String> {
     let manifest: fresco_artifact::ManifestRoot =
         serde_json::from_str(&output.manifest).map_err(|error| error.to_string())?;
     let entries: Vec<_> = manifest
-        .canvases
+        .raster_entries
         .iter()
         .map(|entry| (entry.name.as_str(), EntryKind::Canvas))
         .chain(
@@ -191,7 +191,7 @@ pub fn compile(options: &Options) -> Result<PreparedArtifact, String> {
     let (parameters, texture_definitions) = match kind {
         EntryKind::Canvas => {
             let canvas = manifest
-                .canvases
+                .raster_entries
                 .iter()
                 .find(|canvas| canvas.name == entry)
                 .expect("selected canvas");

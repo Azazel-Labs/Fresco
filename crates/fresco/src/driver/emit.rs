@@ -3,20 +3,20 @@ use std::collections::{BTreeSet, HashMap};
 use std::str::FromStr;
 
 use fresco_artifact::{
-    ManifestArrayDefault as ArrayParamValue, ManifestCanvas, ManifestConfigAxis, ManifestEdge,
-    ManifestEnginePass, ManifestEnginePassVariant, ManifestEnginePassVariantBinding,
-    ManifestEntryProperty, ManifestGlobalUniform, ManifestGlobalUniformField,
-    ManifestIntermediateTarget, ManifestMeshPass, ManifestParam,
-    ManifestParamDefault as ParamDefaultValue, ManifestParamTypeInfo, ManifestPass,
-    ManifestPassInput, ManifestPassPlan, ManifestPathBuffer, ManifestPathData, ManifestPathSegment,
-    ManifestPipeline, ManifestPipelinePassSemantics, ManifestPipelineSemanticSummary, ManifestRoot,
-    ManifestSampler, ManifestSharedLayoutSignatureUse, ManifestSourceRange, ManifestStorageParam,
-    ManifestSurface, ManifestSurfaceContextField, ManifestSurfaceContractRequirements,
-    ManifestSurfaceCustomChannel, ManifestSurfaceEvaluationContract,
-    ManifestSurfaceEvaluationVariant, ManifestSurfaceEvaluationVariantBinding,
-    ManifestSurfaceParam, ManifestSurfaceRequirements, ManifestSurfaceSettings,
-    ManifestSurfaceVertexStage, ManifestTexture, ManifestTextureChannel, ManifestTextureMetadata,
-    ManifestVertexAttribute, ManifestVertexFactory, ManifestVertexFactoryBinding,
+    ManifestArrayDefault as ArrayParamValue, ManifestConfigAxis, ManifestEdge, ManifestEnginePass,
+    ManifestEnginePassVariant, ManifestEnginePassVariantBinding, ManifestEntryProperty,
+    ManifestGlobalUniform, ManifestGlobalUniformField, ManifestIntermediateTarget,
+    ManifestMeshPass, ManifestParam, ManifestParamDefault as ParamDefaultValue,
+    ManifestParamTypeInfo, ManifestPass, ManifestPassInput, ManifestPassPlan, ManifestPathBuffer,
+    ManifestPathData, ManifestPathSegment, ManifestPipeline, ManifestPipelinePassSemantics,
+    ManifestPipelineSemanticSummary, ManifestRasterEntry, ManifestRoot, ManifestSampler,
+    ManifestSharedLayoutSignatureUse, ManifestSourceRange, ManifestStorageParam, ManifestSurface,
+    ManifestSurfaceContextField, ManifestSurfaceContractRequirements, ManifestSurfaceCustomChannel,
+    ManifestSurfaceEvaluationContract, ManifestSurfaceEvaluationVariant,
+    ManifestSurfaceEvaluationVariantBinding, ManifestSurfaceParam, ManifestSurfaceRequirements,
+    ManifestSurfaceSettings, ManifestSurfaceVertexStage, ManifestTexture, ManifestTextureChannel,
+    ManifestTextureMetadata, ManifestVertexAttribute, ManifestVertexFactory,
+    ManifestVertexFactoryBinding,
 };
 use thiserror::Error;
 
@@ -728,10 +728,10 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
         renderers: super::renderers::catalog(pipelines).map_err(EmitError::ExecutablePass)?,
         tables: super::tables::build(structs, material_hirs).map_err(EmitError::ExecutablePass)?,
         build_profile: Some(build_profile.as_str().into()),
-        canvases: hirs
+        raster_entries: hirs
             .iter()
             .map(
-                |hir| -> Result<ManifestCanvas<ParamDefaultValue, f32>, EmitError> {
+                |hir| -> Result<ManifestRasterEntry<ParamDefaultValue, f32>, EmitError> {
                     let plan = pass_plan::build_for_hir(hir);
                     let textures = (!hir.textures.is_empty()).then(|| {
                         hir.textures
@@ -967,7 +967,7 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
                                     .collect(),
                             });
 
-                    Ok(ManifestCanvas {
+                    Ok(ManifestRasterEntry {
                         name: hir.name.clone(),
                         params: hir
                             .params
@@ -1570,7 +1570,7 @@ surface probe(sp: surf) -> material(finish) {
             let output = crate::test_support::compile_source(&source, "main.fr", "manifest", false)
                 .expect("texture fixture compiles without the example engine");
             let root: serde_json::Value = serde_json::from_str(&output.emitted).unwrap();
-            let texture_json = &root["canvases"][0]["textures"][0];
+            let texture_json = &root["raster_entries"][0]["textures"][0];
             let texture: fresco_artifact::ManifestTexture =
                 serde_json::from_value(texture_json.clone()).unwrap();
             assert_eq!(texture.name, "image");
@@ -1613,8 +1613,8 @@ canvas probe(uv: coord) -> color {
         let output = crate::test_support::compile_source(source, "main.fr", "manifest", false)
             .expect("buffer fixture compiles without the example engine");
         let root: serde_json::Value = serde_json::from_str(&output.emitted).unwrap();
-        let canvas = &root["canvases"][0];
-        let uniform_json = &canvas["global_uniforms"][0];
+        let raster = &root["raster_entries"][0];
+        let uniform_json = &raster["global_uniforms"][0];
         let uniform: fresco_artifact::ManifestGlobalUniform =
             serde_json::from_value(uniform_json.clone()).unwrap();
         assert_eq!(uniform.name, "input");
@@ -1625,7 +1625,7 @@ canvas probe(uv: coord) -> color {
         assert_eq!(uniform.fields[1].components, 2);
         assert_eq!(serde_json::to_value(&uniform).unwrap(), *uniform_json);
 
-        let storage_json = &canvas["storage_params"][0];
+        let storage_json = &raster["storage_params"][0];
         let storage: fresco_artifact::ManifestStorageParam =
             serde_json::from_value(storage_json.clone()).unwrap();
         assert_eq!(storage.name, "samples");
