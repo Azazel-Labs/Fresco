@@ -1,4 +1,5 @@
 use super::canvas::lower_user_helper_fn;
+use super::ir::project_context;
 use super::*;
 use crate::hir::Hir;
 use crate::material_hir::MaterialHir;
@@ -21,11 +22,8 @@ fn surface_inputs(
         "context",
         t.entry_context.expect("registered engine context"),
     );
-    let project = |function: &mut FunctionBuilder, path: &[u32]| {
-        path.iter().fold(argument, |base, &index| {
-            function.expr(Ex::AccessIndex { base, index })
-        })
-    };
+    let project =
+        |function: &mut FunctionBuilder, path: &[u32]| project_context(function, argument, path);
     let zero = function.expr(Ex::Literal(naga::Literal::F32(0.0)));
     let zero2 = function.expr(Ex::Compose {
         ty: t.v2,
@@ -254,24 +252,8 @@ fn lower_surface_vertex_fn(input: SurfaceVertexInputs<'_>) -> Option<naga::Funct
     let one = function.expr(Ex::Literal(naga::Literal::F32(1.0)));
 
     let mut param_scalars = scalars;
-    let mut param_scalar_ptrs = HashSet::new();
-    for (name, global) in param_globals {
-        match global {
-            SurfaceParamGlobal::Scalar(handle) => {
-                let ptr = function.expr(Ex::GlobalVariable(*handle));
-                param_scalars.insert(name.clone(), ptr);
-                param_scalar_ptrs.insert(ptr);
-            }
-            SurfaceParamGlobal::Color(handle) => {
-                let base = function.expr(Ex::GlobalVariable(*handle));
-                for (index, suffix) in [(0_u32, "r"), (1, "g"), (2, "b"), (3, "a")] {
-                    let ptr = function.expr(Ex::AccessIndex { base, index });
-                    param_scalars.insert(format!("{name}.{suffix}"), ptr);
-                    param_scalar_ptrs.insert(ptr);
-                }
-            }
-        }
-    }
+    let param_scalar_ptrs =
+        bind_surface_param_globals(&mut function, param_globals, &mut param_scalars);
 
     function.set_result(surface_vertex_ty);
 
@@ -386,24 +368,8 @@ fn lower_surface_response_fn(
     let one = function.expr(Ex::Literal(naga::Literal::F32(1.0)));
 
     let mut param_scalars = scalars;
-    let mut param_scalar_ptrs = HashSet::new();
-    for (name, global) in param_globals {
-        match global {
-            SurfaceParamGlobal::Scalar(handle) => {
-                let ptr = function.expr(Ex::GlobalVariable(*handle));
-                param_scalars.insert(name.clone(), ptr);
-                param_scalar_ptrs.insert(ptr);
-            }
-            SurfaceParamGlobal::Color(handle) => {
-                let base = function.expr(Ex::GlobalVariable(*handle));
-                for (index, suffix) in [(0_u32, "r"), (1, "g"), (2, "b"), (3, "a")] {
-                    let ptr = function.expr(Ex::AccessIndex { base, index });
-                    param_scalars.insert(format!("{name}.{suffix}"), ptr);
-                    param_scalar_ptrs.insert(ptr);
-                }
-            }
-        }
-    }
+    let param_scalar_ptrs =
+        bind_surface_param_globals(&mut function, param_globals, &mut param_scalars);
 
     function.set_result(material_ty);
 
@@ -727,6 +693,34 @@ fn lower_material_value(
 enum SurfaceParamGlobal {
     Scalar(Handle<naga::GlobalVariable>),
     Color(Handle<naga::GlobalVariable>),
+}
+
+/// Load each material param global into `param_scalars` (colors by `r`, `g`,
+/// `b`, `a` component) and return the loaded pointer expressions.
+fn bind_surface_param_globals(
+    function: &mut FunctionBuilder,
+    param_globals: &HashMap<String, SurfaceParamGlobal>,
+    param_scalars: &mut HashMap<String, Handle<Ex>>,
+) -> HashSet<Handle<Ex>> {
+    let mut ptrs = HashSet::new();
+    for (name, global) in param_globals {
+        match global {
+            SurfaceParamGlobal::Scalar(handle) => {
+                let ptr = function.expr(Ex::GlobalVariable(*handle));
+                param_scalars.insert(name.clone(), ptr);
+                ptrs.insert(ptr);
+            }
+            SurfaceParamGlobal::Color(handle) => {
+                let base = function.expr(Ex::GlobalVariable(*handle));
+                for (index, suffix) in [(0_u32, "r"), (1, "g"), (2, "b"), (3, "a")] {
+                    let ptr = function.expr(Ex::AccessIndex { base, index });
+                    param_scalars.insert(format!("{name}.{suffix}"), ptr);
+                    ptrs.insert(ptr);
+                }
+            }
+        }
+    }
+    ptrs
 }
 
 fn create_surface_param_globals(

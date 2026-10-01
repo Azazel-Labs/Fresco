@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 const SP: naga::Span = naga::Span::UNDEFINED;
 
-fn project_context(
+pub(super) fn project_context(
     function: &mut FunctionBuilder,
     mut base: Handle<Ex>,
     path: &[u32],
