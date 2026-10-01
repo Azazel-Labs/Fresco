@@ -442,6 +442,7 @@ fn lower_surface_response_fn(
 fn bridge_hir(material: &MaterialHir) -> Hir {
     Hir {
         entry_context: Some(material.context.clone()),
+        entry_kind: "surface".to_string(),
         name: material.name.clone(),
         params: material.params.clone(),
         rendering_policy: material.rendering_policy,

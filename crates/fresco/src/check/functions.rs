@@ -4764,6 +4764,7 @@ pub fn check_with_workbook(
     let mut c = Checker {
         hir: Hir {
             entry_context: None,
+            entry_kind: entry.entry_kind.clone(),
             name: entry.name.clone(),
             params: Vec::new(),
             rendering_policy: options.rendering_policy(),

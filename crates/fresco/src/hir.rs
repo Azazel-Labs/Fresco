@@ -3874,6 +3874,9 @@ pub struct RenderingPolicy {
 #[derive(Debug)]
 pub struct Hir {
     pub entry_context: Option<crate::context::EntryContext>,
+    /// Authored entry kind: `canvas`, an engine-registered `@entry` kind, or
+    /// `surface`. Used to word diagnostics and `--explain` receipts.
+    pub entry_kind: String,
     pub name: String,
     pub params: Vec<Param>,
     /// Absent only in helper-only checking contexts that do not render.

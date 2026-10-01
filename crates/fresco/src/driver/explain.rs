@@ -157,7 +157,11 @@ fn write_explain(
         let feature_labels = parse_feature_labels(hir);
         let gradient_guardrail_counts = parse_gradient_guardrail_counts(hir);
         let plan = pass_plan::build_for_hir(hir);
-        writeln!(out, "== fresco --explain: canvas `{}` ==", hir.name)?;
+        writeln!(
+            out,
+            "== fresco --explain: {} `{}` ==",
+            hir.entry_kind, hir.name
+        )?;
 
         out.push_str("pass plan (phase-1 locality partitioner DAG):\n");
         for p in &plan.passes {

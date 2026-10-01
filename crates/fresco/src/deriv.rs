@@ -758,6 +758,7 @@ mod tests {
     fn dummy_hir() -> Hir {
         Hir {
             entry_context: None,
+            entry_kind: "canvas".to_string(),
             name: "test".to_string(),
             params: Vec::new(),
             rendering_policy: Some(crate::hir::RenderingPolicy {

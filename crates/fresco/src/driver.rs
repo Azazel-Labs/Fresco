@@ -1013,7 +1013,7 @@ surface demo(sp: surf) -> material {
             file_diag
                 .diags
                 .iter()
-                .all(|diag| !diag.message.contains("requires at least one canvas"))
+                .all(|diag| !diag.message.contains("requires at least one"))
         }));
     }
 

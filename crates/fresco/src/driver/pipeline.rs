@@ -1387,15 +1387,27 @@ fn load_implicit_engine_modules(
             }
         };
 
-        if !program.raster_entries.is_empty() || !program.authored_entries.is_empty() {
+        let declared_entry = program
+            .raster_entries
+            .first()
+            .map(|entry| (&entry.entry_kind, &entry.name))
+            .or_else(|| {
+                program
+                    .authored_entries
+                    .first()
+                    .map(|entry| (&entry.kind, &entry.name))
+            });
+        if let Some((entry_kind, entry_name)) = declared_entry {
             diags.push(FileDiagnostics::one(
                 canonical.clone(),
                 src.as_str(),
                 vec![Diag::error(
                     0..0,
-                    "implicit engine modules cannot declare canvas entry points",
+                    format!(
+                        "implicit engine modules cannot declare entry points (found `{entry_kind}` entry `{entry_name}`)"
+                    ),
                 )
-                .with_help("move canvas definitions to the root source file; engine modules may provide helpers, surfaces, and material models")],
+                .with_help("move entry declarations to the root source file; engine modules may provide helpers, surfaces, material models, and `@entry` interfaces")],
             ));
             continue;
         }
@@ -1523,7 +1535,7 @@ fn load_import_functions(
                 .push((canonical.clone(), imported.pragmas.clone()));
         }
 
-        if !imported.raster_entries.is_empty() {
+        if let Some(entry) = imported.raster_entries.first() {
             ctx.diags.push(FileDiagnostics::one(
                 current_canonical,
                 current_src,
@@ -1531,12 +1543,12 @@ fn load_import_functions(
                     Diag::error(
                         import.span.clone(),
                         format!(
-                            "imported module `{}` contains a canvas definition, \
+                            "imported module `{}` contains `{}` entry `{}`, \
                          which is not supported in imported modules",
-                            import.path
+                            import.path, entry.entry_kind, entry.name
                         ),
                     )
-                    .with_help("keep canvas entry points in the root file; imported modules may provide helpers and surfaces"),
+                    .with_help("keep entry points in the root file; imported modules may provide helpers and surfaces"),
                 ],
             ));
             ctx.active_stack.pop();
@@ -2309,11 +2321,6 @@ fn select_workbook_preview_entry(
         return Ok(previewable_entry);
     }
 
-    let kind_label = match first_root_entry.kind {
-        crate::ast::RootEntryKind::Raster => "canvas",
-        crate::ast::RootEntryKind::Surface => "surface",
-    };
-
     Err(vec![FileDiagnostics::one(
         filename,
         src,
@@ -2321,7 +2328,7 @@ fn select_workbook_preview_entry(
             0..0,
             format!(
                 "workbook preview requires a previewable root entry; {} `{}` is not yet supported by the current preview host",
-                kind_label,
+                first_root_entry.entry_kind,
                 first_root_entry.name
             ),
         )

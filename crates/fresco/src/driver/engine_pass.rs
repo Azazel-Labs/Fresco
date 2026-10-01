@@ -452,7 +452,10 @@ fn emit_expr(expression: &SExpr, context: EmitContext<'_>) -> Result<String, Str
             && name == &context.entry.method =>
         {
             if args.len() != 1 {
-                return Err("canvas entry requires exactly one context argument".to_string());
+                return Err(format!(
+                    "entry method `{}` of `{}` requires exactly one context argument",
+                    context.entry.method, context.entry.interface
+                ));
             }
             let argument = args.first().expect("checked argument count");
             Ok(format!(

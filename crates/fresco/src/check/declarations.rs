@@ -240,6 +240,7 @@ pub(super) fn create_checker_for_surface(
     let mut c = Checker {
         hir: Hir {
             entry_context: None,
+            entry_kind: "surface".to_string(),
             name,
             params: Vec::new(),
             rendering_policy: options.rendering_policy(),
@@ -1323,6 +1324,7 @@ pub fn check(
         globals::build_global_uniform_registry(params, structs, &mut prep_diags);
     let mut c = Checker {
         hir: Hir {
+            entry_kind: entry.entry_kind.clone(),
             name: entry.name.clone(),
             entry_context: None,
             params: Vec::new(),

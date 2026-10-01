@@ -1101,9 +1101,9 @@ impl Checker {
                         self.diags.push(
                             Diag::error(
                                 span.clone(),
-                                "texture bindings are only allowed at canvas top level",
+                                "texture bindings are only allowed at entry top level",
                             )
-                            .with_help("move this declaration to the top-level canvas body"),
+                            .with_help("move this declaration to the top-level entry body"),
                         );
                         continue;
                     }
@@ -1434,7 +1434,7 @@ impl Checker {
                     self.diags.push(
                         Diag::error(
                             span.clone(),
-                            "`match` is not yet supported in canvas/surface layer blocks",
+                            "`match` is not yet supported in entry layer blocks",
                         )
                         .with_help("use `if` chains in layer blocks for now"),
                     );
@@ -2017,7 +2017,7 @@ impl Checker {
                             span.clone(),
                             "`return` is only valid inside function bodies",
                         )
-                        .with_help("remove `return` from canvas/compose blocks"),
+                        .with_help("remove `return` from entry/compose blocks"),
                     );
                 }
                 Stmt::Break { span } => {

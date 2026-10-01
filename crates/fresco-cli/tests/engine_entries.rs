@@ -55,6 +55,22 @@ fn engine_vocabulary_can_rename_entries_and_blocks() {
 }
 
 #[test]
+fn explain_receipt_names_the_registered_entry_kind() {
+    for (kind, method) in [("picture", "paint"), ("canvas", "draw")] {
+        let source = format!("{kind} demo {{ {method} {{ return #fff }} }}");
+        let output =
+            fresco::driver::compile_bundle_virtual(&files(kind, method, &source), "main.fr", true)
+                .unwrap_or_else(|errors| panic!("{kind}: {errors:?}"));
+        let explain = output.explain.expect("explain requested");
+        assert!(
+            explain.starts_with(&format!("== fresco --explain: {kind} `demo` ==")),
+            "{kind}: explain header should name the entry kind
+{explain}"
+        );
+    }
+}
+
+#[test]
 fn registered_shorthand_uses_authored_parameter_and_context_types() {
     let output = fresco::driver::compile_bundle_virtual(
         &files(

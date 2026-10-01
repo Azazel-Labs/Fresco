@@ -1393,6 +1393,7 @@ pub(super) fn validate_normalized_root_entry_params(
     let mut seen_signal: Option<(String, Span)> = None;
     let mut seen_delta: Option<(String, Span)> = None;
     let mut seen_resolution: Option<(String, Span)> = None;
+    let owner = entry.entry_kind.as_str();
 
     for param in &entry.params {
         // `param.role` drives which kind of parameter this is; `ty_name` is
@@ -1400,23 +1401,23 @@ pub(super) fn validate_normalized_root_entry_params(
         // and to word diagnostics — never to redetermine the classification.
         match param.role {
             RootEntryParamRole::Primary if param.ty_name == "coord" => {
-                note_unique_entry_param(&mut seen_coord, param, "coord", "canvas", prep_diags);
+                note_unique_entry_param(&mut seen_coord, param, "coord", owner, prep_diags);
             }
             RootEntryParamRole::Primary => {
-                note_unique_entry_param(&mut seen_surf, param, "surf", "entry", prep_diags);
+                note_unique_entry_param(&mut seen_surf, param, "surf", owner, prep_diags);
             }
             RootEntryParamRole::Signal => {
-                note_unique_entry_param(&mut seen_signal, param, "signal", "canvas", prep_diags);
+                note_unique_entry_param(&mut seen_signal, param, "signal", owner, prep_diags);
             }
             RootEntryParamRole::Delta => {
-                note_unique_entry_param(&mut seen_delta, param, "delta", "canvas", prep_diags);
+                note_unique_entry_param(&mut seen_delta, param, "delta", owner, prep_diags);
             }
             RootEntryParamRole::Resolution => {
                 note_unique_entry_param(
                     &mut seen_resolution,
                     param,
                     "resolution",
-                    "canvas",
+                    owner,
                     prep_diags,
                 );
             }
@@ -1457,7 +1458,7 @@ pub(super) fn validate_normalized_root_entry_params(
                     entry.name
                 ),
             )
-            .with_help("declare either a canvas-style `name: coord` input or a surface-style `name: surf` input, but not both"),
+            .with_help("declare either a raster entry `name: coord` input or a surface `name: surf` input, but not both"),
         );
     }
 
@@ -1474,7 +1475,7 @@ pub(super) fn validate_normalized_root_entry_params(
                 "declare one primary entry parameter as `name: coord` (for example `uv: coord`) or `name: surf` (for example `sp: surf`)",
             )
             .with_label(
-                "entry parameters define which name refers to the primary canvas or surface input",
+                "entry parameters define which name refers to the primary raster or surface input",
             ),
         );
     }

@@ -220,8 +220,9 @@ privacy/security boundary from this spelling.
 #### Orientation and pure animation signals
 
 The bundled Canvas mapping uses bottom-left origin, +X right, and +Y up.
-Use `orientation(y: down)` in a local space or `canvas_space` for a top-left
-interpretation. A custom engine still supplies the actual context coordinates;
+Use `orientation(y: down)` in a local space for a top-left interpretation
+(the former entry-wide `canvas_space` statement was removed and is rejected
+with a diagnostic). A custom engine still supplies the actual context coordinates;
 the language cannot repair an engine pass that violates its chosen convention.
 
 `wave`, `pulse`, and `ramp` construct time-dependent scalar expressions rather
@@ -275,8 +276,7 @@ validated separately from the implemented entry contract.
 
 A space maps sample coordinates. Content transforms generally require inverse
 mapping: moving a shape right means sampling its original field at a coordinate
-shifted left. `in space ...` establishes a scoped mapping; named spaces and
-`canvas_space` support reuse. Rewrites/materialization must preserve coordinates
+shifted left. `in space ...` establishes a scoped mapping; named spaces support reuse. Rewrites/materialization must preserve coordinates
 and filtering footprints.
 
 Units include pixels, UV, viewport-relative values, angles, and time. Pixel and
