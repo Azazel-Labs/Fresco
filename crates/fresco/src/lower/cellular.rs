@@ -153,12 +153,7 @@ impl<'h> FnCtx<'h> {
             let body = self.ir.end_block();
             self.finish_cellular_loop(counter, 49, body);
             // Expressions emitted within this loop cannot escape via a cache.
-            self.clear_point_sensitive_caches();
-            self.user_call_cache.clear();
-            self.path_sample_cache.clear();
-            self.path_param_sample_cache.clear();
-            self.gradient_dither3_cache = None;
-            self.texture_sample_cache.clear();
+            self.clear_block_scoped_caches(false);
             return self.ir.load(result);
         }
         let normals: &[[f32; 2]] = if geometry.cells.layout == CellLayout::Hex {
@@ -439,13 +434,7 @@ impl<'h> FnCtx<'h> {
         self.ir.store(alpha_ptr, zero);
         self.ir.store(index_ptr, zero);
         self.cellular_sample_depth += 1;
-        self.clear_point_sensitive_caches();
-        self.invariant_sx_cache.clear();
-        self.user_call_cache.clear();
-        self.path_sample_cache.clear();
-        self.path_param_sample_cache.clear();
-        self.gradient_dither3_cache = None;
-        self.texture_sample_cache.clear();
+        self.clear_block_scoped_caches(true);
         self.ir.begin_block();
         let index = self.ir.load(index_ptr);
         let width = self.ir.lit(axis as f32);
@@ -478,13 +467,7 @@ impl<'h> FnCtx<'h> {
         self.finish_cellular_loop(index_ptr, axis * axis, body);
         self.cellular_sample_depth -= 1;
         // Expressions emitted in the loop must never escape through a cache.
-        self.clear_point_sensitive_caches();
-        self.invariant_sx_cache.clear();
-        self.user_call_cache.clear();
-        self.path_sample_cache.clear();
-        self.path_param_sample_cache.clear();
-        self.gradient_dither3_cache = None;
-        self.texture_sample_cache.clear();
+        self.clear_block_scoped_caches(true);
         let rgb = self.ir.load(rgb_ptr);
         let alpha = self.ir.load(alpha_ptr);
         let safe_alpha = self.clamp_positive(alpha);

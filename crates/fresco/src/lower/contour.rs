@@ -94,6 +94,7 @@ impl<'h> FnCtx<'h> {
         }
         let key = (scope_id, inset.clone(), p);
         let contour = if let Some(result) = self
+            .caches
             .contour_cache
             .get(&key)
             .filter(|r| at.is_none() || r.edges.is_some())
@@ -105,7 +106,7 @@ impl<'h> FnCtx<'h> {
             } else {
                 self.build_cell_contour(scope_id, inset, p)
             };
-            self.contour_cache.insert(key, result);
+            self.caches.contour_cache.insert(key, result);
             result
         };
         if channel < 6 {
@@ -405,14 +406,9 @@ impl<'h> FnCtx<'h> {
         let body = self.ir.end_block();
         self.finish_cellular_loop(i, count, body);
         // No expression defined inside the face loop may escape through CSE.
-        let contour_cache = std::mem::take(&mut self.contour_cache);
-        self.clear_point_sensitive_caches();
-        self.contour_cache = contour_cache;
-        self.user_call_cache.clear();
-        self.path_sample_cache.clear();
-        self.path_param_sample_cache.clear();
-        self.texture_sample_cache.clear();
-        self.gradient_dither3_cache = None;
+        let contour_cache = std::mem::take(&mut self.caches.contour_cache);
+        self.clear_block_scoped_caches(false);
+        self.caches.contour_cache = contour_cache;
 
         let total = self.ir.local("contour_total", self.ir.types.v2, None);
         let empty = self.ir.vec2(zero, zero);

@@ -729,8 +729,8 @@ impl<'h> FnCtx<'h> {
             });
             (body_rgb, body_a)
         } else {
-            self.sx_cache.clear();
-            self.sdf_cache.clear();
+            self.caches.sx_cache.clear();
+            self.caches.sdf_cache.clear();
 
             self.scatter_instance_ctx.push(ScatterInstanceCtx {
                 pos_x: inst_pos_x,
@@ -860,9 +860,11 @@ impl<'h> FnCtx<'h> {
     fn clear_shape_color_caches(&mut self) {
         // Changing the color receiver does not invalidate geometry or scene
         // expressions. Preserve their sharing across adjacent effects.
-        self.sx_cache
+        self.caches
+            .sx_cache
             .retain(|(expr, _), _| !expr.requires_shape_color_frame());
-        self.user_call_cache
+        self.caches
+            .user_call_cache
             .retain(|(call, _), _| !call.args.iter().any(Sx::requires_shape_color_frame));
     }
 
@@ -1303,7 +1305,7 @@ impl<'h> FnCtx<'h> {
                 // Keep only invariant entries created outside scatter-bin branch
                 // bodies. Entries created while lowering one bin can reference
                 // block-scoped temporaries and must not be reused in sibling bins.
-                let invariant_sx_cache_base = self.invariant_sx_cache.clone();
+                let invariant_sx_cache_base = self.caches.invariant_sx_cache.clone();
 
                 for (bin_idx, bin_entries) in bins.iter().enumerate().rev() {
                     if bin_entries.is_empty() {
@@ -1315,7 +1317,7 @@ impl<'h> FnCtx<'h> {
                     // reference identifiers introduced in a different branch.
                     self.clear_point_sensitive_caches();
                     // Restore only the safe baseline from outside branch scopes.
-                    self.invariant_sx_cache = invariant_sx_cache_base.clone();
+                    self.caches.invariant_sx_cache = invariant_sx_cache_base.clone();
 
                     let idx_f = self.ir.lit(bin_idx as f32);
                     let cond = self.ir.bin(Bo::Equal, selected, idx_f);
@@ -1386,7 +1388,7 @@ impl<'h> FnCtx<'h> {
                 }
 
                 // Do not leak bin-local invariant cache entries to later layers.
-                self.invariant_sx_cache = invariant_sx_cache_base;
+                self.caches.invariant_sx_cache = invariant_sx_cache_base;
 
                 let out = self.ir.load(out_ptr);
                 let out_alpha = self.ir.load(out_alpha_ptr);
@@ -1497,13 +1499,7 @@ impl<'h> FnCtx<'h> {
                 // Branches emit nested WGSL blocks. Any cache that stores
                 // expression handles must be cleared so branch-local values do
                 // not leak into sibling/outer scopes.
-                self.clear_point_sensitive_caches();
-                self.invariant_sx_cache.clear();
-                self.user_call_cache.clear();
-                self.path_sample_cache.clear();
-                self.path_param_sample_cache.clear();
-                self.gradient_dither3_cache = None;
-                self.texture_sample_cache.clear();
+                self.clear_block_scoped_caches(true);
                 self.ir.begin_block();
                 {
                     let (then_rgb, then_a) = self.layer_color(then_layer, p);
@@ -1512,13 +1508,7 @@ impl<'h> FnCtx<'h> {
                 }
                 let accept = self.ir.end_block();
 
-                self.clear_point_sensitive_caches();
-                self.invariant_sx_cache.clear();
-                self.user_call_cache.clear();
-                self.path_sample_cache.clear();
-                self.path_param_sample_cache.clear();
-                self.gradient_dither3_cache = None;
-                self.texture_sample_cache.clear();
+                self.clear_block_scoped_caches(true);
                 self.ir.begin_block();
                 {
                     let (else_rgb, else_a) = self.layer_color(else_layer, p);
@@ -1551,13 +1541,7 @@ impl<'h> FnCtx<'h> {
                         )
                     });
 
-                self.clear_point_sensitive_caches();
-                self.invariant_sx_cache.clear();
-                self.user_call_cache.clear();
-                self.path_sample_cache.clear();
-                self.path_param_sample_cache.clear();
-                self.gradient_dither3_cache = None;
-                self.texture_sample_cache.clear();
+                self.clear_block_scoped_caches(true);
 
                 if requires_uniform_evaluation {
                     self.ir.push_statement(naga::Statement::Block(accept));

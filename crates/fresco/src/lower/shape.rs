@@ -8,15 +8,12 @@ impl<'h> FnCtx<'h> {
     }
 
     pub(super) fn clear_point_sensitive_caches(&mut self) {
-        self.sx_cache.clear();
-        self.contour_cache.clear();
-        self.sdf_cache.clear();
-        self.local_pixel_span_cache.clear();
-        self.shape_anchor_cache.clear();
-        self.shape_half_extent_cache.clear();
-        self.shape_local_point_cache.clear();
-        self.shape_anchor_space_point_cache.clear();
-        self.shape_glow_warp_cache.clear();
+        self.caches.clear_point_sensitive();
+    }
+
+    /// See [`LowerCaches::clear_block_scoped`].
+    pub(super) fn clear_block_scoped_caches(&mut self, include_invariant: bool) {
+        self.caches.clear_block_scoped(include_invariant);
     }
 
     fn adaptive_aa_width(&mut self, d: Handle<Ex>) -> Handle<Ex> {
@@ -291,7 +288,7 @@ impl<'h> FnCtx<'h> {
     }
 
     pub(super) fn shape_anchor(&mut self, id: ShapeId, p: Handle<Ex>) -> Handle<Ex> {
-        if let Some(cached) = self.shape_anchor_cache.get(&(id, p)).copied() {
+        if let Some(cached) = self.caches.shape_anchor_cache.get(&(id, p)).copied() {
             return cached;
         }
 
@@ -370,12 +367,12 @@ impl<'h> FnCtx<'h> {
                 self.ir.mul(sum, half2)
             }
         };
-        self.shape_anchor_cache.insert((id, p), anchor);
+        self.caches.shape_anchor_cache.insert((id, p), anchor);
         anchor
     }
 
     pub(super) fn shape_half_extent(&mut self, id: ShapeId, p: Handle<Ex>) -> Handle<Ex> {
-        if let Some(cached) = self.shape_half_extent_cache.get(&(id, p)).copied() {
+        if let Some(cached) = self.caches.shape_half_extent_cache.get(&(id, p)).copied() {
             return cached;
         }
 
@@ -467,12 +464,12 @@ impl<'h> FnCtx<'h> {
                 self.ir.m2(Mf::Max, ea, eb)
             }
         };
-        self.shape_half_extent_cache.insert((id, p), extent);
+        self.caches.shape_half_extent_cache.insert((id, p), extent);
         extent
     }
 
     pub(super) fn shape_local_point(&mut self, id: ShapeId, p: Handle<Ex>) -> Handle<Ex> {
-        if let Some(cached) = self.shape_local_point_cache.get(&(id, p)).copied() {
+        if let Some(cached) = self.caches.shape_local_point_cache.get(&(id, p)).copied() {
             return cached;
         }
 
@@ -489,7 +486,9 @@ impl<'h> FnCtx<'h> {
         let half = self.ir.lit(0.5);
         let half2 = self.ir.splat2(half);
         let local_point = self.ir.addx(half2, unit);
-        self.shape_local_point_cache.insert((id, p), local_point);
+        self.caches
+            .shape_local_point_cache
+            .insert((id, p), local_point);
         local_point
     }
 
@@ -500,7 +499,12 @@ impl<'h> FnCtx<'h> {
         sample_p: Handle<Ex>,
     ) -> Handle<Ex> {
         let key = (id, anchor_sample_p, sample_p);
-        if let Some(cached) = self.shape_anchor_space_point_cache.get(&key).copied() {
+        if let Some(cached) = self
+            .caches
+            .shape_anchor_space_point_cache
+            .get(&key)
+            .copied()
+        {
             return cached;
         }
 
@@ -510,7 +514,9 @@ impl<'h> FnCtx<'h> {
         let center = self.ir.vec2(half_x, half_y);
         let delta = self.ir.sub(sample_p, anchor);
         let point = self.ir.addx(center, delta);
-        self.shape_anchor_space_point_cache.insert(key, point);
+        self.caches
+            .shape_anchor_space_point_cache
+            .insert(key, point);
         point
     }
 
@@ -522,7 +528,7 @@ impl<'h> FnCtx<'h> {
         ry: Handle<Ex>,
     ) -> (Handle<Ex>, Handle<Ex>) {
         let key = (id, p, rx, ry);
-        if let Some(cached) = self.shape_glow_warp_cache.get(&key).copied() {
+        if let Some(cached) = self.caches.shape_glow_warp_cache.get(&key).copied() {
             return cached;
         }
 
@@ -543,12 +549,12 @@ impl<'h> FnCtx<'h> {
         let scaled = self.ir.vec2(qx_scaled, qy_scaled);
         let glow_p = self.ir.addx(anchor, scaled);
         let out = (glow_p, max_r);
-        self.shape_glow_warp_cache.insert(key, out);
+        self.caches.shape_glow_warp_cache.insert(key, out);
         out
     }
 
     pub(super) fn sdf(&mut self, id: ShapeId, p: Handle<Ex>) -> Handle<Ex> {
-        if let Some(h) = self.sdf_cache.get(&(id, p)) {
+        if let Some(h) = self.caches.sdf_cache.get(&(id, p)) {
             self.stats.sdf_cache_hits += 1;
             return *h;
         }
@@ -1091,7 +1097,7 @@ impl<'h> FnCtx<'h> {
             }
         };
         self.ir.name(d, &format!("d_s{id}"));
-        self.sdf_cache.insert((id, p), d);
+        self.caches.sdf_cache.insert((id, p), d);
         d
     }
 

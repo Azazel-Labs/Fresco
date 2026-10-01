@@ -157,7 +157,7 @@ impl<'h> FnCtx<'h> {
             return self.ir.px;
         }
 
-        if let Some(cached) = self.local_pixel_span_cache.get(&p).copied() {
+        if let Some(cached) = self.caches.local_pixel_span_cache.get(&p).copied() {
             return cached;
         }
 
@@ -178,7 +178,7 @@ impl<'h> FnCtx<'h> {
             .lit(self.rendering_policy().projective_footprint_max_px);
         let span_cap = self.ir.mul(cap_mul, self.ir.px);
         let local_px = self.ir.m2(Mf::Min, span_min, span_cap);
-        self.local_pixel_span_cache.insert(p, local_px);
+        self.caches.local_pixel_span_cache.insert(p, local_px);
         local_px
     }
 
@@ -309,21 +309,21 @@ impl<'h> FnCtx<'h> {
             return self.sx_at_uncached(s, p);
         }
         if self.sx_is_sample_point_invariant(s) {
-            if let Some(cached) = self.invariant_sx_cache.get(s).copied() {
+            if let Some(cached) = self.caches.invariant_sx_cache.get(s).copied() {
                 return cached;
             }
             let lowered = self.sx_at_uncached(s, p);
-            self.invariant_sx_cache.insert(s.clone(), lowered);
+            self.caches.invariant_sx_cache.insert(s.clone(), lowered);
             return lowered;
         }
 
         if s.is_cacheable_at_point() {
             let key = (s.clone(), p);
-            if let Some(cached) = self.sx_cache.get(&key).copied() {
+            if let Some(cached) = self.caches.sx_cache.get(&key).copied() {
                 return cached;
             }
             let lowered = self.sx_at_uncached(s, p);
-            self.sx_cache.insert(key, lowered);
+            self.caches.sx_cache.insert(key, lowered);
             return lowered;
         }
 
@@ -391,7 +391,7 @@ impl<'h> FnCtx<'h> {
                         sample: Rc::clone(sample),
                         channel: u8::try_from(index).expect("RGBA channel fits u8"),
                     };
-                    self.sx_cache.insert((key, p), value);
+                    self.caches.sx_cache.insert((key, p), value);
                 }
                 channels[usize::from(*channel)]
             }
@@ -921,6 +921,7 @@ impl<'h> FnCtx<'h> {
                     (p, TextureSampleCoordKey::Current)
                 };
                 let sample = if let Some(&cached) = self
+                    .caches
                     .texture_sample_cache
                     .get(&(tex_global, sample_key.clone()))
                 {
@@ -943,7 +944,8 @@ impl<'h> FnCtx<'h> {
                         depth_ref: None,
                         clamp_to_edge: false,
                     });
-                    self.texture_sample_cache
+                    self.caches
+                        .texture_sample_cache
                         .insert((tex_global, sample_key), sample);
                     sample
                 };
@@ -1139,7 +1141,7 @@ impl<'h> FnCtx<'h> {
 
     fn lower_path_sample_result(&mut self, path_id: usize, p: Handle<Ex>) -> Handle<Ex> {
         let key = (path_id, p);
-        if let Some(handle) = self.path_sample_cache.get(&key).copied() {
+        if let Some(handle) = self.caches.path_sample_cache.get(&key).copied() {
             return handle;
         }
 
@@ -1154,13 +1156,13 @@ impl<'h> FnCtx<'h> {
             arguments: vec![p],
             result: Some(call_result),
         });
-        self.path_sample_cache.insert(key, call_result);
+        self.caches.path_sample_cache.insert(key, call_result);
         call_result
     }
 
     fn lower_path_param_sample_result(&mut self, path_id: usize, s: Handle<Ex>) -> Handle<Ex> {
         let key = (path_id, s);
-        if let Some(handle) = self.path_param_sample_cache.get(&key).copied() {
+        if let Some(handle) = self.caches.path_param_sample_cache.get(&key).copied() {
             return handle;
         }
 
@@ -1175,7 +1177,7 @@ impl<'h> FnCtx<'h> {
             arguments: vec![s],
             result: Some(call_result),
         });
-        self.path_param_sample_cache.insert(key, call_result);
+        self.caches.path_param_sample_cache.insert(key, call_result);
         call_result
     }
 
@@ -1187,7 +1189,7 @@ impl<'h> FnCtx<'h> {
         // Arguments and captured coordinates may depend on the active sample point.
         // Invariant scalar expressions are already cached by sx_at.
         let key = (call.clone(), Some(p));
-        if let Some(handle) = self.user_call_cache.get(&key).copied() {
+        if let Some(handle) = self.caches.user_call_cache.get(&key).copied() {
             return handle;
         }
 
@@ -1335,7 +1337,7 @@ impl<'h> FnCtx<'h> {
             arguments: args,
             result: Some(call_result),
         });
-        self.user_call_cache.insert(key, call_result);
+        self.caches.user_call_cache.insert(key, call_result);
         call_result
     }
 
@@ -1504,7 +1506,7 @@ impl<'h> FnCtx<'h> {
     /// Deterministic per-channel gradient dither in approximately +/-0.5 LSB
     /// of 8-bit color. Applied in linear space to reduce visible banding.
     pub(super) fn gradient_dither3(&mut self) -> Handle<Ex> {
-        if let Some(cached) = self.gradient_dither3_cache {
+        if let Some(cached) = self.caches.gradient_dither3_cache {
             return cached;
         }
 
@@ -1558,7 +1560,7 @@ impl<'h> FnCtx<'h> {
             ty: self.ir.types.v3,
             components: vec![r, g, b],
         });
-        self.gradient_dither3_cache = Some(dither);
+        self.caches.gradient_dither3_cache = Some(dither);
         dither
     }
 

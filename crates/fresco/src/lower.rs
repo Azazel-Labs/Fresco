@@ -226,6 +226,16 @@ struct FunctionBuilder {
     active_locality: Option<Locality>,
 }
 
+/// The ambient per-sample values every lowered function reads.
+struct SampleInputs {
+    uv: Handle<Ex>,
+    time: Handle<Ex>,
+    delta: Handle<Ex>,
+    res: Handle<Ex>,
+    px: Handle<Ex>,
+    aa: Handle<Ex>,
+}
+
 struct IrBuilder {
     function: FunctionBuilder,
     types: TypeHandles,
@@ -263,16 +273,13 @@ struct BoxFilterDomain {
     dy: Handle<Ex>,
 }
 
-struct FnCtx<'h> {
-    hir: &'h Hir,
-    ir: IrBuilder,
-    /// True when Sx::Param resolves to immutable canvas/runtime parameters.
-    /// Helper and scatter-lowering contexts set this false because their
-    /// param slots include mutable locals.
-    params_are_immutable: bool,
-    current_pass_id: Option<usize>,
-    layer_to_pass: Vec<usize>,
-    pass_output_target_names: HashMap<usize, String>,
+/// Expression-handle caches that let one `FnCtx` reuse lowered values.
+///
+/// Every entry stores naga expression handles, so a cache must be cleared
+/// whenever lowering enters or leaves a nested block whose values cannot
+/// escape (loops, branches, per-instance bodies).
+#[derive(Default)]
+struct LowerCaches {
     /// Shape CSE (§10.3): one SDF evaluation per (shape, coordinate).
     sdf_cache: HashMap<(ShapeId, Handle<Ex>), Handle<Ex>>,
     /// Scalar CSE: reuse lowered scalar subexpressions at the same sample point.
@@ -292,6 +299,64 @@ struct FnCtx<'h> {
     shape_anchor_space_point_cache: HashMap<(ShapeId, Handle<Ex>, Handle<Ex>), Handle<Ex>>,
     /// Reuse GlowReach::Vec2 warp results keyed by shape, sample point, and reach handles.
     shape_glow_warp_cache: GlowWarpCache,
+    /// Runtime call-result cache to avoid emitting duplicate call statements
+    /// when multiple components read from the same vector-returning call.
+    user_call_cache: HashMap<(crate::hir::UserFnCall, Option<Handle<Ex>>), Handle<Ex>>,
+    /// Cache nearest-search helper results per path and sample coordinate.
+    path_sample_cache: HashMap<(usize, Handle<Ex>), Handle<Ex>>,
+    /// Cache arc-length helper results per path and scalar sample parameter.
+    path_param_sample_cache: HashMap<(usize, Handle<Ex>), Handle<Ex>>,
+    /// Reuse texture samples for repeated channel reads from the same texture at the same coordinate.
+    texture_sample_cache:
+        HashMap<(Handle<naga::GlobalVariable>, TextureSampleCoordKey), Handle<Ex>>,
+    /// Reuse the per-pixel gradient dither vector across multiple gradient fills.
+    gradient_dither3_cache: Option<Handle<Ex>>,
+}
+
+impl LowerCaches {
+    /// Drop every cache whose entries are keyed by (or computed at) a
+    /// specific sample point.
+    fn clear_point_sensitive(&mut self) {
+        self.sx_cache.clear();
+        self.contour_cache.clear();
+        self.sdf_cache.clear();
+        self.local_pixel_span_cache.clear();
+        self.shape_anchor_cache.clear();
+        self.shape_half_extent_cache.clear();
+        self.shape_local_point_cache.clear();
+        self.shape_anchor_space_point_cache.clear();
+        self.shape_glow_warp_cache.clear();
+    }
+
+    /// Drop every cache that could leak expression handles out of a nested
+    /// block: the point-sensitive caches plus helper-call, path-sample,
+    /// texture-sample, and dither results. `include_invariant` also drops
+    /// sample-point-invariant scalars.
+    fn clear_block_scoped(&mut self, include_invariant: bool) {
+        self.clear_point_sensitive();
+        if include_invariant {
+            self.invariant_sx_cache.clear();
+        }
+        self.user_call_cache.clear();
+        self.path_sample_cache.clear();
+        self.path_param_sample_cache.clear();
+        self.gradient_dither3_cache = None;
+        self.texture_sample_cache.clear();
+    }
+}
+
+struct FnCtx<'h> {
+    hir: &'h Hir,
+    ir: IrBuilder,
+    /// True when Sx::Param resolves to immutable canvas/runtime parameters.
+    /// Helper and scatter-lowering contexts set this false because their
+    /// param slots include mutable locals.
+    params_are_immutable: bool,
+    current_pass_id: Option<usize>,
+    layer_to_pass: Vec<usize>,
+    pass_output_target_names: HashMap<usize, String>,
+    /// Expression caches keyed by sample point; see [`LowerCaches`].
+    caches: LowerCaches,
     source_color_ctx: Vec<SourceColorCtx>,
     effect_input_layer_ctx: Vec<LayerId>,
     scatter_instance_ctx: Vec<ScatterInstanceCtx>,
@@ -306,20 +371,8 @@ struct FnCtx<'h> {
     scatter_body_fns: HashMap<LayerId, Handle<naga::Function>>,
     /// Pre-built user helper functions indexed by helper id.
     user_helper_fns: HashMap<String, Handle<naga::Function>>,
-    /// Runtime call-result cache to avoid emitting duplicate call statements
-    /// when multiple components read from the same vector-returning call.
-    user_call_cache: HashMap<(crate::hir::UserFnCall, Option<Handle<Ex>>), Handle<Ex>>,
     /// Shared path nearest-search helper handles by path profile id.
     path_helper_fns: HashMap<usize, PathHelperFns>,
-    /// Cache nearest-search helper results per path and sample coordinate.
-    path_sample_cache: HashMap<(usize, Handle<Ex>), Handle<Ex>>,
-    /// Cache arc-length helper results per path and scalar sample parameter.
-    path_param_sample_cache: HashMap<(usize, Handle<Ex>), Handle<Ex>>,
-    /// Reuse texture samples for repeated channel reads from the same texture at the same coordinate.
-    texture_sample_cache:
-        HashMap<(Handle<naga::GlobalVariable>, TextureSampleCoordKey), Handle<Ex>>,
-    /// Reuse the per-pixel gradient dither vector across multiple gradient fills.
-    gradient_dither3_cache: Option<Handle<Ex>>,
     color_shape: Option<ShapeId>,
     cell_inset_pixel_span: Option<Handle<Ex>>,
     /// Var-override stack for `Sx::Var` resolution inside `Layer::UserEffect` lowering.
@@ -329,6 +382,37 @@ struct FnCtx<'h> {
     /// After the body is lowered, the overrides are popped in reverse order.
     var_overrides: Vec<(String, Handle<Ex>)>,
     stats: Stats,
+}
+
+impl<'h> FnCtx<'h> {
+    /// A lowering context with empty caches and context stacks, immutable
+    /// params, and no prebuilt helper functions or pass routing. Callers
+    /// override only the fields their entry point needs.
+    fn new(hir: &'h Hir, ir: IrBuilder) -> Self {
+        FnCtx {
+            hir,
+            ir,
+            params_are_immutable: true,
+            current_pass_id: None,
+            layer_to_pass: Vec::new(),
+            pass_output_target_names: HashMap::new(),
+            caches: LowerCaches::default(),
+            source_color_ctx: Vec::new(),
+            effect_input_layer_ctx: Vec::new(),
+            scatter_instance_ctx: Vec::new(),
+            repeat_cell_ctx: Vec::new(),
+            cellular_sample_depth: 0,
+            discontinuity_space_depth: 0,
+            box_filter_domains: HashMap::new(),
+            scatter_body_fns: HashMap::new(),
+            user_helper_fns: HashMap::new(),
+            path_helper_fns: HashMap::new(),
+            color_shape: None,
+            cell_inset_pixel_span: None,
+            var_overrides: Vec::new(),
+            stats: Stats::default(),
+        }
+    }
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]

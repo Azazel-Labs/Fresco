@@ -275,62 +275,26 @@ fn lower_surface_vertex_fn(input: SurfaceVertexInputs<'_>) -> Option<naga::Funct
 
     function.set_result(surface_vertex_ty);
 
-    let mut cx = FnCtx {
-        hir: bridge_hir,
-        ir: IrBuilder {
+    let ir = IrBuilder {
+        param_scalars,
+        param_scalar_ptrs,
+        global_uniform_globals: global_uniform_globals.clone(),
+        ..IrBuilder::from_parts(
             function,
-            types: *t,
-            uv,
-            time,
-            time_override: None,
-            delta: zero,
-            res,
-            px: one,
-            aa: one,
-            jacobian_j11: None,
-            jacobian_j12: None,
-            jacobian_j21: None,
-            jacobian_j22: None,
-            param_scalars,
-            param_scalar_ptrs,
-            tex_globals: HashMap::new(),
-            sampler_global: None,
-            param_storage_globals: HashMap::new(),
-            global_uniform_globals: global_uniform_globals.clone(),
-        },
-        params_are_immutable: true,
-        current_pass_id: None,
-        layer_to_pass: Vec::new(),
-        pass_output_target_names: HashMap::new(),
-        sdf_cache: HashMap::new(),
-        sx_cache: HashMap::new(),
-        contour_cache: HashMap::new(),
-        invariant_sx_cache: HashMap::new(),
-        local_pixel_span_cache: HashMap::new(),
-        shape_anchor_cache: HashMap::new(),
-        shape_half_extent_cache: HashMap::new(),
-        shape_local_point_cache: HashMap::new(),
-        shape_anchor_space_point_cache: HashMap::new(),
-        shape_glow_warp_cache: HashMap::new(),
-        source_color_ctx: Vec::new(),
-        effect_input_layer_ctx: Vec::new(),
-        scatter_instance_ctx: Vec::new(),
-        repeat_cell_ctx: Vec::new(),
-        cellular_sample_depth: 0,
-        discontinuity_space_depth: 0,
-        box_filter_domains: HashMap::new(),
-        scatter_body_fns: HashMap::new(),
+            *t,
+            SampleInputs {
+                uv,
+                time,
+                delta: zero,
+                res,
+                px: one,
+                aa: one,
+            },
+        )
+    };
+    let mut cx = FnCtx {
         user_helper_fns,
-        user_call_cache: HashMap::new(),
-        path_helper_fns: HashMap::new(),
-        path_sample_cache: HashMap::new(),
-        path_param_sample_cache: HashMap::new(),
-        texture_sample_cache: HashMap::new(),
-        gradient_dither3_cache: None,
-        color_shape: None,
-        cell_inset_pixel_span: None,
-        var_overrides: Vec::new(),
-        stats: Stats::default(),
+        ..FnCtx::new(bridge_hir, ir)
     };
 
     let mut components = Vec::new();
@@ -451,62 +415,28 @@ fn lower_surface_response_fn(
 
     function.set_result(material_ty);
 
-    let mut cx = FnCtx {
-        hir: bridge_hir,
-        ir: IrBuilder {
+    let ir = IrBuilder {
+        param_scalars,
+        param_scalar_ptrs,
+        tex_globals: tex_globals.clone(),
+        sampler_global,
+        global_uniform_globals: global_uniform_globals.clone(),
+        ..IrBuilder::from_parts(
             function,
-            types: *t,
-            uv,
-            time,
-            time_override: None,
-            delta: zero,
-            res,
-            px: one,
-            aa: one,
-            jacobian_j11: None,
-            jacobian_j12: None,
-            jacobian_j21: None,
-            jacobian_j22: None,
-            param_scalars,
-            param_scalar_ptrs,
-            tex_globals: tex_globals.clone(),
-            sampler_global,
-            param_storage_globals: HashMap::new(),
-            global_uniform_globals: global_uniform_globals.clone(),
-        },
-        params_are_immutable: true,
-        current_pass_id: None,
-        layer_to_pass: Vec::new(),
-        pass_output_target_names: HashMap::new(),
-        sdf_cache: HashMap::new(),
-        sx_cache: HashMap::new(),
-        contour_cache: HashMap::new(),
-        invariant_sx_cache: HashMap::new(),
-        local_pixel_span_cache: HashMap::new(),
-        shape_anchor_cache: HashMap::new(),
-        shape_half_extent_cache: HashMap::new(),
-        shape_local_point_cache: HashMap::new(),
-        shape_anchor_space_point_cache: HashMap::new(),
-        shape_glow_warp_cache: HashMap::new(),
-        source_color_ctx: Vec::new(),
-        effect_input_layer_ctx: Vec::new(),
-        scatter_instance_ctx: Vec::new(),
-        repeat_cell_ctx: Vec::new(),
-        cellular_sample_depth: 0,
-        discontinuity_space_depth: 0,
-        box_filter_domains: HashMap::new(),
-        scatter_body_fns: HashMap::new(),
+            *t,
+            SampleInputs {
+                uv,
+                time,
+                delta: zero,
+                res,
+                px: one,
+                aa: one,
+            },
+        )
+    };
+    let mut cx = FnCtx {
         user_helper_fns,
-        user_call_cache: HashMap::new(),
-        path_helper_fns: HashMap::new(),
-        path_sample_cache: HashMap::new(),
-        path_param_sample_cache: HashMap::new(),
-        texture_sample_cache: HashMap::new(),
-        gradient_dither3_cache: None,
-        color_shape: None,
-        cell_inset_pixel_span: None,
-        var_overrides: Vec::new(),
-        stats: Stats::default(),
+        ..FnCtx::new(bridge_hir, ir)
     };
 
     let mut components = Vec::with_capacity(material.material_channels.len());

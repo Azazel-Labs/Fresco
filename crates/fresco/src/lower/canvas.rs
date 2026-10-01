@@ -21,27 +21,18 @@ pub(super) fn lower_path_nearest_fn(
         components: vec![zero, zero],
     });
 
-    let mut ir = IrBuilder {
+    let mut ir = IrBuilder::from_parts(
         function,
-        types: *t,
-        uv: p,
-        time: zero,
-        time_override: None,
-        delta: zero,
-        res: zero_vec2,
-        px: zero,
-        aa: zero,
-        jacobian_j11: None,
-        jacobian_j12: None,
-        jacobian_j21: None,
-        jacobian_j22: None,
-        param_scalars: HashMap::new(),
-        param_scalar_ptrs: HashSet::new(),
-        tex_globals: HashMap::new(),
-        sampler_global: None,
-        param_storage_globals: HashMap::new(),
-        global_uniform_globals: HashMap::new(),
-    };
+        *t,
+        SampleInputs {
+            uv: p,
+            time: zero,
+            delta: zero,
+            res: zero_vec2,
+            px: zero,
+            aa: zero,
+        },
+    );
     let px = ir.x_of(p);
     let py = ir.y_of(p);
     let eps = ir.lit(1.0e-6);
@@ -514,27 +505,18 @@ pub(super) fn lower_path_arc_sample_fn(
         components: vec![zero, zero],
     });
 
-    let mut ir = IrBuilder {
+    let mut ir = IrBuilder::from_parts(
         function,
-        types: *t,
-        uv: zero_vec2,
-        time: zero,
-        time_override: None,
-        delta: zero,
-        res: zero_vec2,
-        px: zero,
-        aa: zero,
-        jacobian_j11: None,
-        jacobian_j12: None,
-        jacobian_j21: None,
-        jacobian_j22: None,
-        param_scalars: HashMap::new(),
-        param_scalar_ptrs: HashSet::new(),
-        tex_globals: HashMap::new(),
-        sampler_global: None,
-        param_storage_globals: HashMap::new(),
-        global_uniform_globals: HashMap::new(),
-    };
+        *t,
+        SampleInputs {
+            uv: zero_vec2,
+            time: zero,
+            delta: zero,
+            res: zero_vec2,
+            px: zero,
+            aa: zero,
+        },
+    );
 
     let eps = ir.lit(1.0e-6);
     let one = ir.lit(1.0);
@@ -1370,7 +1352,7 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
     ) {
         for (index, stmt) in stmts.iter().enumerate() {
             let is_tail = implicit_tail_return && index + 1 == stmts.len();
-            self.cx.user_call_cache.clear();
+            self.cx.caches.user_call_cache.clear();
             self.cx.clear_point_sensitive_caches();
             match stmt {
                 crate::hir::UserFnStmt::Let { name, slots, init } => {
@@ -1508,7 +1490,7 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
                     let cond_bool = self.cx.ir.bin(Bo::NotEqual, cond_s, zero);
 
                     self.cx.ir.begin_block();
-                    self.cx.user_call_cache.clear();
+                    self.cx.caches.user_call_cache.clear();
                     self.cx.clear_point_sensitive_caches();
                     self.push_scope();
                     self.lower_stmt_list(then_body, in_loop, is_tail);
@@ -1516,14 +1498,14 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
                     let accept = self.cx.ir.end_block();
 
                     self.cx.ir.begin_block();
-                    self.cx.user_call_cache.clear();
+                    self.cx.caches.user_call_cache.clear();
                     self.cx.clear_point_sensitive_caches();
                     self.push_scope();
                     self.lower_stmt_list(else_body, in_loop, is_tail);
                     self.pop_scope();
                     let reject = self.cx.ir.end_block();
 
-                    self.cx.user_call_cache.clear();
+                    self.cx.caches.user_call_cache.clear();
                     self.cx.clear_point_sensitive_caches();
 
                     self.cx.ir.push_statement(naga::Statement::If {
@@ -1539,7 +1521,7 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
                     body,
                     index_name,
                 } => {
-                    self.cx.user_call_cache.clear();
+                    self.cx.caches.user_call_cache.clear();
                     self.cx.clear_point_sensitive_caches();
                     for slot in slots {
                         if !self.cx.ir.param_scalars.contains_key(slot) {
@@ -1662,45 +1644,13 @@ pub(super) fn lower_scatter_body_fn(
     let p = ir.uv;
 
     let mut cx = FnCtx {
-        hir,
-        ir,
         params_are_immutable: false,
-        current_pass_id: None,
-        layer_to_pass: Vec::new(),
-        pass_output_target_names: HashMap::new(),
-        sdf_cache: HashMap::new(),
-        sx_cache: HashMap::new(),
-        contour_cache: HashMap::new(),
-        invariant_sx_cache: HashMap::new(),
-        local_pixel_span_cache: HashMap::new(),
-        shape_anchor_cache: HashMap::new(),
-        shape_half_extent_cache: HashMap::new(),
-        shape_local_point_cache: HashMap::new(),
-        shape_anchor_space_point_cache: HashMap::new(),
-        shape_glow_warp_cache: HashMap::new(),
-        source_color_ctx: Vec::new(),
-        effect_input_layer_ctx: Vec::new(),
         scatter_instance_ctx: vec![instance_ctx],
-        repeat_cell_ctx: Vec::new(),
-        cellular_sample_depth: 0,
-        discontinuity_space_depth: 0,
-        box_filter_domains: HashMap::new(),
         // Scatter bodies may contain intrinsic helper calls (e.g. hoisted
         // noise helpers), so carry the prebuilt helper function table.
-        scatter_body_fns: HashMap::new(),
         user_helper_fns,
-        user_call_cache: HashMap::new(),
         path_helper_fns,
-        path_sample_cache: HashMap::new(),
-        path_param_sample_cache: HashMap::new(),
-        texture_sample_cache: HashMap::new(),
-        gradient_dither3_cache: None,
-        color_shape: None,
-        cell_inset_pixel_span: None,
-        var_overrides: Vec::new(),
-        stats: Stats {
-            ..Default::default()
-        },
+        ..FnCtx::new(hir, ir)
     };
 
     let (rgb, a) = cx.layer_color(body, p);
@@ -1723,43 +1673,10 @@ pub(super) fn lower_user_helper_fn(
 ) -> naga::Function {
     let ir = IrBuilder::new_user_helper(helper, t, policy, global_uniform_globals);
     let mut cx = FnCtx {
-        hir,
-        ir,
         params_are_immutable: false,
-        current_pass_id: None,
-        layer_to_pass: Vec::new(),
-        pass_output_target_names: HashMap::new(),
-        sdf_cache: HashMap::new(),
-        sx_cache: HashMap::new(),
-        contour_cache: HashMap::new(),
-        invariant_sx_cache: HashMap::new(),
-        local_pixel_span_cache: HashMap::new(),
-        shape_anchor_cache: HashMap::new(),
-        shape_half_extent_cache: HashMap::new(),
-        shape_local_point_cache: HashMap::new(),
-        shape_anchor_space_point_cache: HashMap::new(),
-        shape_glow_warp_cache: HashMap::new(),
-        source_color_ctx: Vec::new(),
-        effect_input_layer_ctx: Vec::new(),
-        scatter_instance_ctx: Vec::new(),
-        repeat_cell_ctx: Vec::new(),
-        cellular_sample_depth: 0,
-        discontinuity_space_depth: 0,
-        box_filter_domains: HashMap::new(),
-        scatter_body_fns: HashMap::new(),
         user_helper_fns,
-        user_call_cache: HashMap::new(),
         path_helper_fns,
-        path_sample_cache: HashMap::new(),
-        path_param_sample_cache: HashMap::new(),
-        texture_sample_cache: HashMap::new(),
-        gradient_dither3_cache: None,
-        color_shape: None,
-        cell_inset_pixel_span: None,
-        var_overrides: Vec::new(),
-        stats: Stats {
-            ..Default::default()
-        },
+        ..FnCtx::new(hir, ir)
     };
 
     let mut runtime = UserHelperRuntimeCtx::new(&mut cx, helper);
@@ -1789,55 +1706,26 @@ fn lower_scene_fn_with_root(
     param_storage_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
     global_uniform_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
 ) -> (naga::Function, Stats) {
+    let ir = IrBuilder::new(
+        scene_name,
+        t,
+        &hir.params,
+        policy,
+        tex_globals,
+        sampler_global,
+        param_storage_globals,
+        global_uniform_globals,
+        true,
+        None,
+    );
     let mut cx = FnCtx {
-        hir,
-        ir: IrBuilder::new(
-            scene_name,
-            t,
-            &hir.params,
-            policy,
-            tex_globals,
-            sampler_global,
-            param_storage_globals,
-            global_uniform_globals,
-            true,
-            None,
-        ),
-        params_are_immutable: true,
         current_pass_id,
         layer_to_pass,
         pass_output_target_names,
-        sdf_cache: HashMap::new(),
-        sx_cache: HashMap::new(),
-        contour_cache: HashMap::new(),
-        invariant_sx_cache: HashMap::new(),
-        local_pixel_span_cache: HashMap::new(),
-        shape_anchor_cache: HashMap::new(),
-        shape_half_extent_cache: HashMap::new(),
-        shape_local_point_cache: HashMap::new(),
-        shape_anchor_space_point_cache: HashMap::new(),
-        shape_glow_warp_cache: HashMap::new(),
-        source_color_ctx: Vec::new(),
-        effect_input_layer_ctx: Vec::new(),
-        scatter_instance_ctx: Vec::new(),
-        repeat_cell_ctx: Vec::new(),
-        cellular_sample_depth: 0,
-        discontinuity_space_depth: 0,
-        box_filter_domains: HashMap::new(),
         scatter_body_fns,
         user_helper_fns,
-        user_call_cache: HashMap::new(),
         path_helper_fns,
-        path_sample_cache: HashMap::new(),
-        path_param_sample_cache: HashMap::new(),
-        texture_sample_cache: HashMap::new(),
-        gradient_dither3_cache: None,
-        color_shape: None,
-        cell_inset_pixel_span: None,
-        var_overrides: Vec::new(),
-        stats: Stats {
-            ..Default::default()
-        },
+        ..FnCtx::new(hir, ir)
     };
 
     // `px` and `aa` are ambient values supplied through FrescoCtx.
@@ -2015,56 +1903,19 @@ fn lower_canvas_entry_fn_named(
         call_result
     }
 
-    let mut cx = FnCtx {
-        hir,
-        ir: IrBuilder::new(
-            entry_name,
-            t,
-            &hir.params,
-            policy,
-            tex_globals,
-            sampler_global,
-            &HashMap::new(),
-            &HashMap::new(),
-            false,
-            hir.entry_context.as_ref(),
-        ),
-        params_are_immutable: true,
-        current_pass_id: None,
-        layer_to_pass: Vec::new(),
-        pass_output_target_names: HashMap::new(),
-        sdf_cache: HashMap::new(),
-        sx_cache: HashMap::new(),
-        contour_cache: HashMap::new(),
-        invariant_sx_cache: HashMap::new(),
-        local_pixel_span_cache: HashMap::new(),
-        shape_anchor_cache: HashMap::new(),
-        shape_half_extent_cache: HashMap::new(),
-        shape_local_point_cache: HashMap::new(),
-        shape_anchor_space_point_cache: HashMap::new(),
-        shape_glow_warp_cache: HashMap::new(),
-        source_color_ctx: Vec::new(),
-        effect_input_layer_ctx: Vec::new(),
-        scatter_instance_ctx: Vec::new(),
-        repeat_cell_ctx: Vec::new(),
-        cellular_sample_depth: 0,
-        discontinuity_space_depth: 0,
-        box_filter_domains: HashMap::new(),
-        scatter_body_fns: HashMap::new(),
-        user_helper_fns: HashMap::new(),
-        user_call_cache: HashMap::new(),
-        path_helper_fns: HashMap::new(),
-        path_sample_cache: HashMap::new(),
-        path_param_sample_cache: HashMap::new(),
-        texture_sample_cache: HashMap::new(),
-        gradient_dither3_cache: None,
-        color_shape: None,
-        cell_inset_pixel_span: None,
-        var_overrides: Vec::new(),
-        stats: Stats {
-            ..Default::default()
-        },
-    };
+    let ir = IrBuilder::new(
+        entry_name,
+        t,
+        &hir.params,
+        policy,
+        tex_globals,
+        sampler_global,
+        &HashMap::new(),
+        &HashMap::new(),
+        false,
+        hir.entry_context.as_ref(),
+    );
+    let mut cx = FnCtx::new(hir, ir);
 
     // Build a context payload shared across scene re-evaluations.
     let res_y = cx.ir.add(Ex::AccessIndex {

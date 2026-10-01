@@ -425,6 +425,44 @@ impl FunctionBuilder {
 }
 
 impl IrBuilder {
+    /// A builder over `function` with the given ambient sample inputs and no
+    /// params, textures, globals, or footprint Jacobian bound yet.
+    pub(super) fn from_parts(
+        function: FunctionBuilder,
+        types: TypeHandles,
+        inputs: SampleInputs,
+    ) -> Self {
+        let SampleInputs {
+            uv,
+            time,
+            delta,
+            res,
+            px,
+            aa,
+        } = inputs;
+        IrBuilder {
+            function,
+            types,
+            uv,
+            time,
+            time_override: None,
+            delta,
+            res,
+            px,
+            aa,
+            jacobian_j11: None,
+            jacobian_j12: None,
+            jacobian_j21: None,
+            jacobian_j22: None,
+            param_scalars: HashMap::new(),
+            param_scalar_ptrs: HashSet::new(),
+            tex_globals: HashMap::new(),
+            sampler_global: None,
+            param_storage_globals: HashMap::new(),
+            global_uniform_globals: HashMap::new(),
+        }
+    }
+
     #[expect(
         clippy::too_many_arguments,
         reason = "This compiler boundary explicitly threads independent checking or lowering inputs."
@@ -646,26 +684,24 @@ impl IrBuilder {
         }
         function.set_result(t.v4);
 
-        Self {
-            function,
-            types: *t,
-            uv,
-            time,
-            time_override: None,
-            delta,
-            res,
-            px,
-            aa,
-            jacobian_j11: None,
-            jacobian_j12: None,
-            jacobian_j21: None,
-            jacobian_j22: None,
+        IrBuilder {
             param_scalars,
-            param_scalar_ptrs: HashSet::new(),
             tex_globals: tex_globals.clone(),
             sampler_global,
             param_storage_globals: param_storage_globals.clone(),
             global_uniform_globals: global_uniform_globals.clone(),
+            ..IrBuilder::from_parts(
+                function,
+                *t,
+                SampleInputs {
+                    uv,
+                    time,
+                    delta,
+                    res,
+                    px,
+                    aa,
+                },
+            )
         }
     }
 
@@ -796,26 +832,21 @@ impl IrBuilder {
             (zero_vec2, zero, zero, zero_vec2)
         };
 
-        Self {
-            function,
-            types: *t,
-            uv,
-            time,
-            time_override: None,
-            delta,
-            res,
-            px: zero,
-            aa: zero,
-            jacobian_j11: None,
-            jacobian_j12: None,
-            jacobian_j21: None,
-            jacobian_j22: None,
+        IrBuilder {
             param_scalars,
-            param_scalar_ptrs: HashSet::new(),
-            tex_globals: HashMap::new(),
-            sampler_global: None,
-            param_storage_globals: HashMap::new(),
             global_uniform_globals: global_uniform_globals.clone(),
+            ..IrBuilder::from_parts(
+                function,
+                *t,
+                SampleInputs {
+                    uv,
+                    time,
+                    delta,
+                    res,
+                    px: zero,
+                    aa: zero,
+                },
+            )
         }
     }
 
@@ -877,28 +908,25 @@ impl IrBuilder {
             age_norm: inst_age_norm,
         };
 
-        let ir = Self {
-            function,
-            types: *t,
-            uv: p,
-            time: time_h,
-            time_override: None,
-            delta: delta_h,
-            res: res_h,
-            px: px_h,
-            aa: aa_h,
-            jacobian_j11: None,
-            jacobian_j12: None,
-            jacobian_j21: None,
-            jacobian_j22: None,
+        let ir = IrBuilder {
             param_scalars,
-            param_scalar_ptrs: HashSet::new(),
             tex_globals: tex_globals.clone(),
             sampler_global,
-            // Scatter helper functions do not access dynamic array params directly;
-            // they receive expanded scalar arguments. Leave globals empty.
-            param_storage_globals: HashMap::new(),
             global_uniform_globals: global_uniform_globals.clone(),
+            // Scatter helper functions do not access dynamic array params directly;
+            // they receive expanded scalar arguments. Leave param storage globals empty.
+            ..IrBuilder::from_parts(
+                function,
+                *t,
+                SampleInputs {
+                    uv: p,
+                    time: time_h,
+                    delta: delta_h,
+                    res: res_h,
+                    px: px_h,
+                    aa: aa_h,
+                },
+            )
         };
 
         (ir, ctx)
