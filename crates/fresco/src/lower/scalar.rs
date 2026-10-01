@@ -18,10 +18,7 @@ impl<'h> FnCtx<'h> {
         let args = value
             .args
             .iter()
-            .map(|arg| match arg {
-                Sx::Typed(value) => self.typed_scalar(value, p),
-                value => self.sx_at(value, p),
-            })
+            .map(|arg| self.native_scalar(arg, p))
             .collect::<Vec<_>>();
         value
             .emit(&args, |e| Ok::<_, std::convert::Infallible>(self.ir.add(e)))
