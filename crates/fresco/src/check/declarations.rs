@@ -813,7 +813,7 @@ pub(crate) fn validate_conformance_method_bodies(
         struct_stack: &mut HashSet<String>,
         type_param_names: &HashSet<String>,
     ) -> Option<Value> {
-        let normalized = super::strip_spatial_type_suffix(ty_name);
+        let normalized = strip_spatial_type_suffix(ty_name);
         if type_param_names.contains(normalized) {
             return Some(Value::Scalar(Sx::Var(symbol_seed.to_string())));
         }
@@ -842,7 +842,7 @@ pub(crate) fn validate_conformance_method_bodies(
             }
 
             if base == "array" && args.len() == 1 {
-                let elem_type = match super::strip_spatial_type_suffix(&args[0]) {
+                let elem_type = match strip_spatial_type_suffix(&args[0]) {
                     "f32" | "f64" | "half" => hir::ArrayElemType::F32,
                     "i32" => hir::ArrayElemType::I32,
                     "u32" => hir::ArrayElemType::U32,
@@ -2503,28 +2503,6 @@ fn parse_fn_type(input: FnTypeInputs<'_>) -> Option<FnValueTy> {
             None
         }
     }
-}
-
-fn strip_spatial_type_suffix(name: &str) -> &str {
-    let trimmed = name.trim();
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" in ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-    {
-        return base.trim();
-    }
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" from ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-        && let Some((_src, dst)) = suffix.rsplit_once(" to ")
-        && !dst.trim().is_empty()
-    {
-        return base.trim();
-    }
-
-    trimmed
 }
 
 #[cfg(test)]

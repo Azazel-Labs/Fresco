@@ -1743,36 +1743,10 @@ fn declared_type_text_compatible(expected: &str, actual: &str) -> bool {
         return false;
     }
 
-    match (
-        spatial_qualifier_text(expected),
-        spatial_qualifier_text(actual),
-    ) {
+    match (spatial_qualifier(expected), spatial_qualifier(actual)) {
         (Some(expected_q), Some(actual_q)) => expected_q == actual_q,
         _ => true,
     }
-}
-
-fn spatial_qualifier_text(name: &str) -> Option<String> {
-    let trimmed = name.trim();
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" in ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-    {
-        return Some(format!("in {}", suffix.trim()));
-    }
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" from ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-        && let Some((src, dst)) = suffix.rsplit_once(" to ")
-        && !src.trim().is_empty()
-        && !dst.trim().is_empty()
-    {
-        return Some(format!("from {} to {}", src.trim(), dst.trim()));
-    }
-
-    None
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2171,6 +2145,39 @@ pub(super) fn local_decl_expected_kind(
             }
         }
     }
+}
+
+/// The `in <space>` / `from <a> to <b>` qualifier trailing a declared type name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SpatialQualifier {
+    In(String),
+    FromTo { from: String, to: String },
+}
+
+pub(crate) fn spatial_qualifier(ty_name: &str) -> Option<SpatialQualifier> {
+    let trimmed = ty_name.trim();
+
+    if let Some((base, suffix)) = trimmed.rsplit_once(" in ")
+        && !base.trim().is_empty()
+        && !suffix.trim().is_empty()
+    {
+        return Some(SpatialQualifier::In(suffix.trim().to_string()));
+    }
+
+    if let Some((base, suffix)) = trimmed.rsplit_once(" from ")
+        && !base.trim().is_empty()
+        && !suffix.trim().is_empty()
+        && let Some((src, dst)) = suffix.rsplit_once(" to ")
+        && !src.trim().is_empty()
+        && !dst.trim().is_empty()
+    {
+        return Some(SpatialQualifier::FromTo {
+            from: src.trim().to_string(),
+            to: dst.trim().to_string(),
+        });
+    }
+
+    None
 }
 
 pub(crate) fn strip_spatial_type_suffix(name: &str) -> &str {

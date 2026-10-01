@@ -121,38 +121,6 @@ enum MaterialPropertiesResolutionState {
     Failed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SpatialQualifier {
-    In(String),
-    FromTo { from: String, to: String },
-}
-
-fn spatial_qualifier(ty_name: &str) -> Option<SpatialQualifier> {
-    let trimmed = ty_name.trim();
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" in ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-    {
-        return Some(SpatialQualifier::In(suffix.trim().to_string()));
-    }
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" from ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-        && let Some((src, dst)) = suffix.rsplit_once(" to ")
-        && !src.trim().is_empty()
-        && !dst.trim().is_empty()
-    {
-        return Some(SpatialQualifier::FromTo {
-            from: src.trim().to_string(),
-            to: dst.trim().to_string(),
-        });
-    }
-
-    None
-}
-
 #[expect(
     clippy::too_many_arguments,
     reason = "This compiler boundary explicitly threads independent checking or lowering inputs."
@@ -470,8 +438,8 @@ pub(crate) fn validate_material_properties(
                     continue;
                 }
 
-                let inherited_qualifier = spatial_qualifier(&existing.ty_name);
-                let override_qualifier = spatial_qualifier(&channel.ty_name);
+                let inherited_qualifier = super::spatial_qualifier(&existing.ty_name);
+                let override_qualifier = super::spatial_qualifier(&channel.ty_name);
                 if let (Some(inherited), Some(override_q)) =
                     (&inherited_qualifier, &override_qualifier)
                     && inherited != override_q

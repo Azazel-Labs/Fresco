@@ -3568,28 +3568,6 @@ fn parse_local_fn_type(
     }
 }
 
-fn strip_spatial_type_suffix(name: &str) -> &str {
-    let trimmed = name.trim();
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" in ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-    {
-        return base.trim();
-    }
-
-    if let Some((base, suffix)) = trimmed.rsplit_once(" from ")
-        && !base.trim().is_empty()
-        && !suffix.trim().is_empty()
-        && let Some((_src, dst)) = suffix.rsplit_once(" to ")
-        && !dst.trim().is_empty()
-    {
-        return base.trim();
-    }
-
-    trimmed
-}
-
 #[cfg(test)]
 mod numeric_tests {
     use super::ScalarBounds;
