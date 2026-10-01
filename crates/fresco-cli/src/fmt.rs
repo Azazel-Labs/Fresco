@@ -5,6 +5,10 @@ use std::process::ExitCode;
 
 const INDENT: &str = "    ";
 
+/// Lines (or standalone calls) longer than this many bytes are candidates for
+/// wrapping.
+const WRAP_THRESHOLD: usize = 100;
+
 #[derive(Debug, Clone, Copy, Default, clap::ValueEnum, PartialEq, Eq)]
 pub enum BinaryWrapStyle {
     #[default]
@@ -52,11 +56,7 @@ pub fn run(paths: &[PathBuf], options: FormatOptions) -> ExitCode {
             }
         };
 
-        let formatted = if matches!(options.binary_wrap_style, BinaryWrapStyle::Indent) {
-            format_source(&src)
-        } else {
-            format_source_with_options(&src, options.binary_wrap_style)
-        };
+        let formatted = format_source_with_options(&src, options.binary_wrap_style);
         if formatted != src {
             changed += 1;
 
@@ -131,8 +131,7 @@ fn collect_fr_files(path: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
 fn is_fr_file(path: &Path) -> bool {
     path.extension()
         .and_then(OsStr::to_str)
-        .map(|ext| ext.eq_ignore_ascii_case("fr"))
-        .unwrap_or(false)
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("fr"))
 }
 
 #[derive(Default)]
@@ -148,56 +147,138 @@ struct ScanStats {
     close_bracket: usize,
 }
 
+/// Tracks string literals and `()`/`[]`/`{}` nesting while walking source
+/// text one character at a time.
+#[derive(Default)]
+struct DelimScanner {
+    paren: usize,
+    bracket: usize,
+    brace: usize,
+    in_string: bool,
+    escaped: bool,
+}
+
+impl DelimScanner {
+    /// A scanner positioned just inside an already-consumed `(`.
+    fn inside_paren() -> Self {
+        Self {
+            paren: 1,
+            ..Self::default()
+        }
+    }
+
+    /// Consumes `ch`, updating string and nesting state. Returns `true` when
+    /// `ch` is code: neither part of a string literal nor one of its quotes.
+    fn advance(&mut self, ch: char) -> bool {
+        if self.in_string {
+            if self.escaped {
+                self.escaped = false;
+            } else if ch == '\\' {
+                self.escaped = true;
+            } else if ch == '"' {
+                self.in_string = false;
+            }
+            return false;
+        }
+
+        match ch {
+            '"' => {
+                self.in_string = true;
+                return false;
+            }
+            '(' => self.paren += 1,
+            ')' => self.paren = self.paren.saturating_sub(1),
+            '[' => self.bracket += 1,
+            ']' => self.bracket = self.bracket.saturating_sub(1),
+            '{' => self.brace += 1,
+            '}' => self.brace = self.brace.saturating_sub(1),
+            _ => {}
+        }
+        true
+    }
+
+    fn at_top_level(&self) -> bool {
+        self.paren == 0 && self.bracket == 0 && self.brace == 0
+    }
+}
+
+/// The code characters of `line` (see [`DelimScanner::advance`]), stopping at
+/// a `//` comment that is not inside a string literal.
+fn code_chars(line: &str) -> impl Iterator<Item = char> + '_ {
+    let mut scanner = DelimScanner::default();
+    line.char_indices()
+        .map_while(move |(idx, ch)| {
+            if !scanner.in_string && line[idx..].starts_with("//") {
+                return None;
+            }
+            Some(scanner.advance(ch).then_some(ch))
+        })
+        .flatten()
+}
+
+/// The nearest non-whitespace characters before and after `chars[idx]`.
+fn non_ws_neighbors(chars: &[char], idx: usize) -> (Option<char>, Option<char>) {
+    let prev = chars[..idx]
+        .iter()
+        .rev()
+        .find(|c| !c.is_whitespace())
+        .copied();
+    let next = chars[idx + 1..]
+        .iter()
+        .find(|c| !c.is_whitespace())
+        .copied();
+    (prev, next)
+}
+
+/// Accumulates operands and operators of a top-level binary chain.
+#[derive(Default)]
+struct ChainSplit {
+    parts: Vec<String>,
+    ops: Vec<char>,
+    current: String,
+}
+
+impl ChainSplit {
+    /// Ends the current operand at operator `op`; `None` if the operand is empty.
+    fn split(&mut self, op: char) -> Option<()> {
+        let trimmed = self.current.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        self.parts.push(trimmed.to_string());
+        self.ops.push(op);
+        self.current.clear();
+        Some(())
+    }
+
+    /// The operands and operators, if the input formed a chain of at least two
+    /// non-empty operands.
+    fn finish(mut self) -> Option<(Vec<String>, Vec<char>)> {
+        let tail = self.current.trim();
+        if tail.is_empty() {
+            return None;
+        }
+        self.parts.push(tail.to_string());
+
+        (self.parts.len() >= 2 && self.ops.len() + 1 == self.parts.len())
+            .then_some((self.parts, self.ops))
+    }
+}
+
 fn scan_line(line: &str) -> ScanStats {
     let mut s = ScanStats::default();
-    let bytes = line.as_bytes();
-    let mut i = 0usize;
-
-    while i < bytes.len() {
-        match bytes[i] as char {
-            ' ' | '\t' => i += 1,
-            '}' => {
-                s.leading_closing_curly += 1;
-                i += 1;
-            }
-            ')' => {
-                s.leading_closing_paren += 1;
-                i += 1;
-            }
-            ']' => {
-                s.leading_closing_bracket += 1;
-                i += 1;
-            }
+    for ch in line.chars() {
+        match ch {
+            ' ' | '\t' => {}
+            '}' => s.leading_closing_curly += 1,
+            ')' => s.leading_closing_paren += 1,
+            ']' => s.leading_closing_bracket += 1,
             _ => break,
         }
     }
 
-    let mut in_string = false;
-    let mut escaped = false;
-    i = 0;
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
-        if !in_string && ch == '/' && i + 1 < bytes.len() && bytes[i + 1] as char == '/' {
-            break;
-        }
-
-        if in_string {
-            if escaped {
-                escaped = false;
-                i += 1;
-                continue;
-            }
-            if ch == '\\' {
-                escaped = true;
-            } else if ch == '"' {
-                in_string = false;
-            }
-            i += 1;
-            continue;
-        }
-
+    for ch in code_chars(line) {
         match ch {
-            '"' => in_string = true,
             '{' => s.open_curly += 1,
             '}' => s.close_curly += 1,
             '(' => s.open_paren += 1,
@@ -206,7 +287,6 @@ fn scan_line(line: &str) -> ScanStats {
             ']' => s.close_bracket += 1,
             _ => {}
         }
-        i += 1;
     }
 
     s
@@ -215,64 +295,17 @@ fn scan_line(line: &str) -> ScanStats {
 fn split_top_level(input: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
-    let mut paren = 0usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
+    let mut scanner = DelimScanner::default();
 
     for ch in input.chars() {
-        if in_string {
+        if scanner.advance(ch) && ch == ',' && scanner.at_top_level() {
+            let trimmed = current.trim();
+            if !trimmed.is_empty() {
+                out.push(trimmed.to_string());
+            }
+            current.clear();
+        } else {
             current.push(ch);
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            continue;
-        }
-
-        match ch {
-            '"' => {
-                in_string = true;
-                current.push(ch);
-            }
-            '(' => {
-                paren += 1;
-                current.push(ch);
-            }
-            ')' => {
-                paren = paren.saturating_sub(1);
-                current.push(ch);
-            }
-            '[' => {
-                bracket += 1;
-                current.push(ch);
-            }
-            ']' => {
-                bracket = bracket.saturating_sub(1);
-                current.push(ch);
-            }
-            '{' => {
-                brace += 1;
-                current.push(ch);
-            }
-            '}' => {
-                brace = brace.saturating_sub(1);
-                current.push(ch);
-            }
-            ',' if paren == 0 && bracket == 0 && brace == 0 => {
-                let trimmed = current.trim();
-                if !trimmed.is_empty() {
-                    out.push(trimmed.to_string());
-                }
-                current.clear();
-            }
-            _ => current.push(ch),
         }
     }
 
@@ -284,44 +317,11 @@ fn split_top_level(input: &str) -> Vec<String> {
 }
 
 fn find_matching_paren(input: &str) -> Option<usize> {
-    let mut paren = 1usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-
-    for (idx, ch) in input.char_indices() {
-        if in_string {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            continue;
-        }
-
-        match ch {
-            '"' => in_string = true,
-            '(' => paren += 1,
-            ')' => {
-                paren = paren.saturating_sub(1);
-                if paren == 0 && bracket == 0 && brace == 0 {
-                    return Some(idx);
-                }
-            }
-            '[' => bracket += 1,
-            ']' => bracket = bracket.saturating_sub(1),
-            '{' => brace += 1,
-            '}' => brace = brace.saturating_sub(1),
-            _ => {}
-        }
-    }
-
-    None
+    let mut scanner = DelimScanner::inside_paren();
+    input
+        .char_indices()
+        .find(|&(_, ch)| scanner.advance(ch) && ch == ')' && scanner.at_top_level())
+        .map(|(idx, _)| idx)
 }
 
 fn expand_inline_gradient_stops(normalized: &str) -> String {
@@ -333,13 +333,10 @@ fn expand_inline_gradient_stops(normalized: &str) -> String {
             continue;
         }
 
-        let Some(gradient_idx) = line.find("gradient(") else {
+        let Some((prefix, after_open)) = line.split_once("gradient(") else {
             out.push(line.to_string());
             continue;
         };
-
-        let prefix = &line[..gradient_idx];
-        let after_open = &line[gradient_idx + "gradient(".len()..];
         let Some(close_idx) = find_matching_paren(after_open) else {
             out.push(line.to_string());
             continue;
@@ -357,17 +354,18 @@ fn expand_inline_gradient_stops(normalized: &str) -> String {
         };
 
         let stops_arg = args[stop_idx].trim();
-        let Some(colon_idx) = stops_arg.find(':') else {
+        let Some((_, stops_value)) = stops_arg.split_once(':') else {
             out.push(line.to_string());
             continue;
         };
-        let stops_value = stops_arg[colon_idx + 1..].trim();
-        if !(stops_value.starts_with('[') && stops_value.ends_with(']')) {
+        let Some(items_body) = stops_value
+            .trim()
+            .strip_prefix('[')
+            .and_then(|value| value.strip_suffix(']'))
+        else {
             out.push(line.to_string());
             continue;
-        }
-
-        let items_body = &stops_value[1..stops_value.len() - 1];
+        };
         let stop_items = split_top_level(items_body);
         if stop_items.is_empty() {
             out.push(line.to_string());
@@ -400,249 +398,79 @@ fn expand_inline_gradient_stops(normalized: &str) -> String {
 }
 
 fn find_top_level_equal(input: &str) -> Option<usize> {
-    let mut paren = 0usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
+    let mut scanner = DelimScanner::default();
+    input
+        .char_indices()
+        .find(|&(_, ch)| scanner.advance(ch) && ch == '=' && scanner.at_top_level())
+        .map(|(idx, _)| idx)
+}
 
-    for (idx, ch) in input.char_indices() {
-        if in_string {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            continue;
-        }
-
-        match ch {
-            '"' => in_string = true,
-            '(' => paren += 1,
-            ')' => paren = paren.saturating_sub(1),
-            '[' => bracket += 1,
-            ']' => bracket = bracket.saturating_sub(1),
-            '{' => brace += 1,
-            '}' => brace = brace.saturating_sub(1),
-            '=' if paren == 0 && bracket == 0 && brace == 0 => return Some(idx),
-            _ => {}
-        }
-    }
-
-    None
+/// Splits `line` around its first top-level `=` into untrimmed `(lhs, rhs)`.
+fn split_top_level_equal(line: &str) -> Option<(&str, &str)> {
+    let eq_idx = find_top_level_equal(line)?;
+    Some((&line[..eq_idx], &line[eq_idx + 1..]))
 }
 
 fn split_top_level_shape_chain(input: &str) -> Option<(Vec<String>, Vec<char>)> {
-    let mut parts = Vec::new();
-    let mut ops = Vec::new();
-    let mut current = String::new();
-    let mut paren = 0usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-
+    let mut chain = ChainSplit::default();
+    let mut scanner = DelimScanner::default();
     let chars = input.chars().collect::<Vec<_>>();
-    let mut i = 0usize;
-    while i < chars.len() {
-        let ch = chars[i];
-        if in_string {
-            current.push(ch);
-            if escaped {
-                escaped = false;
-                i += 1;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            i += 1;
+
+    for (i, &ch) in chars.iter().enumerate() {
+        if !(scanner.advance(ch) && scanner.at_top_level()) {
+            chain.current.push(ch);
             continue;
         }
 
         match ch {
-            '"' => {
-                in_string = true;
-                current.push(ch);
-            }
-            '(' => {
-                paren += 1;
-                current.push(ch);
-            }
-            ')' => {
-                paren = paren.saturating_sub(1);
-                current.push(ch);
-            }
-            '[' => {
-                bracket += 1;
-                current.push(ch);
-            }
-            ']' => {
-                bracket = bracket.saturating_sub(1);
-                current.push(ch);
-            }
-            '{' => {
-                brace += 1;
-                current.push(ch);
-            }
-            '}' => {
-                brace = brace.saturating_sub(1);
-                current.push(ch);
-            }
-            '|' if paren == 0 && bracket == 0 && brace == 0 => {
-                // Keep pipelines (`|>`) untouched.
-                if i + 1 < chars.len() && chars[i + 1] == '>' {
-                    current.push(ch);
+            // Keep pipelines (`|>`) untouched.
+            '|' if chars.get(i + 1) != Some(&'>') => chain.split('|')?,
+            '&' => chain.split('&')?,
+            // Skip arrows (`->`) and likely unary minus sites.
+            '-' if chars.get(i + 1) != Some(&'>') => {
+                let (prev_non_ws, next_non_ws) = non_ws_neighbors(&chars, i);
+                let unary_site = prev_non_ws.is_none_or(|c| {
+                    matches!(
+                        c,
+                        '(' | '[' | '{' | '=' | ':' | ',' | '+' | '-' | '*' | '/' | '|' | '&'
+                    )
+                });
+                if unary_site || next_non_ws.is_none() {
+                    chain.current.push(ch);
                 } else {
-                    let trimmed = current.trim();
-                    if trimmed.is_empty() {
-                        return None;
-                    }
-                    parts.push(trimmed.to_string());
-                    ops.push('|');
-                    current.clear();
+                    chain.split('-')?;
                 }
             }
-            '&' if paren == 0 && bracket == 0 && brace == 0 => {
-                let trimmed = current.trim();
-                if trimmed.is_empty() {
-                    return None;
-                }
-                parts.push(trimmed.to_string());
-                ops.push('&');
-                current.clear();
-            }
-            '-' if paren == 0 && bracket == 0 && brace == 0 => {
-                // Skip arrows (`->`) and likely unary minus sites.
-                if i + 1 < chars.len() && chars[i + 1] == '>' {
-                    current.push(ch);
-                } else {
-                    let prev_non_ws = chars[..i]
-                        .iter()
-                        .rev()
-                        .find(|c| !c.is_whitespace())
-                        .copied();
-                    let next_non_ws = chars[i + 1..].iter().find(|c| !c.is_whitespace()).copied();
-                    let unary_site = prev_non_ws.is_none_or(|c| {
-                        matches!(
-                            c,
-                            '(' | '[' | '{' | '=' | ':' | ',' | '+' | '-' | '*' | '/' | '|' | '&'
-                        )
-                    });
-                    if unary_site || next_non_ws.is_none() {
-                        current.push(ch);
-                    } else {
-                        let trimmed = current.trim();
-                        if trimmed.is_empty() {
-                            return None;
-                        }
-                        parts.push(trimmed.to_string());
-                        ops.push('-');
-                        current.clear();
-                    }
-                }
-            }
-            _ => current.push(ch),
+            _ => chain.current.push(ch),
         }
-
-        i += 1;
     }
 
-    let tail = current.trim();
-    if tail.is_empty() {
-        return None;
-    }
-    parts.push(tail.to_string());
-
-    if parts.len() >= 2 && ops.len() + 1 == parts.len() {
-        Some((parts, ops))
-    } else {
-        None
-    }
+    chain.finish()
 }
 
-fn is_fully_wrapped_parens(input: &str) -> bool {
-    let trimmed = input.trim();
-    if !(trimmed.starts_with('(') && trimmed.ends_with(')')) {
-        return false;
-    }
-
-    let inner = &trimmed[1..trimmed.len() - 1];
-    let mut paren = 1usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
+/// The text between the outer parentheses of `input` (after trimming), if one
+/// `(...)` group spans all of it.
+fn fully_wrapped_parens_inner(input: &str) -> Option<&str> {
+    let inner = input.trim().strip_prefix('(')?.strip_suffix(')')?;
+    let mut scanner = DelimScanner::inside_paren();
 
     for ch in inner.chars() {
-        if in_string {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            continue;
-        }
-
-        match ch {
-            '"' => in_string = true,
-            '(' => paren += 1,
-            ')' => {
-                paren = paren.saturating_sub(1);
-                if paren == 0 && (bracket > 0 || brace > 0) {
-                    return false;
-                }
-            }
-            '[' => bracket += 1,
-            ']' => bracket = bracket.saturating_sub(1),
-            '{' => brace += 1,
-            '}' => brace = brace.saturating_sub(1),
-            _ => {}
+        if scanner.advance(ch)
+            && ch == ')'
+            && scanner.paren == 0
+            && (scanner.bracket > 0 || scanner.brace > 0)
+        {
+            return None;
         }
     }
 
-    paren == 1 && bracket == 0 && brace == 0 && !in_string
+    (scanner.paren == 1 && scanner.bracket == 0 && scanner.brace == 0 && !scanner.in_string)
+        .then_some(inner)
 }
 
 fn accumulate_delimiter_balance(input: &str, paren: &mut i32, bracket: &mut i32, brace: &mut i32) {
-    let mut in_string = false;
-    let mut escaped = false;
-    let bytes = input.as_bytes();
-    let mut i = 0usize;
-
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
-        if !in_string && ch == '/' && i + 1 < bytes.len() && bytes[i + 1] as char == '/' {
-            break;
-        }
-
-        if in_string {
-            if escaped {
-                escaped = false;
-                i += 1;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            i += 1;
-            continue;
-        }
-
+    for ch in code_chars(input) {
         match ch {
-            '"' => in_string = true,
             '(' => *paren += 1,
             ')' => *paren -= 1,
             '[' => *bracket += 1,
@@ -651,7 +479,6 @@ fn accumulate_delimiter_balance(input: &str, paren: &mut i32, bracket: &mut i32,
             '}' => *brace -= 1,
             _ => {}
         }
-        i += 1;
     }
 }
 
@@ -662,14 +489,14 @@ fn normalize_parenthesized_shape_chain_blocks(normalized: &str) -> String {
 
     while i < lines.len() {
         let line = lines[i];
-        let Some(eq_idx) = find_top_level_equal(line) else {
+        let Some((lhs, rhs)) = split_top_level_equal(line) else {
             out.push(line.to_string());
             i += 1;
             continue;
         };
 
-        let lhs = line[..eq_idx].trim_end();
-        let rhs = line[eq_idx + 1..].trim();
+        let lhs = lhs.trim_end();
+        let rhs = rhs.trim();
         if !rhs.starts_with('(') {
             out.push(line.to_string());
             i += 1;
@@ -706,14 +533,11 @@ fn normalize_parenthesized_shape_chain_blocks(normalized: &str) -> String {
         }
 
         let rhs_block = block_parts.join(" ");
-        if !is_fully_wrapped_parens(&rhs_block) {
+        let Some(rhs_inner) = fully_wrapped_parens_inner(&rhs_block) else {
             out.extend(block_lines);
             i = j + 1;
             continue;
-        }
-
-        let trimmed = rhs_block.trim();
-        let rhs_inner = &trimmed[1..trimmed.len() - 1];
+        };
         let Some((parts, ops)) = split_top_level_shape_chain(rhs_inner) else {
             out.extend(block_lines);
             i = j + 1;
@@ -726,96 +550,47 @@ fn normalize_parenthesized_shape_chain_blocks(normalized: &str) -> String {
             continue;
         }
 
-        out.push(format!("{lhs} = ("));
-        for idx in 0..parts.len() {
-            if idx < ops.len() {
-                out.push(format!("{} {}", parts[idx], ops[idx]));
-            } else {
-                out.push(parts[idx].to_string());
-            }
-        }
-        out.push(")".to_string());
+        push_wrapped_shape_chain(&mut out, lhs, &parts, &ops);
         i = j + 1;
     }
 
     out.join("\n")
 }
 
+/// Emits `lhs = (` followed by one operand per line (each but the last
+/// trailed by its operator) and a closing `)`.
+fn push_wrapped_shape_chain(out: &mut Vec<String>, lhs: &str, parts: &[String], ops: &[char]) {
+    out.push(format!("{lhs} = ("));
+    for (idx, part) in parts.iter().enumerate() {
+        match ops.get(idx) {
+            Some(op) => out.push(format!("{part} {op}")),
+            None => out.push(part.clone()),
+        }
+    }
+    out.push(")".to_string());
+}
+
 fn split_top_level_dot_chain(input: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
-    let mut paren = 0usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-
+    let mut scanner = DelimScanner::default();
     let chars = input.chars().collect::<Vec<_>>();
-    let mut i = 0usize;
-    while i < chars.len() {
-        let ch = chars[i];
-        if in_string {
-            current.push(ch);
-            if escaped {
-                escaped = false;
-                i += 1;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            i += 1;
-            continue;
-        }
 
-        match ch {
-            '"' => {
-                in_string = true;
-                current.push(ch);
+    for (i, &ch) in chars.iter().enumerate() {
+        let is_member_dot = scanner.advance(ch)
+            && ch == '.'
+            && scanner.at_top_level()
+            && chars
+                .get(i + 1)
+                .is_some_and(|c| c.is_ascii_alphabetic() || *c == '_');
+        if is_member_dot {
+            let trimmed = current.trim();
+            if !trimmed.is_empty() {
+                out.push(trimmed.to_string());
             }
-            '(' => {
-                paren += 1;
-                current.push(ch);
-            }
-            ')' => {
-                paren = paren.saturating_sub(1);
-                current.push(ch);
-            }
-            '[' => {
-                bracket += 1;
-                current.push(ch);
-            }
-            ']' => {
-                bracket = bracket.saturating_sub(1);
-                current.push(ch);
-            }
-            '{' => {
-                brace += 1;
-                current.push(ch);
-            }
-            '}' => {
-                brace = brace.saturating_sub(1);
-                current.push(ch);
-            }
-            '.' if paren == 0 && bracket == 0 && brace == 0 => {
-                let next = chars.get(i + 1).copied();
-                if next.is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
-                    let trimmed = current.trim();
-                    if !trimmed.is_empty() {
-                        out.push(trimmed.to_string());
-                    }
-                    current.clear();
-                    current.push('.');
-                } else {
-                    current.push(ch);
-                }
-            }
-            _ => current.push(ch),
+            current.clear();
         }
-
-        i += 1;
+        current.push(ch);
     }
 
     let trimmed = current.trim();
@@ -826,113 +601,35 @@ fn split_top_level_dot_chain(input: &str) -> Vec<String> {
 }
 
 fn split_top_level_additive_chain(input: &str) -> Option<(Vec<String>, Vec<char>)> {
-    let mut parts = Vec::new();
-    let mut ops = Vec::new();
-    let mut current = String::new();
-    let mut paren = 0usize;
-    let mut bracket = 0usize;
-    let mut brace = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-
+    let mut chain = ChainSplit::default();
+    let mut scanner = DelimScanner::default();
     let chars = input.chars().collect::<Vec<_>>();
-    let mut i = 0usize;
-    while i < chars.len() {
-        let ch = chars[i];
-        if in_string {
-            current.push(ch);
-            if escaped {
-                escaped = false;
-                i += 1;
-                continue;
-            }
-            match ch {
-                '\\' => escaped = true,
-                '"' => in_string = false,
-                _ => {}
-            }
-            i += 1;
+
+    for (i, &ch) in chars.iter().enumerate() {
+        let is_operator = scanner.advance(ch)
+            && scanner.at_top_level()
+            && (ch == '+' || (ch == '-' && chars.get(i + 1) != Some(&'>')));
+        if !is_operator {
+            chain.current.push(ch);
             continue;
         }
 
-        match ch {
-            '"' => {
-                in_string = true;
-                current.push(ch);
-            }
-            '(' => {
-                paren += 1;
-                current.push(ch);
-            }
-            ')' => {
-                paren = paren.saturating_sub(1);
-                current.push(ch);
-            }
-            '[' => {
-                bracket += 1;
-                current.push(ch);
-            }
-            ']' => {
-                bracket = bracket.saturating_sub(1);
-                current.push(ch);
-            }
-            '{' => {
-                brace += 1;
-                current.push(ch);
-            }
-            '}' => {
-                brace = brace.saturating_sub(1);
-                current.push(ch);
-            }
-            '+' | '-' if paren == 0 && bracket == 0 && brace == 0 => {
-                if ch == '-' && i + 1 < chars.len() && chars[i + 1] == '>' {
-                    current.push(ch);
-                    i += 1;
-                    continue;
-                }
+        let (prev_non_ws, next_non_ws) = non_ws_neighbors(&chars, i);
+        let unary_site = prev_non_ws.is_none_or(|c| {
+            matches!(
+                c,
+                '(' | '[' | '{' | '=' | ':' | ',' | '+' | '-' | '*' | '/' | '%' | '|' | '&'
+            )
+        });
 
-                let prev_non_ws = chars[..i]
-                    .iter()
-                    .rev()
-                    .find(|c| !c.is_whitespace())
-                    .copied();
-                let next_non_ws = chars[i + 1..].iter().find(|c| !c.is_whitespace()).copied();
-                let unary_site = prev_non_ws.is_none_or(|c| {
-                    matches!(
-                        c,
-                        '(' | '[' | '{' | '=' | ':' | ',' | '+' | '-' | '*' | '/' | '%' | '|' | '&'
-                    )
-                });
-
-                if unary_site || next_non_ws.is_none() {
-                    current.push(ch);
-                } else {
-                    let trimmed = current.trim();
-                    if trimmed.is_empty() {
-                        return None;
-                    }
-                    parts.push(trimmed.to_string());
-                    ops.push(ch);
-                    current.clear();
-                }
-            }
-            _ => current.push(ch),
+        if unary_site || next_non_ws.is_none() {
+            chain.current.push(ch);
+        } else {
+            chain.split(ch)?;
         }
-
-        i += 1;
     }
 
-    let tail = current.trim();
-    if tail.is_empty() {
-        return None;
-    }
-    parts.push(tail.to_string());
-
-    if parts.len() >= 2 && ops.len() + 1 == parts.len() {
-        Some((parts, ops))
-    } else {
-        None
-    }
+    chain.finish()
 }
 
 fn leading_binary_operator_len(trimmed: &str) -> Option<usize> {
@@ -944,12 +641,7 @@ fn leading_binary_operator_len(trimmed: &str) -> Option<usize> {
         return Some(2);
     }
 
-    if trimmed.starts_with('+')
-        || trimmed.starts_with('-')
-        || trimmed.starts_with('*')
-        || trimmed.starts_with('/')
-        || trimmed.starts_with('%')
-        || trimmed.starts_with('&')
+    if trimmed.starts_with(['+', '-', '*', '/', '%', '&'])
         || (trimmed.starts_with('|') && !trimmed.starts_with("|>"))
     {
         return Some(1);
@@ -958,21 +650,10 @@ fn leading_binary_operator_len(trimmed: &str) -> Option<usize> {
     None
 }
 
-fn starts_with_binary_continuation(trimmed: &str) -> bool {
-    leading_binary_operator_len(trimmed).is_some()
-}
-
 fn ends_with_binary_operator(trimmed: &str) -> bool {
     let line = trimmed.trim_end();
-    line.ends_with("&&")
-        || line.ends_with("||")
-        || line.ends_with('+')
-        || line.ends_with('-')
-        || line.ends_with('*')
-        || line.ends_with('/')
-        || line.ends_with('%')
-        || line.ends_with('&')
-        || (line.ends_with('|') && !line.ends_with("|>"))
+    // `&&` and `||` are covered by the single-character `&` and `|` cases.
+    line.ends_with(['+', '-', '*', '/', '%', '&']) || (line.ends_with('|') && !line.ends_with("|>"))
 }
 
 fn rhs_anchor_column(trimmed: &str, indent_cols: usize) -> Option<usize> {
@@ -994,8 +675,6 @@ struct BinaryContinuationState {
 }
 
 fn wrap_long_space_transform_chains(normalized: &str) -> String {
-    const WRAP_THRESHOLD: usize = 100;
-
     let mut out = Vec::new();
     for line in normalized.split('\n') {
         if line.len() <= WRAP_THRESHOLD {
@@ -1003,18 +682,16 @@ fn wrap_long_space_transform_chains(normalized: &str) -> String {
             continue;
         }
 
-        let trimmed = line.trim_start();
-        if !trimmed.starts_with("in space ") {
-            out.push(line.to_string());
-            continue;
-        }
-
-        let Some(stripped) = trimmed.strip_suffix('{') else {
+        let Some(expr) = line
+            .trim_start()
+            .strip_prefix("in space ")
+            .and_then(|rest| rest.strip_suffix('{'))
+        else {
             out.push(line.to_string());
             continue;
         };
 
-        let expr = stripped["in space ".len()..].trim();
+        let expr = expr.trim();
         let parts = split_top_level_dot_chain(expr);
         if parts.len() < 2 {
             out.push(line.to_string());
@@ -1035,8 +712,6 @@ fn wrap_long_space_transform_chains(normalized: &str) -> String {
 }
 
 fn wrap_long_shape_combinations(normalized: &str) -> String {
-    const WRAP_THRESHOLD: usize = 100;
-
     let mut out = Vec::new();
     for line in normalized.split('\n') {
         let trimmed = line.trim();
@@ -1045,19 +720,14 @@ fn wrap_long_shape_combinations(normalized: &str) -> String {
             continue;
         }
 
-        let Some(eq_idx) = find_top_level_equal(line) else {
+        let Some((lhs, rhs)) = split_top_level_equal(line) else {
             out.push(line.to_string());
             continue;
         };
 
-        let lhs = line[..eq_idx].trim_end();
-        let rhs = line[eq_idx + 1..].trim();
-        let rhs_inner = if is_fully_wrapped_parens(rhs) {
-            let trimmed = rhs.trim();
-            &trimmed[1..trimmed.len() - 1]
-        } else {
-            rhs
-        };
+        let lhs = lhs.trim_end();
+        let rhs = rhs.trim();
+        let rhs_inner = fully_wrapped_parens_inner(rhs).unwrap_or(rhs);
 
         let Some((parts, ops)) = split_top_level_shape_chain(rhs_inner) else {
             out.push(line.to_string());
@@ -1070,23 +740,13 @@ fn wrap_long_shape_combinations(normalized: &str) -> String {
             continue;
         }
 
-        out.push(format!("{lhs} = ("));
-        for idx in 0..parts.len() {
-            if idx < ops.len() {
-                out.push(format!("{} {}", parts[idx], ops[idx]));
-            } else {
-                out.push(parts[idx].to_string());
-            }
-        }
-        out.push(")".to_string());
+        push_wrapped_shape_chain(&mut out, lhs, &parts, &ops);
     }
 
     out.join("\n")
 }
 
 fn wrap_long_additive_assignments(normalized: &str) -> String {
-    const WRAP_THRESHOLD: usize = 100;
-
     let mut out = Vec::new();
     for line in normalized.split('\n') {
         let trimmed = line.trim();
@@ -1095,13 +755,13 @@ fn wrap_long_additive_assignments(normalized: &str) -> String {
             continue;
         }
 
-        let Some(eq_idx) = find_top_level_equal(line) else {
+        let Some((lhs, rhs)) = split_top_level_equal(line) else {
             out.push(line.to_string());
             continue;
         };
 
-        let lhs = line[..eq_idx].trim_end();
-        let rhs = line[eq_idx + 1..].trim();
+        let lhs = lhs.trim_end();
+        let rhs = rhs.trim();
         if rhs.contains('|') || rhs.contains('&') {
             out.push(line.to_string());
             continue;
@@ -1127,8 +787,6 @@ fn wrap_long_additive_assignments(normalized: &str) -> String {
 }
 
 fn wrap_long_scatter_declarations(normalized: &str) -> String {
-    const WRAP_THRESHOLD: usize = 100;
-
     let mut out = Vec::new();
     for line in normalized.split('\n') {
         let trimmed = line.trim();
@@ -1137,13 +795,13 @@ fn wrap_long_scatter_declarations(normalized: &str) -> String {
             continue;
         }
 
-        let Some(eq_idx) = find_top_level_equal(line) else {
+        let Some((lhs, rhs)) = split_top_level_equal(line) else {
             out.push(line.to_string());
             continue;
         };
 
-        let lhs = line[..eq_idx].trim_end();
-        let rhs = line[eq_idx + 1..].trim();
+        let lhs = lhs.trim_end();
+        let rhs = rhs.trim();
         if !rhs.starts_with("scatter ") {
             out.push(line.to_string());
             continue;
@@ -1227,7 +885,10 @@ fn wrap_standalone_calls(source: &str) -> String {
         let close = open + 1 + close;
         let suffix = &call[close + 1..];
         let args = split_top_level(&call[open + 1..close]);
-        if args.len() < 2 || !suffix.trim().is_empty() || (end == index && call.len() <= 100) {
+        if args.len() < 2
+            || !suffix.trim().is_empty()
+            || (end == index && call.len() <= WRAP_THRESHOLD)
+        {
             out.push(lines[index].to_string());
             index += 1;
             continue;
@@ -1296,6 +957,7 @@ fn separate_member_sections(source: &str) -> String {
     out.join("\n")
 }
 
+#[cfg(test)]
 pub fn format_source(src: &str) -> String {
     format_source_with_options(src, BinaryWrapStyle::Indent)
 }
@@ -1336,7 +998,7 @@ pub fn format_source_with_options(src: &str, binary_wrap_style: BinaryWrapStyle)
         let base_indent_depth = indent_curly + base_continuation;
         let current_anchor = binary_state
             .and_then(|state| (state.indent_curly == indent_curly).then_some(state.rhs_anchor_col));
-        let binary_contextual = starts_with_binary_continuation(trimmed)
+        let binary_contextual = leading_binary_operator_len(trimmed).is_some()
             && (indent_paren > 0
                 || indent_bracket > 0
                 || binary_state.is_some_and(|state| state.indent_curly == indent_curly));
@@ -1364,12 +1026,7 @@ pub fn format_source_with_options(src: &str, binary_wrap_style: BinaryWrapStyle)
             default_indent_cols
         };
 
-        let mut line = String::new();
-        for _ in 0..indent_cols {
-            line.push(' ');
-        }
-        line.push_str(trimmed);
-        out_lines.push(line);
+        out_lines.push(format!("{:indent_cols$}{trimmed}", ""));
 
         let assignment_anchor = rhs_anchor_column(trimmed, indent_cols);
         let carries_binary_chain =

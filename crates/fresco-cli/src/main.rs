@@ -157,23 +157,23 @@ struct FmtArgs {
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    if let Some(Command::Native(args)) = &cli.cmd {
-        return native::run(args);
-    }
-
-    if let Some(Command::Fmt(fmt_args)) = cli.cmd {
-        if fmt_args.paths.is_empty() {
-            eprintln!("error: `fresco fmt` requires at least one file or directory path");
-            return ExitCode::FAILURE;
+    match cli.cmd {
+        Some(Command::Native(args)) => return native::run(&args),
+        Some(Command::Fmt(fmt_args)) => {
+            if fmt_args.paths.is_empty() {
+                eprintln!("error: `fresco fmt` requires at least one file or directory path");
+                return ExitCode::FAILURE;
+            }
+            return fmt::run(
+                &fmt_args.paths,
+                fmt::FormatOptions {
+                    check: fmt_args.check,
+                    stdout: fmt_args.stdout,
+                    binary_wrap_style: fmt_args.binary_wrap_style,
+                },
+            );
         }
-        return fmt::run(
-            &fmt_args.paths,
-            fmt::FormatOptions {
-                check: fmt_args.check,
-                stdout: fmt_args.stdout,
-                binary_wrap_style: fmt_args.binary_wrap_style,
-            },
-        );
+        None => {}
     }
 
     let Some(input) = cli.input else {
