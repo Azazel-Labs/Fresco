@@ -127,9 +127,7 @@ impl SpanCapture {
     }
 }
 
-pub(crate) fn space_transform_names() -> &'static [&'static str] {
-    blocks::SPACE_TRANSFORM_NAMES
-}
+pub(crate) use blocks::SPACE_TRANSFORM_NAMES;
 
 fn normalize_pipeline_semantic_token(value: &str) -> String {
     canonical_layout_identity(value)
@@ -684,11 +682,11 @@ fn validate_pipeline_known_axis_agreement(program: &Program, diags: &mut Vec<Dia
 
         let missing_in_consumer = producer_set
             .difference(&consumer_set)
-            .map(|axis| (*axis).to_string())
+            .copied()
             .collect::<BTreeSet<_>>();
         let missing_in_producer = consumer_set
             .difference(&producer_set)
-            .map(|axis| (*axis).to_string())
+            .copied()
             .collect::<BTreeSet<_>>();
 
         if missing_in_consumer.is_empty() && missing_in_producer.is_empty() {
@@ -844,16 +842,12 @@ fn validate_pass_vertex_factory_contracts(program: &Program, diags: &mut Vec<Dia
                 continue;
             };
 
-            let mut satisfies = true;
-            for iface_member in &interface_decl.members {
+            let satisfies = interface_decl.members.iter().all(|iface_member| {
                 let format_member = resolved_members
                     .iter()
                     .find(|member| member.name == iface_member.name);
-                if !interface_member_satisfied_by_format_member(iface_member, format_member) {
-                    satisfies = false;
-                    break;
-                }
-            }
+                interface_member_satisfied_by_format_member(iface_member, format_member)
+            });
 
             if satisfies {
                 eligible_factories.push(factory.name.clone());
@@ -946,21 +940,21 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
     let mut diags = Vec::new();
     let known_builtin_pipeline_types: HashSet<&'static str> =
         HashSet::from(["postprocess", "compute"]);
-    let declared_pipeline_types: HashSet<String> = program
+    let declared_pipeline_types: HashSet<&str> = program
         .tags
         .iter()
         .filter(|decl| decl.domain == "pipeline")
-        .flat_map(|decl| decl.values.iter().map(|value| value.node.clone()))
+        .flat_map(|decl| decl.values.iter().map(|value| value.node.as_str()))
         .collect();
-    let declared_pass_names: HashSet<String> = program
+    let declared_pass_names: HashSet<&str> = program
         .passes
         .iter()
-        .map(|pass_decl| pass_decl.name.clone())
+        .map(|pass_decl| pass_decl.name.as_str())
         .collect();
-    let declared_vertex_interfaces: HashSet<String> = program
+    let declared_vertex_interfaces: HashSet<&str> = program
         .vertex_interfaces
         .iter()
-        .map(|iface| iface.name.clone())
+        .map(|iface| iface.name.as_str())
         .collect();
 
     for pass_decl in &program.passes {
@@ -1003,15 +997,11 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
             }
 
             if stage.node == "compute" {
-                if pass_decl.blend.is_some() {
+                if let Some(blend) = &pass_decl.blend {
                     diags.push(
                         pass_error(
                             pass_decl,
-                            pass_decl
-                                .blend
-                                .as_ref()
-                                .map(|blend| blend.span.clone())
-                                .unwrap_or_else(|| stage.span.clone()),
+                            blend.span.clone(),
                             format!(
                                 "pass `{}` declares `blend`, but compute passes do not support blending",
                                 pass_decl.name
@@ -1021,15 +1011,11 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
                     );
                 }
 
-                if pass_decl.draw.is_some() {
+                if let Some(draw) = &pass_decl.draw {
                     diags.push(
                         pass_error(
                             pass_decl,
-                            pass_decl
-                                .draw
-                                .as_ref()
-                                .map(|draw| draw.span.clone())
-                                .unwrap_or_else(|| stage.span.clone()),
+                            draw.span.clone(),
                             format!(
                                 "pass `{}` declares `draw`, but compute passes cannot use draw semantics",
                                 pass_decl.name
@@ -1096,7 +1082,7 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
         }
 
         if let Some(vertex_interface) = &pass_decl.vertex_interface
-            && !declared_vertex_interfaces.contains(&vertex_interface.node)
+            && !declared_vertex_interfaces.contains(vertex_interface.node.as_str())
         {
             diags.push(
                     pass_error(
@@ -1298,7 +1284,7 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
         }
 
         for pass_ref in &pipeline_decl.pass_refs {
-            if !declared_pass_names.contains(&pass_ref.name) {
+            if !declared_pass_names.contains(pass_ref.name.as_str()) {
                 diags.push(
                     Diag::error(
                         pass_ref.name_span.clone(),
@@ -3279,7 +3265,7 @@ impl Checker {
             .filter(|(_, _, total_ms)| *total_ms >= min_ms)
             .collect::<Vec<_>>();
 
-        ranked.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        ranked.sort_by(|a, b| b.2.total_cmp(&a.2));
         if ranked.is_empty() {
             return;
         }
@@ -3848,16 +3834,13 @@ pub(super) fn try_parse_type_application(name: &str) -> Option<(String, Vec<Stri
 pub(super) fn type_name_to_key(name: &str) -> String {
     let name = strip_spatial_type_suffix(name);
 
-    if let Some((base, args)) = try_parse_type_application(name)
-        && base == "field"
-        && args.len() == 1
-    {
-        return type_name_to_key(&args[0]);
-    }
-    if let Some((base, _args)) = try_parse_type_application(name)
-        && base == "texture"
-    {
-        return "typed_texture".to_string();
+    if let Some((base, args)) = try_parse_type_application(name) {
+        if base == "field" && args.len() == 1 {
+            return type_name_to_key(&args[0]);
+        }
+        if base == "texture" {
+            return "typed_texture".to_string();
+        }
     }
 
     match name {

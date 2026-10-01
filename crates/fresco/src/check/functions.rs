@@ -1,5 +1,6 @@
 use super::*;
 use std::collections::HashSet;
+use std::fmt::Write as _;
 use std::rc::Rc;
 use tracing::trace_span;
 use web_time::Instant;
@@ -4269,8 +4270,13 @@ impl Checker {
                 key.push_str(const_name);
                 key.push('=');
                 match const_value {
-                    ConstTemplateValue::U32(v) => key.push_str(&format!("u{v}")),
-                    ConstTemplateValue::I32(v) => key.push_str(&format!("i{v}")),
+                    // Writing into a `String` cannot fail.
+                    ConstTemplateValue::U32(v) => {
+                        let _ = write!(key, "u{v}");
+                    }
+                    ConstTemplateValue::I32(v) => {
+                        let _ = write!(key, "i{v}");
+                    }
                 }
             }
             key

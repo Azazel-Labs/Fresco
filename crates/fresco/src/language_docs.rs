@@ -221,7 +221,7 @@ fn build_language_docs_model_for_prelude(
         .collect();
     space_transforms.sort();
 
-    let parser_space_transforms: BTreeSet<String> = crate::check::space_transform_names()
+    let parser_space_transforms: BTreeSet<String> = crate::check::SPACE_TRANSFORM_NAMES
         .iter()
         .map(|name| (*name).to_string())
         .collect();

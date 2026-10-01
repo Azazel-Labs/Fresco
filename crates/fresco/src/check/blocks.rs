@@ -4,7 +4,7 @@ use crate::hir::ScatterLoweringStrategy;
 use crate::hir::VerticalAxis;
 use tracing::{debug, info};
 
-pub(super) const SPACE_TRANSFORM_NAMES: &[&str] = &[
+pub(crate) const SPACE_TRANSFORM_NAMES: &[&str] = &[
     "rotate",
     "rotate_x",
     "rotate_y",
