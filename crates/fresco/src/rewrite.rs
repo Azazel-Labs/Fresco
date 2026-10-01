@@ -8,8 +8,8 @@
 //! pass partitioner (§11) handles by selecting a kernel strategy and allocating
 //! intermediate render targets.
 
-use crate::hir::Sx;
 use crate::driver::pass_plan;
+use crate::hir::Sx;
 use crate::hir::{Hir, Layer, Locality, Xform};
 
 fn color_to_expr(color: [f32; 4]) -> [Sx; 4] {

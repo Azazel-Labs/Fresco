@@ -140,7 +140,7 @@ impl ComputeLibrary {
             &[],
             &args,
         );
-        if c.diags.iter().any(|d| d.severity == Severity::Error) {
+        if has_errors(&c.diags) {
             return Err(c
                 .diags
                 .iter()
@@ -391,11 +391,7 @@ fn constant_value(
     let folded = result.and_then(|value| {
         checker.eval_compile_time_const_value(&value, &expression.span, "resource policy")
     });
-    if checker
-        .diags
-        .iter()
-        .any(|diag| diag.severity == Severity::Error)
-    {
+    if checker.diags.iter().any(Diag::is_error) {
         return Err(checker.diags);
     }
     folded.ok_or_else(|| {
@@ -534,7 +530,7 @@ pub(crate) fn style_parameter_value(
     let folded = result.and_then(|v| {
         checker.eval_compile_time_const_value(&v, &expression.span, "style parameter")
     });
-    if checker.diags.iter().any(|d| d.severity == Severity::Error) {
+    if has_errors(&checker.diags) {
         return Err(checker.diags);
     }
     if matches!(parameter.ty_name.as_str(), "u32" | "i32" | "bool") {

@@ -34,9 +34,9 @@ pub struct Diag {
 }
 
 impl Diag {
-    pub fn error(span: Span, message: impl Into<String>) -> Self {
+    fn new(severity: Severity, span: Span, message: impl Into<String>) -> Self {
         Diag {
-            severity: Severity::Error,
+            severity,
             span,
             message: message.into(),
             code: None,
@@ -45,41 +45,28 @@ impl Diag {
             help: None,
             file: None,
         }
+    }
+
+    pub fn error(span: Span, message: impl Into<String>) -> Self {
+        Self::new(Severity::Error, span, message)
     }
 
     pub fn warning(span: Span, message: impl Into<String>) -> Self {
-        Diag {
-            severity: Severity::Warning,
-            span,
-            message: message.into(),
-            code: None,
-            label: None,
-            related_labels: Vec::new(),
-            help: None,
-            file: None,
-        }
+        Self::new(Severity::Warning, span, message)
     }
 
     pub fn info(span: Span, message: impl Into<String>) -> Self {
-        Diag {
-            severity: Severity::Info,
-            span,
-            message: message.into(),
-            code: None,
-            label: None,
-            related_labels: Vec::new(),
-            help: None,
-            file: None,
-        }
+        Self::new(Severity::Info, span, message)
+    }
+
+    #[must_use]
+    pub fn is_error(&self) -> bool {
+        self.severity == Severity::Error
     }
 
     pub fn with_code(mut self, code: impl Into<String>) -> Self {
         self.code = Some(code.into());
         self
-    }
-
-    pub fn with_tag(self, tag: impl Into<String>) -> Self {
-        self.with_code(tag)
     }
 
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
@@ -101,6 +88,21 @@ impl Diag {
         self.file = Some(file.into());
         self
     }
+
+    /// Attach a source file when one is known; `None` leaves the diagnostic
+    /// unchanged.
+    pub fn with_file_opt(self, file: Option<impl Into<String>>) -> Self {
+        match file {
+            Some(file) => self.with_file(file),
+            None => self,
+        }
+    }
+}
+
+/// Returns `true` when any diagnostic in `diags` is an error.
+#[must_use]
+pub fn has_errors(diags: &[Diag]) -> bool {
+    diags.iter().any(Diag::is_error)
 }
 
 /// Render all diagnostics for one source file to stderr.

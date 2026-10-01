@@ -688,7 +688,7 @@ pub(crate) fn validate_style_contract_signatures(
             }
         }
     }
-    if diags.iter().any(|d| d.severity == Severity::Error) {
+    if has_errors(&diags) {
         Err(diags)
     } else {
         Ok(())
@@ -1077,10 +1077,7 @@ pub(crate) fn validate_conformance_method_bodies(
         }
     }
 
-    if all_diags
-        .iter()
-        .any(|diag| diag.severity == Severity::Error)
-    {
+    if all_diags.iter().any(Diag::is_error) {
         Err(all_diags)
     } else {
         Ok(())
@@ -1964,7 +1961,7 @@ pub fn check(
     }
     c.emit_expr_hotspot_summary();
     match root {
-        Some(root) if !c.diags.iter().any(|d| d.severity == Severity::Error) => {
+        Some(root) if !has_errors(&c.diags) => {
             c.hir.root = root;
             info!(
                 shapes = c.hir.shapes.len(),
@@ -1975,7 +1972,7 @@ pub fn check(
             Ok((c.hir, c.diags))
         }
         _ => {
-            if !c.diags.iter().any(|d| d.severity == Severity::Error) {
+            if !has_errors(&c.diags) {
                 c.diags.push(
                     Diag::error(entry.name_span.clone(), "entry body produces no layer").with_help(
                         "end the entry with a `compose { ... }` block or a layer expression",
@@ -2360,10 +2357,7 @@ fn parse_fn_type(input: FnTypeInputs<'_>) -> Option<FnValueTy> {
         return match resource {
             Ok(resource) => Some(FnValueTy::ShaderResource(resource)),
             Err(message) => {
-                let mut diagnostic = Diag::error(span.clone(), message);
-                if let Some(file) = source_file {
-                    diagnostic = diagnostic.with_file(file);
-                }
+                let diagnostic = Diag::error(span.clone(), message).with_file_opt(source_file);
                 diags.push(diagnostic);
                 None
             }
@@ -2431,17 +2425,15 @@ fn parse_fn_type(input: FnTypeInputs<'_>) -> Option<FnValueTy> {
         && base == "field"
     {
         if args.len() != 1 {
-            let mut d = Diag::error(
+            let d = Diag::error(
                 span.clone(),
                 format!(
                     "`field<...>` expects exactly one type argument, found {}",
                     args.len()
                 ),
             )
-            .with_help("use `field<T>` with a single element type parameter");
-            if let Some(file) = source_file {
-                d = d.with_file(file);
-            }
+            .with_help("use `field<T>` with a single element type parameter")
+            .with_file_opt(source_file);
             diags.push(d);
             return None;
         }
@@ -2480,16 +2472,14 @@ fn parse_fn_type(input: FnTypeInputs<'_>) -> Option<FnValueTy> {
                 return Some(FnValueTy::TypeVar(other.to_string()));
             }
             if interface_names.contains(other) {
-                let mut d = Diag::error(
+                let d = Diag::error(
                     span.clone(),
                     format!("interface `{other}` cannot be used as a value type in v1"),
                 )
                 .with_help(format!(
                     "use a generic type parameter with an interface bound instead, e.g. `<T: {other}>`"
-                ));
-                if let Some(file) = source_file {
-                    d = d.with_file(file);
-                }
+                ))
+.with_file_opt(source_file);
                 diags.push(d);
                 return None;
             }
@@ -2501,16 +2491,14 @@ fn parse_fn_type(input: FnTypeInputs<'_>) -> Option<FnValueTy> {
                 return Some(FnValueTy::Struct(other.to_string()));
             }
 
-            let mut d = Diag::error(
+            let d = Diag::error(
                 span.clone(),
                 format!("unsupported function {context} `{other}`"),
             )
             .with_help(
                 "supported types are family-first: scalar aliases (f32/f64/half/i32/u32/bool/signal/delta/mask/coverage/angle/length), vector aliases (vec2/uvec2/coord/coord_like/resolution, vec3/uvec3, vec4/uvec4), matrix aliases (mat2/mat3/mat4), texture<T>, color, shape, layer, fixed-size arrays, records, or a defined enum",
-            );
-            if let Some(file) = source_file {
-                d = d.with_file(file);
-            }
+            )
+.with_file_opt(source_file);
             diags.push(d);
             None
         }
@@ -2548,7 +2536,6 @@ mod tests {
         TextureChannelDef, TextureTypeDecl,
     };
     use crate::check::CheckOptions;
-    use crate::diag::Severity;
 
     fn span(start: usize, end: usize) -> std::ops::Range<usize> {
         start..end
@@ -2731,16 +2718,11 @@ mod tests {
         );
 
         assert!(
-            prep_diags
-                .iter()
-                .all(|diag| diag.severity != Severity::Error),
+            prep_diags.iter().all(|diag| !diag.is_error()),
             "unexpected prep diagnostics: {prep_diags:?}"
         );
         assert!(
-            checker
-                .diags
-                .iter()
-                .all(|diag| diag.severity != Severity::Error),
+            checker.diags.iter().all(|diag| !diag.is_error()),
             "unexpected checker diagnostics: {:?}",
             checker.diags
         );
@@ -2773,7 +2755,7 @@ mod tests {
 
         assert!(
             checker.diags.iter().any(|diag| {
-                diag.severity == Severity::Error
+                diag.is_error()
                     && diag.message.contains("texture_type result expression for `NormalGL` must produce `vec3 in tangent`, found vec2")
             }),
             "expected spatial result mismatch diagnostic, got: {:?}",

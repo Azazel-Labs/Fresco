@@ -25,7 +25,7 @@ fn with_checker_stack<T>(evaluate: impl FnOnce() -> T) -> T {
 }
 
 use crate::ast::*;
-use crate::diag::{Diag, Severity};
+use crate::diag::{Diag, has_errors};
 use crate::hir::{
     self, Blend, CenteredMode, ColorSource, GlowColorSpace, GlowFalloff, GlowReach, GradientAnchor,
     GradientKind, GradientStop, Hir, Layer, LayerId, Param, ParamDefault, Shape, ShapeId, Sx, V2,

@@ -1846,7 +1846,7 @@ impl Checker {
                         .diags
                         .iter()
                         .skip(diags_before_inner)
-                        .any(|d| d.severity == Severity::Error);
+                        .any(Diag::is_error);
                     self.scopes.pop();
                     self.style_scopes.pop();
                     if let (Some(inner), Some(resolved), true) = (inner, resolved, bindings_ok) {
@@ -2099,7 +2099,7 @@ impl Checker {
             .diags
             .iter()
             .skip(diags_before_block)
-            .any(|d| d.severity == Severity::Error);
+            .any(Diag::is_error);
 
         if !allow_empty && last.is_none() && !has_new_errors {
             self.diags.push(
@@ -2111,7 +2111,7 @@ impl Checker {
             .diags
             .iter()
             .skip(diags_before_block)
-            .any(|d| d.severity == Severity::Error)
+            .any(Diag::is_error)
         {
             if is_canvas_root {
                 info!(
@@ -2418,7 +2418,7 @@ impl Checker {
                         .diags
                         .iter()
                         .skip(diags_before_inner)
-                        .any(|d| d.severity == Severity::Error);
+                        .any(Diag::is_error);
                     self.scopes.pop();
                     self.style_scopes.pop();
                     let layer = match (inner, resolved, bindings_ok) {
@@ -3418,10 +3418,7 @@ fn parse_local_fn_type(
         return match resource {
             Ok(resource) => Some(FnValueTy::ShaderResource(resource)),
             Err(message) => {
-                let mut diagnostic = Diag::error(span.clone(), message);
-                if let Some(file) = source_file {
-                    diagnostic = diagnostic.with_file(file);
-                }
+                let diagnostic = Diag::error(span.clone(), message).with_file_opt(source_file);
                 diags.push(diagnostic);
                 None
             }
@@ -3491,17 +3488,15 @@ fn parse_local_fn_type(
         && base == "field"
     {
         if args.len() != 1 {
-            let mut d = Diag::error(
+            let d = Diag::error(
                 span.clone(),
                 format!(
                     "`field<...>` expects exactly one type argument, found {}",
                     args.len()
                 ),
             )
-            .with_help("use `field<T>` with a single element type parameter");
-            if let Some(file) = source_file {
-                d = d.with_file(file);
-            }
+            .with_help("use `field<T>` with a single element type parameter")
+            .with_file_opt(source_file);
             diags.push(d);
             return None;
         }
@@ -3542,16 +3537,14 @@ fn parse_local_fn_type(
                 return Some(FnValueTy::TypeVar(other.to_string()));
             }
             if interface_names.contains(other) {
-                let mut d = Diag::error(
+                let d = Diag::error(
                     span.clone(),
                     format!("interface `{other}` cannot be used as a value type in v1"),
                 )
                 .with_help(format!(
                     "use a generic type parameter with an interface bound instead, e.g. `<T: {other}>`"
-                ));
-                if let Some(file) = source_file {
-                    d = d.with_file(file);
-                }
+                ))
+.with_file_opt(source_file);
                 diags.push(d);
                 return None;
             }
@@ -3561,16 +3554,14 @@ fn parse_local_fn_type(
             if struct_defs.contains_key(other) {
                 return Some(FnValueTy::Struct(other.to_string()));
             }
-            let mut d = Diag::error(
+            let d = Diag::error(
                 span.clone(),
                 format!("unsupported function {context} `{other}`"),
             )
             .with_help(
                 "supported types are family-first: scalar aliases (f32/f64/half/i32/u32/bool/signal/delta/mask/coverage/angle/length), vector aliases (vec2/uvec2/coord/coord_like/resolution, vec3/uvec3, vec4/uvec4), matrix aliases (mat2/mat3/mat4), texture<T>, color, shape, layer, fixed-size arrays, records, or a defined enum",
-            );
-            if let Some(file) = source_file {
-                d = d.with_file(file);
-            }
+            )
+.with_file_opt(source_file);
             diags.push(d);
             None
         }

@@ -130,7 +130,7 @@ impl Checker {
         self.style_scopes.pop();
 
         let Some(body_layer_id) = body_layer else {
-            if !self.diags.iter().any(|d| d.severity == Severity::Error) {
+            if !has_errors(&self.diags) {
                 self.diags.push(
                     Diag::error(
                         decl.span.clone(),

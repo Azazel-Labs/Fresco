@@ -6,10 +6,6 @@ use web_time::Instant;
 
 type InlineWrites = BTreeMap<(usize, String), Value>;
 
-fn has_errors(diags: &[Diag]) -> bool {
-    diags.iter().any(|d| d.severity == Severity::Error)
-}
-
 #[expect(
     clippy::too_many_arguments,
     reason = "This compiler boundary explicitly threads independent checking or lowering inputs."
@@ -30,10 +26,7 @@ fn parse_fn_type(
         return match resource {
             Ok(resource) => Some(FnValueTy::ShaderResource(resource)),
             Err(message) => {
-                let mut diagnostic = Diag::error(span.clone(), message);
-                if let Some(file) = source_file {
-                    diagnostic = diagnostic.with_file(file);
-                }
+                let diagnostic = Diag::error(span.clone(), message).with_file_opt(source_file);
                 diags.push(diagnostic);
                 None
             }
@@ -101,17 +94,15 @@ fn parse_fn_type(
         && base == "field"
     {
         if args.len() != 1 {
-            let mut d = Diag::error(
+            let d = Diag::error(
                 span.clone(),
                 format!(
                     "`field<...>` expects exactly one type argument, found {}",
                     args.len()
                 ),
             )
-            .with_help("use `field<T>` with a single element type parameter");
-            if let Some(file) = source_file {
-                d = d.with_file(file);
-            }
+            .with_help("use `field<T>` with a single element type parameter")
+            .with_file_opt(source_file);
             diags.push(d);
             return None;
         }
@@ -150,16 +141,14 @@ fn parse_fn_type(
                 return Some(FnValueTy::TypeVar(other.to_string()));
             }
             if interface_names.contains(other) {
-                let mut d = Diag::error(
+                let d = Diag::error(
                     span.clone(),
                     format!("interface `{other}` cannot be used as a value type in v1"),
                 )
                 .with_help(format!(
                     "use a generic type parameter with an interface bound instead, e.g. `<T: {other}>`"
-                ));
-                if let Some(file) = source_file {
-                    d = d.with_file(file);
-                }
+                ))
+.with_file_opt(source_file);
                 diags.push(d);
                 return None;
             }
@@ -171,16 +160,14 @@ fn parse_fn_type(
                 return Some(FnValueTy::Struct(other.to_string()));
             }
 
-            let mut d = Diag::error(
+            let d = Diag::error(
                 span.clone(),
                 format!("unsupported function {context} `{other}`"),
             )
             .with_help(
                 "supported types are family-first: scalar aliases (f32/f64/half/i32/u32/bool/signal/delta/mask/coverage/angle/length), vector aliases (vec2/uvec2/coord/coord_like/resolution, vec3/uvec3, vec4/uvec4), matrix aliases (mat2/mat3/mat4), texture<T>, color, shape, layer, fixed-size arrays, records, or a defined enum",
-            );
-            if let Some(file) = source_file {
-                d = d.with_file(file);
-            }
+            )
+.with_file_opt(source_file);
             diags.push(d);
             None
         }
@@ -3582,7 +3569,7 @@ impl Checker {
                                     "helper `{fn_name}` ({helper_id}) statement `assignment` to `{name}` expects {target_components} component(s), but got {rhs_components}"
                                 ),
                             )
-                            .with_tag("E_HELPER_ASSIGN_ARITY")
+                            .with_code("E_HELPER_ASSIGN_ARITY")
                             .with_file(def.source_file.clone())
                             .with_help("make assignment value match target scalar/vector arity"),
                         );
@@ -3742,7 +3729,7 @@ impl Checker {
                                     "helper `{fn_name}` ({helper_id}) statement `break` is only valid inside loop bodies"
                                 ),
                             )
-                                .with_tag("E_HELPER_BREAK_OUTSIDE_LOOP")
+                                .with_code("E_HELPER_BREAK_OUTSIDE_LOOP")
                                 .with_file(def.source_file.clone())
                                 .with_help("use `break` inside a `for` loop body"),
                         );
@@ -3781,7 +3768,7 @@ impl Checker {
                                 "helper `{fn_name}` ({helper_id}) statement `{kind}` is not supported yet"
                             ),
                         )
-                        .with_tag("E_HELPER_UNSUPPORTED_STMT")
+                        .with_code("E_HELPER_UNSUPPORTED_STMT")
                         .with_file(def.source_file.clone())
                         .with_help(
                             "runtime helper lowering supports scalar/vec2/vec3/vec4 logic with `if`, `for`, `let`, assignment, `return`, and expression statements",
@@ -3946,7 +3933,7 @@ impl Checker {
                             Self::helper_param_ty_name(&param.ty)
                         ),
                     )
-                    .with_tag("E_HELPER_CALL_PACK_UNSUPPORTED")
+                    .with_code("E_HELPER_CALL_PACK_UNSUPPORTED")
                     .with_file(def.source_file.clone())
                     .with_help("use helper argument types supported by runtime helper packing"),
                 );
@@ -3965,7 +3952,7 @@ impl Checker {
                         expected_args
                     ),
                 )
-                .with_tag("E_HELPER_CALL_PACK_MISMATCH")
+                .with_code("E_HELPER_CALL_PACK_MISMATCH")
                 .with_file(def.source_file.clone())
                 .with_help("this indicates helper call packing drift between checker and lowering"),
             );

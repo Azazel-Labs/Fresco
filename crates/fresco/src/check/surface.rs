@@ -6,7 +6,7 @@ use crate::ast::{
     SchemaEvaluatorPermutationDecl, SchemaEvaluatorVariantDecl, SchemaExpressionDecl,
     SchemaProgramDecl, Span, Stmt, SurfaceDecl,
 };
-use crate::diag::{Diag, Severity};
+use crate::diag::{Diag, has_errors};
 use crate::hir::Sx;
 use crate::material_hir::{
     EvaluationVariant, MaterialChannel, MaterialHir, MaterialLayer, MaterialValue,
@@ -511,9 +511,7 @@ pub(crate) fn validate_material_properties(
         diags.extend(checker.diags);
         stack.pop();
 
-        let had_error = diags[diag_start..]
-            .iter()
-            .any(|diag| diag.severity == Severity::Error);
+        let had_error = diags[diag_start..].iter().any(Diag::is_error);
         if had_error {
             states.insert(name.to_string(), MaterialPropertiesResolutionState::Failed);
             return None;
@@ -549,7 +547,7 @@ pub(crate) fn validate_material_properties(
         );
     }
 
-    if diags.iter().any(|diag| diag.severity == Severity::Error) {
+    if has_errors(&diags) {
         return Err(diags);
     }
 
@@ -962,7 +960,7 @@ pub(crate) fn validate_material_models(
         model.evaluation_variant_bodies = evaluation_variant_bodies;
     }
 
-    if diags.iter().any(|diag| diag.severity == Severity::Error) {
+    if has_errors(&diags) {
         return Err(diags);
     }
 
@@ -1345,7 +1343,7 @@ pub(crate) fn validate_surface_model_bindings(
         );
     }
 
-    if diags.iter().any(|diag| diag.severity == Severity::Error) {
+    if has_errors(&diags) {
         return Err(diags);
     }
 
@@ -1816,7 +1814,7 @@ pub(crate) fn check_surface(
     checker.materialize_pending_user_helpers();
     checker.emit_expr_hotspot_summary();
 
-    if checker.diags.iter().any(|d| d.severity == Severity::Error) {
+    if has_errors(&checker.diags) {
         return Err(checker.diags);
     }
 
@@ -1939,7 +1937,7 @@ pub(crate) fn check_surface(
             .or_else(|| selected_model.and_then(|model| model.evaluation_shader_source.clone()))
     });
 
-    if checker.diags.iter().any(|d| d.severity == Severity::Error) {
+    if has_errors(&checker.diags) {
         return Err(checker.diags);
     }
 
