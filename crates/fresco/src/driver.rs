@@ -643,7 +643,7 @@ pub struct VisualizerCompileOutput {
     pub diagnostics: Vec<DiagnosticRecord>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VisualizerMetadata {
     pub kind: String,
     pub domain: String,
@@ -754,26 +754,6 @@ pub fn compile_variant_with_files(
     })
 }
 
-pub fn compile_visualizer(
-    src: &str,
-    filename: &str,
-    span_start: usize,
-    span_end: usize,
-    kind: VisualizerKind,
-    domain: &str,
-    sweep_max: f32,
-) -> Result<VisualizerCompileOutput, Vec<DiagnosticRecord>> {
-    compile_visualizer_with_files(
-        src,
-        filename,
-        (span_start, span_end),
-        kind,
-        domain,
-        sweep_max,
-        None,
-    )
-}
-
 pub fn compile_visualizer_with_files(
     src: &str,
     filename: &str,
@@ -788,14 +768,10 @@ pub fn compile_visualizer_with_files(
         .map(|r| (r.span_start, r.span_end))
         .unwrap_or((span_start, span_end));
     let expr_text = src.get(resolved_span.0..resolved_span.1);
-    let range_hint = expr_text.and_then(viz::extract_range_hint_for_visualizer);
+    let range_hint = expr_text.and_then(viz::extract_range_hint);
     let variant = compile_variant_with_files(src, filename, span_start, span_end, files)?;
     let visualizer_spec = viz::VisualizerSpec {
-        kind: match kind {
-            VisualizerKind::Sparkline => viz::VisualizerKind::Sparkline,
-            VisualizerKind::Swatch => viz::VisualizerKind::Swatch,
-            VisualizerKind::Thumbnail => viz::VisualizerKind::Thumbnail,
-        },
+        kind,
         domain,
         sweep_max,
         semantic_type: &variant.semantic_type,
@@ -815,18 +791,7 @@ pub fn compile_visualizer_with_files(
         draw_wgsl: shaders.draw_wgsl,
         reduce_wgsl: shaders.reduce_wgsl,
         semantic_type: variant.semantic_type,
-        metadata: VisualizerMetadata {
-            kind: metadata.kind,
-            domain: metadata.domain,
-            sweep_max: metadata.sweep_max,
-            x_axis_label: metadata.x_axis_label,
-            y_axis_label: metadata.y_axis_label,
-            fit_mode: metadata.fit_mode,
-            y_min_hint: metadata.y_min_hint,
-            y_max_hint: metadata.y_max_hint,
-            preview_label: metadata.preview_label,
-            preview_detail: metadata.preview_detail,
-        },
+        metadata,
         diagnostics: variant.diagnostics,
     })
 }

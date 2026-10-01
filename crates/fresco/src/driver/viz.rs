@@ -1,3 +1,4 @@
+use super::{VisualizerKind, VisualizerMetadata};
 use crate::pipeline_layout::compact_type;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -9,13 +10,6 @@ const MAX_RUNTIME_PARAMS: usize = 16;
 const PREVIEW_UNIFORM_PARAM_VECS: usize = MAX_RUNTIME_PARAMS.div_ceil(4);
 pub(super) const VIZ_SERIES_SAMPLES: u32 = 256;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum VisualizerKind {
-    Sparkline,
-    Swatch,
-    Thumbnail,
-}
-
 #[derive(Debug, Clone)]
 pub(crate) struct VisualizerSpec<'a> {
     pub kind: VisualizerKind,
@@ -26,33 +20,14 @@ pub(crate) struct VisualizerSpec<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct VisualizerMetadata {
-    pub kind: String,
-    pub domain: String,
-    pub sweep_max: f32,
-    pub x_axis_label: Option<String>,
-    pub y_axis_label: Option<String>,
-    pub fit_mode: Option<String>,
-    pub y_min_hint: Option<f32>,
-    pub y_max_hint: Option<f32>,
-    pub preview_label: Option<String>,
-    pub preview_detail: Option<String>,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct VisualizerShaderSet {
     pub draw_wgsl: String,
     pub reduce_wgsl: String,
 }
 
+/// A visualized entry parameter, reflected from WGSL or the manifest.
 #[derive(Debug, Clone)]
-struct EntryParam {
-    name: String,
-    ty: String,
-}
-
-#[derive(Debug, Clone)]
-struct ManifestParamDef {
+struct ParamDef {
     name: String,
     ty: String,
 }
@@ -124,18 +99,13 @@ pub(crate) fn build_shaders(
     } else {
         1.0
     };
-    let mode = match spec.kind {
-        VisualizerKind::Sparkline => draw::DrawMode::Sparkline,
-        VisualizerKind::Swatch => draw::DrawMode::Swatch,
-        VisualizerKind::Thumbnail => draw::DrawMode::Thumbnail,
-    };
     let draw_wgsl = draw::build_draw_shader(
         variant_wgsl,
         &fn_name,
         &call_args,
         domain,
         sweep_max,
-        mode,
+        spec.kind,
         spec.semantic_type,
     )?;
     let reduce_wgsl = reduce::build_reduce_shader(
@@ -488,7 +458,7 @@ fn format_space_preview_detail(labels: &[String]) -> String {
     )
 }
 
-fn extract_range_hint(expr_text: &str) -> Option<(f32, f32)> {
+pub(crate) fn extract_range_hint(expr_text: &str) -> Option<(f32, f32)> {
     let idx = expr_text.find("range")?;
     let tail = &expr_text[idx..];
     let colon_idx = tail.find(':')?;
@@ -501,10 +471,6 @@ fn extract_range_hint(expr_text: &str) -> Option<(f32, f32)> {
     }
 
     None
-}
-
-pub(crate) fn extract_range_hint_for_visualizer(expr_text: &str) -> Option<(f32, f32)> {
-    extract_range_hint(expr_text)
 }
 
 fn trim_top_level_expr_end(text: &str) -> &str {
@@ -767,12 +733,12 @@ fn build_viz_call_args(
         .map(|p| (p.name.clone(), p.ty.clone()))
         .collect::<HashMap<_, _>>();
     let manifest_defs = parse_manifest_params(manifest_text, fn_name);
-    let param_defs: Vec<ManifestParamDef> = if manifest_defs.is_empty() {
+    let param_defs: Vec<ParamDef> = if manifest_defs.is_empty() {
         reflected_params
             .iter()
             .skip(fixed_count)
             .enumerate()
-            .map(|(index, param)| ManifestParamDef {
+            .map(|(index, param)| ParamDef {
                 name: if param.name.is_empty() {
                     format!("param{}", index + 1)
                 } else {
@@ -784,7 +750,7 @@ fn build_viz_call_args(
     } else {
         manifest_defs
             .into_iter()
-            .map(|def| ManifestParamDef {
+            .map(|def| ParamDef {
                 name: def.name.clone(),
                 ty: reflected_by_name
                     .get(&def.name)
@@ -836,7 +802,7 @@ fn viz_context_expression(
     Ok(format!("{}({})", context.name, fields.join(", ")))
 }
 
-fn parse_manifest_params(manifest_text: &str, fn_name: &str) -> Vec<ManifestParamDef> {
+fn parse_manifest_params(manifest_text: &str, fn_name: &str) -> Vec<ParamDef> {
     if manifest_text.trim().is_empty() {
         return Vec::new();
     }
@@ -856,7 +822,7 @@ fn parse_manifest_params(manifest_text: &str, fn_name: &str) -> Vec<ManifestPara
             entry
                 .params
                 .iter()
-                .map(|param| ManifestParamDef {
+                .map(|param| ParamDef {
                     name: param.name.clone(),
                     ty: param.ty.clone(),
                 })
@@ -865,7 +831,7 @@ fn parse_manifest_params(manifest_text: &str, fn_name: &str) -> Vec<ManifestPara
         .unwrap_or_default()
 }
 
-fn parse_entry_params(wgsl: &str, fn_name: &str) -> Vec<EntryParam> {
+fn parse_entry_params(wgsl: &str, fn_name: &str) -> Vec<ParamDef> {
     let Some(start) = wgsl.find(&format!("fn {fn_name}")) else {
         return Vec::new();
     };
@@ -887,7 +853,7 @@ fn parse_entry_params(wgsl: &str, fn_name: &str) -> Vec<EntryParam> {
                 Some(idx) => (part[..idx].trim(), part[idx + 1..].trim()),
                 None => ("", part),
             };
-            EntryParam {
+            ParamDef {
                 name: name.to_string(),
                 ty: compact_type(ty),
             }

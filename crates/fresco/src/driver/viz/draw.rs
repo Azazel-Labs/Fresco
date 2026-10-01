@@ -1,20 +1,13 @@
 use super::{VIZ_SERIES_SAMPLES, preview_uniform_params_field_wgsl};
 use crate::pipeline_layout::compact_type;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum DrawMode {
-    Sparkline,
-    Swatch,
-    Thumbnail,
-}
-
 pub(super) fn build_draw_shader(
     variant_wgsl: &str,
     fn_name: &str,
     call_args: &[String],
     domain: &str,
     sweep_max: f32,
-    mode: DrawMode,
+    mode: crate::driver::VisualizerKind,
     semantic_type: &str,
 ) -> Result<String, String> {
     let sample_uv = if domain == "time" {
@@ -24,7 +17,7 @@ pub(super) fn build_draw_shader(
     };
     let time_expr = if domain == "time" { "s" } else { "u.time" };
     let (expr_eval, shade) = match mode {
-        DrawMode::Swatch | DrawMode::Thumbnail => (
+        crate::driver::VisualizerKind::Swatch | crate::driver::VisualizerKind::Thumbnail => (
             format!(
                 "let expr_out = fresco_viz_bridge({sample_uv}, {time_expr});",
                 sample_uv = sample_uv,
@@ -32,7 +25,7 @@ pub(super) fn build_draw_shader(
             ),
             "return expr_out;".to_string(),
         ),
-        DrawMode::Sparkline => (
+        crate::driver::VisualizerKind::Sparkline => (
             String::new(),
             format!(
                 r#"
