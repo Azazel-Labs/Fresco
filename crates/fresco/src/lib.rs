@@ -1,6 +1,12 @@
 // Re-export procedural macros
 pub use fresco_macros::{builtin, enum_decl, type_decl};
 
+/// Stack size, in bytes, for threads that run the compiler. The recursive
+/// parser and checker can overflow default thread stacks (notably the Windows
+/// main thread) on deeply nested programs, so hosts should compile on a
+/// dedicated thread with at least this much stack.
+pub const COMPILER_THREAD_STACK_SIZE: usize = 32 * 1024 * 1024;
+
 pub(crate) mod ast;
 pub(crate) mod builtin_catalog;
 pub(crate) mod check;

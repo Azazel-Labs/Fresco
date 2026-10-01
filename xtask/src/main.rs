@@ -1,7 +1,8 @@
 use std::env;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, ExitStatus};
 use std::time::{Duration, Instant};
 #[cfg(unix)]
 use std::{fs::Permissions, os::unix::fs::PermissionsExt};
@@ -16,6 +17,14 @@ const RUSTFMT_CONFIG_EDITION: &str = "edition=2024";
 const HOOK_EXPECTED_RUSTFMT: &str = "rustfmt --edition 2024";
 const LANGUAGE_DOCS_ARTIFACT_PATH: &str = "docs/generated/language-reference.v1.json";
 const LANGUAGE_DOCS_MARKDOWN_ARTIFACT_PATH: &str = "docs/generated/language-reference.v1.md";
+const FMT_CHECK: &[&str] = &[
+    "fmt",
+    "--all",
+    "--",
+    "--check",
+    "--config",
+    RUSTFMT_CONFIG_EDITION,
+];
 
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
@@ -55,8 +64,8 @@ fn main() -> ExitCode {
         "gate-status" => run_gate_status(&root),
         "dist" => run_dist(&root),
         "clean-all" => run_clean_all(&root),
-        "run" => run_cargo_with_extra(&root, "run", &extra),
-        "run-fast" => run_cargo_with_profile_extra(&root, "run", "dev-fast", &extra),
+        "run" => run_cargo_with_extra(&root, &["run"], &extra),
+        "run-fast" => run_cargo_with_extra(&root, &["run", "--profile", "dev-fast"], &extra),
         "help" | "-h" | "--help" => {
             print_help();
             Ok(())
@@ -85,10 +94,15 @@ fn default_workers() -> usize {
     std::thread::available_parallelism().map_or(1, |cpus| cpus.get().div_ceil(2))
 }
 
-fn run_workspace_tests(root: &PathBuf, locked: bool) -> Result<(), i32> {
-    let workers = default_workers().to_string();
-    let build_jobs = env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| workers.clone());
-    let test_threads = env::var("RUST_TEST_THREADS").unwrap_or(workers);
+/// `CARGO_BUILD_JOBS`, defaulting to [`default_workers`].
+fn build_jobs() -> String {
+    env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| default_workers().to_string())
+}
+
+fn run_workspace_tests(root: &Path, locked: bool) -> Result<(), i32> {
+    let build_jobs = build_jobs();
+    let test_threads =
+        env::var("RUST_TEST_THREADS").unwrap_or_else(|_| default_workers().to_string());
     let mut args = vec!["test", "--workspace"];
     if locked {
         args.push("--locked");
@@ -105,25 +119,20 @@ fn run_workspace_tests(root: &PathBuf, locked: bool) -> Result<(), i32> {
     )
 }
 
-fn run_ci(root: &PathBuf) -> Result<(), i32> {
-    let build_jobs = env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| default_workers().to_string());
-    let ci_build_jobs = [("CARGO_BUILD_JOBS", build_jobs.as_str())];
-
+/// Source-hygiene checks shared by `ci` and `ci-strict`.
+fn run_ci_prelude(root: &Path) -> Result<(), i32> {
     repo_guard::run(root)?;
     readme::run(root, false)?;
-    run_fmt_guard(root)?;
+    run_fmt_guard(root)
+}
+
+fn run_ci(root: &Path) -> Result<(), i32> {
+    let build_jobs = build_jobs();
+    let ci_build_jobs = [("CARGO_BUILD_JOBS", build_jobs.as_str())];
+
+    run_ci_prelude(root)?;
     warn_only(
-        run_cargo(
-            root,
-            &[
-                "fmt",
-                "--all",
-                "--",
-                "--check",
-                "--config",
-                RUSTFMT_CONFIG_EDITION,
-            ],
-        ),
+        run_cargo(root, FMT_CHECK),
         "cargo fmt --check reported formatting drift; continuing without failing `cargo xtask ci`",
     );
     run_cargo_with_env(
@@ -143,7 +152,7 @@ fn run_ci(root: &PathBuf) -> Result<(), i32> {
     Ok(())
 }
 
-fn run_timed_run(root: &PathBuf, extra: &[String]) -> Result<(), i32> {
+fn run_timed_run(root: &Path, extra: &[String]) -> Result<(), i32> {
     if extra.is_empty() {
         eprintln!(
             "timed-run requires an input .fr path\n\
@@ -221,37 +230,15 @@ help: cargo xtask timed-run \"examples/90) gallery/floating_boxes.fr\" [--trace 
     cargo_args.push("--".to_string());
     cargo_args.extend(cli_args.iter().cloned());
 
-    let mut envs: Vec<(String, String)> = vec![("FRESCO_TRACE".to_string(), trace_mode)];
-    if let Some(filter) = log_filter {
-        envs.push(("RUST_LOG".to_string(), filter));
+    let mut envs = vec![("FRESCO_TRACE", trace_mode.as_str())];
+    if let Some(filter) = &log_filter {
+        envs.push(("RUST_LOG", filter.as_str()));
     }
 
-    let env_display = envs
-        .iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect::<Vec<_>>()
-        .join(" ");
-    eprintln!("> {env_display} cargo {}", cargo_args.join(" "));
-
-    let mut cmd = Command::new("cargo");
-    cmd.current_dir(root).args(&cargo_args);
-    for (k, v) in &envs {
-        cmd.env(k, v);
-    }
-
-    let status = cmd.status().map_err(|e| {
-        eprintln!("failed to run cargo: {e}");
-        1
-    })?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(status.code().unwrap_or(1))
-    }
+    run_cargo_with_env(root, &cargo_args, &envs)
 }
 
-fn run_check_timing(root: &PathBuf, extra: &[String]) -> Result<(), i32> {
+fn run_check_timing(root: &Path, extra: &[String]) -> Result<(), i32> {
     let mut runs = 3usize;
     let mut profile = "dev";
 
@@ -279,7 +266,7 @@ fn run_check_timing(root: &PathBuf, extra: &[String]) -> Result<(), i32> {
     let mut durations: Vec<Duration> = Vec::with_capacity(runs);
     for i in 1..=runs {
         let start = Instant::now();
-        run_cargo_owned(root, &args)?;
+        run_cargo(root, &args)?;
         let elapsed = start.elapsed();
         eprintln!("  run {i}/{runs}: {:.2} ms", elapsed.as_secs_f64() * 1000.0);
         durations.push(elapsed);
@@ -313,24 +300,12 @@ fn run_check_timing(root: &PathBuf, extra: &[String]) -> Result<(), i32> {
     Ok(())
 }
 
-fn run_ci_strict(root: &PathBuf) -> Result<(), i32> {
-    let build_jobs = env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| default_workers().to_string());
+fn run_ci_strict(root: &Path) -> Result<(), i32> {
+    let build_jobs = build_jobs();
     let ci_build_jobs = [("CARGO_BUILD_JOBS", build_jobs.as_str())];
 
-    repo_guard::run(root)?;
-    readme::run(root, false)?;
-    run_fmt_guard(root)?;
-    run_cargo(
-        root,
-        &[
-            "fmt",
-            "--all",
-            "--",
-            "--check",
-            "--config",
-            RUSTFMT_CONFIG_EDITION,
-        ],
-    )?;
+    run_ci_prelude(root)?;
+    run_cargo(root, FMT_CHECK)?;
     run_cargo_with_env(
         root,
         &["check", "--workspace", "--all-targets", "--locked"],
@@ -368,8 +343,6 @@ fn run_lang_docs(root: &Path, extra: &[String]) -> Result<(), i32> {
         return Err(1);
     }
 
-    let output_path = root.join(LANGUAGE_DOCS_ARTIFACT_PATH);
-    let markdown_output_path = root.join(LANGUAGE_DOCS_MARKDOWN_ARTIFACT_PATH);
     let model = fresco::language_docs::build_language_docs_model_with_prelude(
         fresco_example_engine::PRELUDE,
     )
@@ -379,78 +352,79 @@ fn run_lang_docs(root: &Path, extra: &[String]) -> Result<(), i32> {
     })?;
     let json = serde_json::to_string_pretty(&model).expect("language docs serialize");
     let markdown = fresco::language_docs::render_language_docs_markdown(&model);
-    let payload = format!("{json}\n");
-    let markdown_payload = format!("{markdown}\n");
+
+    struct Artifact {
+        path: PathBuf,
+        payload: String,
+        create_dir_error: &'static str,
+        write_error: &'static str,
+    }
+    let artifacts = [
+        Artifact {
+            path: root.join(LANGUAGE_DOCS_ARTIFACT_PATH),
+            payload: format!("{json}\n"),
+            create_dir_error: "failed to create",
+            write_error: "failed to write",
+        },
+        Artifact {
+            path: root.join(LANGUAGE_DOCS_MARKDOWN_ARTIFACT_PATH),
+            payload: format!("{markdown}\n"),
+            create_dir_error: "failed to create output directory",
+            write_error: "failed to write language docs markdown artifact",
+        },
+    ];
+    let listing: String = artifacts
+        .iter()
+        .map(|artifact| format!("\n- {}", artifact.path.display()))
+        .collect();
 
     if check_mode {
-        let existing_json = fs::read_to_string(&output_path).map_err(|e| {
+        let mut stale = false;
+        for artifact in &artifacts {
+            let existing = fs::read_to_string(&artifact.path).map_err(|e| {
+                eprintln!(
+                    "failed to read {} (run `cargo xtask lang-docs`): {e}",
+                    artifact.path.display()
+                );
+                1
+            })?;
+            stale |= existing != artifact.payload;
+        }
+        if stale {
             eprintln!(
-                "failed to read {} (run `cargo xtask lang-docs`): {e}",
-                output_path.display()
-            );
-            1
-        })?;
-        let existing_markdown = fs::read_to_string(&markdown_output_path).map_err(|e| {
-            eprintln!(
-                "failed to read {} (run `cargo xtask lang-docs`): {e}",
-                markdown_output_path.display()
-            );
-            1
-        })?;
-        if existing_json != payload || existing_markdown != markdown_payload {
-            eprintln!(
-                "language docs artifacts are out of date; run `cargo xtask lang-docs` and commit the results\n- {}\n- {}",
-                output_path.display(),
-                markdown_output_path.display()
+                "language docs artifacts are out of date; run `cargo xtask lang-docs` and commit the results{listing}"
             );
             return Err(1);
         }
-        println!(
-            "language docs artifacts are up to date\n- {}\n- {}",
-            output_path.display(),
-            markdown_output_path.display()
-        );
+        println!("language docs artifacts are up to date{listing}");
         return Ok(());
     }
 
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            eprintln!("failed to create {}: {e}", parent.display());
+    for artifact in &artifacts {
+        if let Some(parent) = artifact.path.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                eprintln!("{} {}: {e}", artifact.create_dir_error, parent.display());
+                1
+            })?;
+        }
+    }
+    for artifact in &artifacts {
+        fs::write(&artifact.path, &artifact.payload).map_err(|e| {
+            eprintln!("{} {}: {e}", artifact.write_error, artifact.path.display());
             1
         })?;
     }
-    if let Some(parent) = markdown_output_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            eprintln!(
-                "failed to create output directory {}: {e}",
-                parent.display()
-            );
-            1
-        })?;
+    for artifact in &artifacts {
+        println!("wrote {}", artifact.path.display());
     }
-
-    fs::write(&output_path, payload).map_err(|e| {
-        eprintln!("failed to write {}: {e}", output_path.display());
-        1
-    })?;
-    fs::write(&markdown_output_path, markdown_payload).map_err(|e| {
-        eprintln!(
-            "failed to write language docs markdown artifact {}: {e}",
-            markdown_output_path.display()
-        );
-        1
-    })?;
-
-    println!("wrote {}", output_path.display());
-    println!("wrote {}", markdown_output_path.display());
     Ok(())
 }
 
-fn run_dist(root: &PathBuf) -> Result<(), i32> {
+fn run_dist(root: &Path) -> Result<(), i32> {
     run_cargo(root, &["build", "--release"])
 }
 
-fn run_clean_all(root: &PathBuf) -> Result<(), i32> {
+fn run_clean_all(root: &Path) -> Result<(), i32> {
     run_cargo(root, &["clean"])?;
 
     let dist_dir = root.join("dist");
@@ -549,18 +523,13 @@ fn run_install_hooks(root: &Path) -> Result<(), i32> {
     }
 
     eprintln!("> git config core.hooksPath .githooks");
-    let status = Command::new("git")
-        .current_dir(root)
-        .args(["config", "core.hooksPath", ".githooks"])
-        .status()
-        .map_err(|e| {
-            eprintln!("failed to run git config: {e}");
-            1
-        })?;
-
-    if !status.success() {
-        return Err(status.code().unwrap_or(1));
-    }
+    exit_status(
+        "git config",
+        Command::new("git")
+            .current_dir(root)
+            .args(["config", "core.hooksPath", ".githooks"])
+            .status(),
+    )?;
 
     eprintln!(
         "Installed git hook path. Staged Rust files will now be rustfmt'ed by .githooks/pre-commit."
@@ -568,68 +537,45 @@ fn run_install_hooks(root: &Path) -> Result<(), i32> {
     Ok(())
 }
 
-fn run_cargo_with_extra(root: &PathBuf, subcommand: &str, extra: &[String]) -> Result<(), i32> {
-    let mut args = vec![subcommand.to_string()];
-    args.extend(extra.iter().cloned());
-    run_cargo_owned(root, &args)
+fn run_cargo_with_extra(root: &Path, args: &[&str], extra: &[String]) -> Result<(), i32> {
+    let args: Vec<&str> = args
+        .iter()
+        .copied()
+        .chain(extra.iter().map(String::as_str))
+        .collect();
+    run_cargo(root, &args)
 }
 
-fn run_cargo_with_profile_extra(
-    root: &PathBuf,
-    subcommand: &str,
-    profile: &str,
-    extra: &[String],
+fn run_cargo(root: &Path, args: &[impl AsRef<str>]) -> Result<(), i32> {
+    run_cargo_with_env(root, args, &[])
+}
+
+/// Runs `cargo <args>` in `root` with extra environment variables, echoing
+/// the command line first.
+fn run_cargo_with_env(
+    root: &Path,
+    args: &[impl AsRef<str>],
+    envs: &[(&str, &str)],
 ) -> Result<(), i32> {
-    let mut args = vec![
-        subcommand.to_string(),
-        "--profile".to_string(),
-        profile.to_string(),
-    ];
-    args.extend(extra.iter().cloned());
-    run_cargo_owned(root, &args)
+    let args: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
+    let env_display: String = envs.iter().map(|(k, v)| format!("{k}={v} ")).collect();
+    eprintln!("> {env_display}cargo {}", args.join(" "));
+
+    exit_status(
+        "cargo",
+        Command::new("cargo")
+            .current_dir(root)
+            .args(&args)
+            .envs(envs.iter().copied())
+            .status(),
+    )
 }
 
-fn run_cargo(root: &PathBuf, args: &[&str]) -> Result<(), i32> {
-    let owned: Vec<String> = args.iter().map(ToString::to_string).collect();
-    run_cargo_owned(root, &owned)
-}
-
-fn run_cargo_owned(root: &PathBuf, args: &[String]) -> Result<(), i32> {
-    eprintln!("> cargo {}", args.join(" "));
-    let status = Command::new("cargo")
-        .current_dir(root)
-        .args(args)
-        .status()
-        .map_err(|e| {
-            eprintln!("failed to run cargo: {e}");
-            1
-        })?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        Err(status.code().unwrap_or(1))
-    }
-}
-
-fn run_cargo_with_env(root: &PathBuf, args: &[&str], envs: &[(&str, &str)]) -> Result<(), i32> {
-    let mut cmd = Command::new("cargo");
-    cmd.current_dir(root).args(args);
-    for (k, v) in envs {
-        cmd.env(k, v);
-    }
-
-    eprintln!(
-        "> {} cargo {}",
-        envs.iter()
-            .map(|(k, v)| format!("{k}={v}"))
-            .collect::<Vec<_>>()
-            .join(" "),
-        args.join(" ")
-    );
-
-    let status = cmd.status().map_err(|e| {
-        eprintln!("failed to run cargo: {e}");
+/// Maps a spawned command's status to the xtask result: a spawn failure is
+/// reported and becomes exit code 1, a failing exit keeps its code.
+fn exit_status(program: &str, status: io::Result<ExitStatus>) -> Result<(), i32> {
+    let status = status.map_err(|e| {
+        eprintln!("failed to run {program}: {e}");
         1
     })?;
 

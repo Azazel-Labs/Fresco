@@ -147,7 +147,7 @@ fn floating_boxes_scatter_compile_timing_regression_guard() {
     // codegen size budget checked above.
     let scatter_compile_ms = std::thread::Builder::new()
         .name("floating-boxes-scatter-timing".to_string())
-        .stack_size(32 * 1024 * 1024)
+        .stack_size(fresco::COMPILER_THREAD_STACK_SIZE)
         .spawn(move || {
             let _warmup = common::compile_example(&src, &filename, false)
                 .expect("warmup compile should succeed");

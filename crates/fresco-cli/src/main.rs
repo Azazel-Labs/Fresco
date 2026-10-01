@@ -215,7 +215,7 @@ fn main() -> ExitCode {
 
     match thread::Builder::new()
         .name("fresco-compile".to_string())
-        .stack_size(32 * 1024 * 1024)
+        .stack_size(fresco::COMPILER_THREAD_STACK_SIZE)
         .spawn(move || {
             driver::run(driver::Options {
                 input,

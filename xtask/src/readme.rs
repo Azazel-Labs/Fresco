@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
@@ -60,7 +61,7 @@ pub(crate) fn run(root: &Path, check: bool) -> Result<(), i32> {
     let result = std::thread::scope(|scope| {
         std::thread::Builder::new()
             .name("readme-compiler".into())
-            .stack_size(32 * 1024 * 1024)
+            .stack_size(fresco::COMPILER_THREAD_STACK_SIZE)
             .spawn_scoped(scope, || execute(root, check))
             .map_err(|error| error.to_string())?
             .join()
@@ -76,9 +77,10 @@ fn execute(root: &Path, check: bool) -> Result<(), String> {
     let mut files = HashMap::new();
     let samples = load_manifest(root)?;
     collect(root, &root.join("examples"), &mut files)?;
-    files.extend(fresco_example_engine::source_files());
+    let engine_files = fresco_example_engine::source_files();
+    files.extend(engine_files.clone());
     files.extend(
-        fresco_example_engine::source_files()
+        engine_files
             .into_iter()
             .map(|(path, source)| (format!("integrations/example-engine/{path}"), source)),
     );
@@ -170,10 +172,11 @@ fn render(
         let source = files
             .get(&sample.source)
             .ok_or_else(|| format!("unknown README source: {}", sample.source))?;
-        output.push_str(&format!(
+        let _ = write!(
+            output,
             "{START}{id} -->\n```fresco\n{}\n```\n{END}",
             source.trim_end()
-        ));
+        );
         rest = after;
     }
     reject_unmanaged(rest)?;
