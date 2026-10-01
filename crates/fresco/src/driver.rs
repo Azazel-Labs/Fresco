@@ -233,34 +233,6 @@ impl ContextFile {
     }
 
     pub fn apply_to(&self, context: &mut CompileContext) {
-        fn parse_build_profile(value: &str) -> Option<BuildProfile> {
-            match value.to_ascii_lowercase().as_str() {
-                "all" => Some(BuildProfile::All),
-                "editor" => Some(BuildProfile::Editor),
-                "runtime" => Some(BuildProfile::Runtime),
-                _ => None,
-            }
-        }
-
-        fn parse_aa_style(value: &str) -> Option<crate::hir::ShapeAaStyle> {
-            match value.to_ascii_lowercase().as_str() {
-                "gradient" => Some(crate::hir::ShapeAaStyle::Gradient),
-                "fwidth" => Some(crate::hir::ShapeAaStyle::Fwidth),
-                "conservative" | "best" => Some(crate::hir::ShapeAaStyle::Conservative),
-                _ => None,
-            }
-        }
-
-        fn parse_aa_level(value: &str) -> Option<(f32, f32)> {
-            match value.to_ascii_lowercase().as_str() {
-                "sharp" | "low" => Some((1.0, 2.0)),
-                "balanced" | "medium" => Some((1.5, 3.0)),
-                "soft" | "high" => Some((2.0, 4.0)),
-                "ultra" | "max" => Some((2.5, 5.5)),
-                _ => None,
-            }
-        }
-
         if let Some(v) = self.check.wide_effect_warn_ratio {
             context.check.wide_effect_warn_ratio = v;
         }
@@ -274,12 +246,13 @@ impl ContextFile {
             context.check.shape_aa_max_px = Some(v);
         }
         if let Some(v) = &self.check.shape_aa_style
-            && let Some(style) = parse_aa_style(v)
+            && let Some(style) = crate::hir::ShapeAaStyle::from_name(&v.to_ascii_lowercase())
         {
             context.check.shape_aa_style = Some(style);
         }
         if let Some(v) = &self.check.shape_aa_level
-            && let Some((min_px, max_px)) = parse_aa_level(v)
+            && let Some((min_px, max_px)) =
+                crate::hir::shape_aa_level_bounds(&v.to_ascii_lowercase())
         {
             context.check.shape_aa_min_px = Some(min_px);
             context.check.shape_aa_max_px = Some(max_px);
@@ -294,7 +267,7 @@ impl ContextFile {
             context.check.warn_implicit_texture_uv = v;
         }
         if let Some(v) = &self.build_profile
-            && let Some(profile) = parse_build_profile(v)
+            && let Some(profile) = BuildProfile::from_name(&v.to_ascii_lowercase())
         {
             context.build_profile = profile;
         }

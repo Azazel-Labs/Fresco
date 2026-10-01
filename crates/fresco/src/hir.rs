@@ -790,6 +790,29 @@ pub enum ShapeAaStyle {
     Conservative,
 }
 
+impl ShapeAaStyle {
+    /// The style named by a lowercase compiler-context or pragma value.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "gradient" => Some(Self::Gradient),
+            "fwidth" => Some(Self::Fwidth),
+            "conservative" | "best" => Some(Self::Conservative),
+            _ => None,
+        }
+    }
+}
+
+/// `(min_px, max_px)` antialiasing bounds for a lowercase named AA level.
+pub fn shape_aa_level_bounds(name: &str) -> Option<(f32, f32)> {
+    match name {
+        "sharp" | "low" => Some((1.0, 2.0)),
+        "balanced" | "medium" => Some((1.5, 3.0)),
+        "soft" | "high" => Some((2.0, 4.0)),
+        "ultra" | "max" => Some((2.5, 5.5)),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UserFnCall {
     pub helper_id: String,

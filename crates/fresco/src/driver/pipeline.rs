@@ -168,6 +168,16 @@ impl BuildProfile {
     pub fn includes_editor_only(self) -> bool {
         !matches!(self, BuildProfile::Runtime)
     }
+
+    /// The profile named by a lowercase compiler-context value.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "all" => Some(BuildProfile::All),
+            "editor" => Some(BuildProfile::Editor),
+            "runtime" => Some(BuildProfile::Runtime),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -859,25 +869,6 @@ fn apply_program_pragmas(
         }
     }
 
-    fn parse_aa_style(value: &str) -> Option<ShapeAaStyle> {
-        match value {
-            "gradient" => Some(ShapeAaStyle::Gradient),
-            "fwidth" => Some(ShapeAaStyle::Fwidth),
-            "conservative" | "best" => Some(ShapeAaStyle::Conservative),
-            _ => None,
-        }
-    }
-
-    fn parse_aa_level(value: &str) -> Option<(f32, f32)> {
-        match value {
-            "sharp" | "low" => Some((1.0, 2.0)),
-            "balanced" | "medium" => Some((1.5, 3.0)),
-            "soft" | "high" => Some((2.0, 4.0)),
-            "ultra" | "max" => Some((2.5, 5.5)),
-            _ => None,
-        }
-    }
-
     fn parse_bool(value: &PragmaValue) -> Option<bool> {
         match value {
             PragmaValue::Ident(v) => match v.to_ascii_lowercase().as_str() {
@@ -938,7 +929,7 @@ fn apply_program_pragmas(
                         }
                     }
                 };
-                if let Some(style) = parse_aa_style(raw.as_str()) {
+                if let Some(style) = ShapeAaStyle::from_name(&raw) {
                     context.check.shape_aa_style = Some(style);
                 } else {
                     diags.push(
@@ -966,7 +957,7 @@ fn apply_program_pragmas(
                         }
                     }
                 };
-                if let Some((min_px, max_px)) = parse_aa_level(raw.as_str()) {
+                if let Some((min_px, max_px)) = crate::hir::shape_aa_level_bounds(&raw) {
                     context.check.shape_aa_min_px = Some(min_px);
                     context.check.shape_aa_max_px = Some(max_px);
                 } else {
