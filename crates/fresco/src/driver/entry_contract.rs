@@ -8,23 +8,23 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     for interface in &program.interfaces {
         if let Some((kind, method)) = &interface.entry {
             if registrations.insert(kind.clone(), interface).is_some() {
-                return Err(vec![Diag::error(
-                    interface.name_span.clone(),
+                return Err(Diag::fail(
+                    &interface.name_span,
                     format!("duplicate @entry({kind}, ...) registration"),
-                )]);
+                ));
             }
             if !interface
                 .methods
                 .iter()
                 .any(|candidate| candidate.name == *method)
             {
-                return Err(vec![Diag::error(
-                    interface.name_span.clone(),
+                return Err(Diag::fail(
+                    &interface.name_span,
                     format!(
                         "entry method `{method}` is not declared by `{}`",
                         interface.name
                     ),
-                )]);
+                ));
             }
         }
     }
@@ -35,10 +35,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             if template.entry.is_none()
                 && let Some(composition) = &plug.compose_param
             {
-                return Err(vec![Diag::error(
-                    composition.span.clone(),
+                return Err(Diag::fail(
+                    &composition.span,
                     "@compose requires an engine-registered @entry interface",
-                )]);
+                ));
             }
             if let Some(composition) = &plug.compose_param
                 && !plug.params.first().is_some_and(|state| {
@@ -51,10 +51,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                             .is_some_and(|ty| ty.node == state.ty_name)
                 })
             {
-                return Err(vec![Diag::error(
-                    composition.span.clone(),
+                return Err(Diag::fail(
+                    &composition.span,
                     "@compose requires the named first parameter and result to have the same state type",
-                )]);
+                ));
             }
         }
     }
@@ -124,27 +124,27 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             && canvas.body.is_empty()
         {
             let (_, method) = interface.entry.as_ref().expect("registered interface");
-            return Err(vec![Diag::error(
-                canvas.name_span.clone(),
+            return Err(Diag::fail(
+                &canvas.name_span,
                 format!("missing required entry block `{method}`"),
-            )]);
+            ));
         }
         if let Some(ty) = &canvas.declared_return_ty
             && ty.node != "color"
         {
-            return Err(vec![Diag::error(
-                ty.span.clone(),
+            return Err(Diag::fail(
+                &ty.span,
                 "raster entry result type must be color",
-            )]);
+            ));
         }
         if let Some(interface) = registrations.get(&canvas.entry_kind)
             && interface.methods.len() != 1
             && !canvas.params.is_empty()
         {
-            return Err(vec![Diag::error(
-                canvas.name_span.clone(),
+            return Err(Diag::fail(
+                &canvas.name_span,
                 "entry shorthand requires named blocks for all interface methods",
-            )]);
+            ));
         }
     }
     let configuration_program = program.clone();
@@ -171,10 +171,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                     }
                     param @ Stmt::Param { .. } => params.push(param),
                     _ => {
-                        return Err(vec![Diag::error(
-                            entry.name_span.clone(),
+                        return Err(Diag::fail(
+                            &entry.name_span,
                             "registered contract bodies require instance parameters and method implementations",
-                        )]);
+                        ));
                     }
                 }
             }
@@ -259,10 +259,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             return Err(config_diags);
         }
         if entry.blocks.is_empty() && entry.params.is_empty() && entry.body.is_empty() {
-            return Err(vec![Diag::error(
-                entry.name_span.clone(),
+            return Err(Diag::fail(
+                &entry.name_span,
                 format!("missing required entry block `{entry_method}`"),
-            )]);
+            ));
         }
         let compute = compute_interfaces.contains(&interface.name);
         // Select a supported execution contract by its explicit typed signature.
@@ -272,10 +272,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 || !method.params[0].is_context
                 || method.ret_ty.as_ref().is_none_or(|(ty, _)| ty != "color"))
         {
-            return Err(vec![Diag::error(
-                entry.name_span.clone(),
+            return Err(Diag::fail(
+                &entry.name_span,
                 "registered entry has no supported execution contract; raster entries require one @context parameter and a color result",
-            )]);
+            ));
         }
         if !compute
             && entry
@@ -283,38 +283,38 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 .as_ref()
                 .is_some_and(|ty| ty.node != "color")
         {
-            return Err(vec![Diag::error(
-                entry.return_ty.as_ref().expect("present").span.clone(),
+            return Err(Diag::fail(
+                &entry.return_ty.as_ref().expect("present").span,
                 "entry result type does not match the registered method's color result",
-            )]);
+            ));
         }
         if compute && entry.return_ty.is_some() {
-            return Err(vec![Diag::error(
-                entry.name_span.clone(),
+            return Err(Diag::fail(
+                &entry.name_span,
                 "compute entry methods inherit result types from the engine interface; omit the entry result annotation",
-            )]);
+            ));
         }
         if compute && entry.blocks.is_empty() {
-            return Err(vec![Diag::error(
-                entry.name_span.clone(),
+            return Err(Diag::fail(
+                &entry.name_span,
                 "compute entries require named method blocks",
-            )]);
+            ));
         }
         let (params, body) = if entry.blocks.is_empty() {
             if interface.methods.len() != 1 {
-                return Err(vec![Diag::error(
-                    entry.name_span.clone(),
+                return Err(Diag::fail(
+                    &entry.name_span,
                     "entry shorthand requires named blocks for all interface methods",
-                )]);
+                ));
             }
             config_body.extend(entry.body);
             (entry.params, config_body)
         } else {
             if !entry.params.is_empty() {
-                return Err(vec![Diag::error(
-                    entry.name_span.clone(),
+                return Err(Diag::fail(
+                    &entry.name_span,
                     "named entry blocks inherit their parameters from the engine interface",
-                )]);
+                ));
             }
             let mut seen = HashSet::new();
             let mut diagnostics = Vec::new();
@@ -371,24 +371,24 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                                 .as_ref()
                                 .is_some_and(|(ty, _)| *ty == state.ty_name)
                     }) else {
-                        return Err(vec![Diag::error(
-                            composition.span.clone(),
+                        return Err(Diag::fail(
+                            &composition.span,
                             "@compose requires the named first parameter and result to have the same state type",
-                        )]);
+                        ));
                     };
                     let mut composed = Vec::new();
                     for statement in block.body {
                         let Stmt::Expr(mut call) = statement else {
-                            return Err(vec![Diag::error(
-                                block.name_span.clone(),
+                            return Err(Diag::fail(
+                                &block.name_span,
                                 "composition blocks require module calls; use an explicit fn implementation for control flow",
-                            )]);
+                            ));
                         };
                         let Expr::Call { args, .. } = &mut call.node else {
-                            return Err(vec![Diag::error(
-                                call.span.clone(),
+                            return Err(Diag::fail(
+                                &call.span,
                                 "composition blocks require module calls",
-                            )]);
+                            ));
                         };
                         args.insert(
                             0,
@@ -430,13 +430,13 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                         || block.return_ty.as_ref().map(|ty| &ty.node)
                             != required.ret_ty.as_ref().map(|(ty, _)| ty)
                     {
-                        return Err(vec![Diag::error(
-                            block.name_span.clone(),
+                        return Err(Diag::fail(
+                            &block.name_span,
                             format!(
                                 "entry block `{}` signature does not match engine interface `{}`",
                                 block.name, interface.name
                             ),
-                        )]);
+                        ));
                     }
                     params
                 } else {
@@ -465,10 +465,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                     .filter(|plan| plan.material_name.as_deref() == Some(&interface.name))
                     .collect();
                 if plans.len() != 1 {
-                    return Err(vec![Diag::error(
-                        entry.name_span.clone(),
+                    return Err(Diag::fail(
+                        &entry.name_span,
                         "compute entry requires exactly one engine pipeline for its interface",
-                    )]);
+                    ));
                 }
                 let mut bindings: Vec<_> = body
                     .iter()
@@ -478,13 +478,12 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 let mut aliases = HashSet::new();
                 for required in &interface.methods {
                     let alias = schema.and_then(|schema| schema.plugs.iter().find(|plug| plug.name == required.name))
-                        .and_then(|plug| plug.binding_name.as_ref()).ok_or_else(|| vec![Diag::error(required.name_span.clone(),
-                            format!("compute entry method `{}` requires an explicit @bind(engine_callable) declaration", required.name))])?;
+                        .and_then(|plug| plug.binding_name.as_ref()).ok_or_else(|| Diag::fail(&required.name_span, format!("compute entry method `{}` requires an explicit @bind(engine_callable) declaration", required.name)))?;
                     if !aliases.insert(alias.node.clone()) {
-                        return Err(vec![Diag::error(
-                            alias.span.clone(),
+                        return Err(Diag::fail(
+                            &alias.span,
                             "duplicate compute entry binding alias",
-                        )]);
+                        ));
                     }
                     let mut implementation = body.clone();
                     implementation.push(Stmt::Return {
@@ -612,20 +611,20 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                                 .as_ref()
                                 .is_none_or(|stage| stage.node != "compute")
                         {
-                            return Err(vec![Diag::error(
-                                reference.span.clone(),
+                            return Err(Diag::fail(
+                                &reference.span,
                                 "entry pipeline references an incompatible compute pass contract",
-                            )]);
+                            ));
                         }
                         if template
                             .hooks
                             .iter()
                             .any(|hook| aliases.contains(&hook.name))
                         {
-                            return Err(vec![Diag::error(
-                                template.name_span.clone(),
+                            return Err(Diag::fail(
+                                &template.name_span,
                                 "entry binding alias conflicts with an engine pass hook",
-                            )]);
+                            ));
                         }
                         let mut instance = template.clone();
                         instance.name = format!("{}_{}", entry.name, template.name);
@@ -641,17 +640,17 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                         .iter()
                         .any(|pass| pass.name == reference.node)
                     {
-                        return Err(vec![Diag::error(
-                            reference.span.clone(),
+                        return Err(Diag::fail(
+                            &reference.span,
                             "entry pipeline references an unknown pass",
-                        )]);
+                        ));
                     }
                 }
                 if remapped.is_empty() {
-                    return Err(vec![Diag::error(
-                        entry.name_span.clone(),
+                    return Err(Diag::fail(
+                        &entry.name_span,
                         "compute entry pipeline must bind a compute pass for its interface",
-                    )]);
+                    ));
                 }
                 for reference in &mut plan.pass_refs {
                     if let Some(name) = remapped.get(&reference.name) {
@@ -745,10 +744,10 @@ fn resolve_attribute(
                     if let Expr::Var(name) = &expression.node {
                         return Ok(name.clone());
                     }
-                    return Err(vec![Diag::error(
-                        expression.span.clone(),
+                    return Err(Diag::fail(
+                        &expression.span,
                         "metadata key must be a name or string",
-                    )]);
+                    ));
                 }
             }
             crate::check::compute::constant_scalar(program, bindings, expression)

@@ -29,10 +29,6 @@ impl KernelDefinition {
     }
 }
 
-fn fail(span: &Span, message: impl Into<String>) -> Vec<Diag> {
-    vec![Diag::error(span.clone(), message)]
-}
-
 pub(super) use crate::resource_type::{ResourceType, resource_type};
 
 pub(super) fn resource_signature(resource: &ResourceType, write: bool) -> String {
@@ -92,7 +88,7 @@ pub(super) fn host_type(
                 return Ok("u32".into());
             }
         }
-        return Err(fail(
+        return Err(Diag::fail(
             &value.span,
             format!("`{name}` is not a CPU-known scalar or resource extent"),
         ));
@@ -110,7 +106,10 @@ pub(super) fn host_type(
             if matches!(ty.as_str(), "number" | "f32" | "i32") {
                 Ok(ty)
             } else {
-                Err(fail(&value.span, "host negation requires a signed scalar"))
+                Err(Diag::fail(
+                    &value.span,
+                    "host negation requires a signed scalar",
+                ))
             }
         }
         Expr::Binary(op, left, right) => {
@@ -124,7 +123,7 @@ pub(super) fn host_type(
             if left != right
                 && !(left == "number" && numeric(&right) || right == "number" && numeric(&left))
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &value.span,
                     "host expression operands have incompatible types",
                 ));
@@ -140,7 +139,10 @@ pub(super) fn host_type(
                 {
                     Ok(common.clone())
                 }
-                _ => Err(fail(&value.span, "unsupported host expression operator")),
+                _ => Err(Diag::fail(
+                    &value.span,
+                    "unsupported host expression operator",
+                )),
             }
         }
         Expr::Call {
@@ -160,13 +162,13 @@ pub(super) fn host_type(
             {
                 Ok(name.clone())
             } else {
-                Err(fail(
+                Err(Diag::fail(
                     &value.span,
                     "host expressions require scalar conversions or checked arithmetic",
                 ))
             }
         }
-        _ => Err(fail(
+        _ => Err(Diag::fail(
             &value.span,
             "operation extents and preconditions cannot read GPU values",
         )),
@@ -188,7 +190,10 @@ fn extent(program: &Program, operation: &StyleOperation, value: &SExpr) -> Resul
         };
         crate::check::compute::style_parameter_value(program, &parameter, value)?;
     } else if ty != "u32" {
-        return Err(fail(&value.span, "logical extents require u32 values"));
+        return Err(Diag::fail(
+            &value.span,
+            "logical extents require u32 values",
+        ));
     }
     Ok(())
 }
@@ -228,10 +233,10 @@ pub(super) fn shader_definition_projected(
     ) -> Result<(), Vec<Diag>> {
         let (name, ty) = declaration;
         if sources.insert(name.into(), source).is_some() {
-            return Err(fail(&pass.span, "duplicate lowered compute binding"));
+            return Err(Diag::fail(&pass.span, "duplicate lowered compute binding"));
         }
         let index = u32::try_from(pass.bindings.len())
-            .map_err(|_| fail(&pass.span, "compute binding count overflow"))?;
+            .map_err(|_| Diag::fail(&pass.span, "compute binding count overflow"))?;
         let mut attrs = vec![
             PipelineAttribute::synthetic("group", vec!["0".into()], pass.span.clone()),
             PipelineAttribute::synthetic("binding", vec![index.to_string()], pass.span.clone()),
@@ -257,7 +262,7 @@ pub(super) fn shader_definition_projected(
     }
     for input in &operation.inputs {
         if input.name.starts_with("__fresco_") {
-            return Err(fail(
+            return Err(Diag::fail(
                 &input.span,
                 "__fresco_ is reserved for compiler-owned operation bindings",
             ));
@@ -299,7 +304,7 @@ pub(super) fn shader_definition_projected(
                             .copied()
                         })
                         .ok_or_else(|| {
-                            fail(&field.span, "geometry field has no compute binding role")
+                            Diag::fail(&field.span, "geometry field has no compute binding role")
                         })?;
                     Ok(BindingSource::Geometry {
                         parameter: input.name.clone(),
@@ -318,7 +323,7 @@ pub(super) fn shader_definition_projected(
                         || record.fields[1].ty_name != "vec3"
                         || record.fields[2].ty_name != "bool"
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &field.span,
                             "geometry bounds require two vec3 fields and a bool availability flag",
                         ));
@@ -424,7 +429,7 @@ pub(super) fn shader_definition_projected(
         }
     }
     if output.name.starts_with("__fresco_") {
-        return Err(fail(
+        return Err(Diag::fail(
             &output.span,
             "__fresco_ is reserved for compiler-owned operation bindings",
         ));
@@ -435,7 +440,7 @@ pub(super) fn shader_definition_projected(
         (
             &output.name,
             &resource_signature(
-                &resource_type(&output.ty, "write").map_err(|m| fail(&output.span, m))?,
+                &resource_type(&output.ty, "write").map_err(|m| Diag::fail(&output.span, m))?,
                 true,
             ),
         ),
@@ -523,7 +528,7 @@ pub(super) fn shader_definition_projected(
             let id = &parameter.name;
             capture.push_str(&format!("if {id}.x >= __fresco_dispatch.x || {id}.y >= __fresco_dispatch.y || {id}.z >= __fresco_dispatch.z {{ return }}\n"));
         } else if !hook.attrs.is_empty() {
-            return Err(fail(
+            return Err(Diag::fail(
                 &hook.span,
                 "compute helpers cannot declare other shader stages or attributes",
             ));
@@ -552,7 +557,7 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
         || pass.draw.is_some()
         || pass.blend.is_some()
     {
-        return Err(fail(
+        return Err(Diag::fail(
             &pass.span,
             "compute operations cannot declare raster state or attachments",
         ));
@@ -565,25 +570,28 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
         || !pass.permutations.is_empty()
         || !pass.requirements.is_empty()
     {
-        return Err(fail(
+        return Err(Diag::fail(
             &pass.span,
             "compute resources must be explicit operation inputs and owned outputs",
         ));
     }
     let output = compute.output.as_ref().ok_or_else(|| {
-        fail(
+        Diag::fail(
             &pass.span,
             "compute operation requires one typed output allocation",
         )
     })?;
     if output.name.contains('.') || operation.inputs.iter().any(|p| p.name == output.name) {
-        return Err(fail(&output.span, "output requires a unique simple name"));
+        return Err(Diag::fail(
+            &output.span,
+            "output requires a unique simple name",
+        ));
     }
     let returned = resource_type(&compute.return_ty.node, "read")
-        .map_err(|m| fail(&compute.return_ty.span, m))?;
-    let written = resource_type(&output.ty, "write").map_err(|m| fail(&output.span, m))?;
+        .map_err(|m| Diag::fail(&compute.return_ty.span, m))?;
+    let written = resource_type(&output.ty, "write").map_err(|m| Diag::fail(&output.span, m))?;
     if returned != written {
-        return Err(fail(
+        return Err(Diag::fail(
             &output.span,
             "returned resource type does not match the owned output",
         ));
@@ -593,7 +601,7 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
         .as_ref()
         .is_none_or(|r| r.node != output.name)
     {
-        return Err(fail(
+        return Err(Diag::fail(
             &pass.span,
             "compute must return its owned output by name",
         ));
@@ -603,19 +611,19 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
         ResourceType::Image(_) => 2,
     };
     if output.extents.len() != dimensions {
-        return Err(fail(
+        return Err(Diag::fail(
             &output.span,
             format!("output allocation requires {dimensions} logical extents"),
         ));
     }
     let threads = compute.threads.as_ref().ok_or_else(|| {
-        fail(
+        Diag::fail(
             &pass.span,
             "compute operation requires dispatch threads(x, y, z)",
         )
     })?;
     if threads.len() != 3 {
-        return Err(fail(
+        return Err(Diag::fail(
             &pass.span,
             "dispatch threads requires three logical extents",
         ));
@@ -626,9 +634,9 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
     let workgroup = compute
         .workgroup_size
         .as_ref()
-        .ok_or_else(|| fail(&pass.span, "compute operation requires workgroup_size"))?;
+        .ok_or_else(|| Diag::fail(&pass.span, "compute operation requires workgroup_size"))?;
     if workgroup.len() != 3 {
-        return Err(fail(
+        return Err(Diag::fail(
             &pass.span,
             "workgroup_size requires three constant dimensions",
         ));
@@ -650,18 +658,18 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
             .and_then(|n| u32::try_from(n).ok())
             .filter(|n| *n > 0)
             .ok_or_else(|| {
-                fail(
+                Diag::fail(
                     &value.span,
                     "workgroup dimensions must be positive u32 constants",
                 )
             })?;
         product = product
             .checked_mul(dimension)
-            .ok_or_else(|| fail(&value.span, "workgroup size product exceeds u32"))?;
+            .ok_or_else(|| Diag::fail(&value.span, "workgroup size product exceeds u32"))?;
     }
     for requirement in &operation.requirements {
         if host_type(program, operation, requirement)? != "bool" {
-            return Err(fail(
+            return Err(Diag::fail(
                 &requirement.span,
                 "compute preconditions require bool expressions",
             ));
@@ -673,7 +681,7 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
         .filter(|h| has_attr(&h.attrs, "compute"))
         .collect();
     let [entry] = entries.as_slice() else {
-        return Err(fail(
+        return Err(Diag::fail(
             &pass.span,
             "compute operation requires exactly one @compute entry",
         ));
@@ -685,7 +693,7 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
         || !entry.attrs[0].args.is_empty()
         || !entry.params[0].attrs.is_empty()
     {
-        return Err(fail(
+        return Err(Diag::fail(
             &entry.span,
             "compute entry requires one uvec3 invocation ID and no return value or additional attributes",
         ));
@@ -696,13 +704,13 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
                 || p.name == output.name
                 || operation.inputs.iter().any(|i| i.name == p.name)
         }) {
-            return Err(fail(
+            return Err(Diag::fail(
                 &hook.span,
                 "compute shader parameters cannot shadow operation resources or inputs",
             ));
         }
         let body = crate::parser::executable_pass_hook_body(hook)
-            .map_err(|e| fail(&hook.span, format!("invalid compute shader body: {e:?}")))?;
+            .map_err(|e| Diag::fail(&hook.span, format!("invalid compute shader body: {e:?}")))?;
         fn captures(
             body: &[Stmt],
             operation: &StyleOperation,
@@ -741,10 +749,12 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
             }
             Ok(())
         }
-        captures(&body, operation, output).map_err(|m| fail(&hook.span, m))?;
+        captures(&body, operation, output).map_err(|m| Diag::fail(&hook.span, m))?;
     }
     let shader = shader_definition(program, pass)?;
-    shader.emit(program).map_err(|m| fail(&pass.span, m))?;
+    shader
+        .emit(program)
+        .map_err(|m| Diag::fail(&pass.span, m))?;
     Ok(())
 }
 

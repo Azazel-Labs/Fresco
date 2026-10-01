@@ -54,10 +54,10 @@ fn resolve_properties(
             .iter()
             .find(|contract| !contract.surface_defaults.is_empty())
         {
-            return Err(vec![Diag::error(
-                contract.span.clone(),
+            return Err(Diag::fail(
+                &contract.span,
                 "@surface_defaults requires an engine @surface_properties declaration",
-            )]);
+            ));
         }
         if let Some(block) = program
             .surfaces
@@ -65,10 +65,10 @@ fn resolve_properties(
             .flat_map(|surface| &surface.property_blocks)
             .next()
         {
-            return Err(vec![Diag::error(
-                block.span.clone(),
+            return Err(Diag::fail(
+                &block.span,
                 "surface property blocks require an engine @surface_properties declaration",
-            )]);
+            ));
         }
         return Ok(());
     };
@@ -82,16 +82,16 @@ fn resolve_properties(
         };
         for target in targets {
             if target != "*" && !program.material_properties.iter().any(|m| m.name == target) {
-                return Err(vec![Diag::error(
-                    schema.span.clone(),
+                return Err(Diag::fail(
+                    &schema.span,
                     format!("unknown surface property contract `{target}`"),
-                )]);
+                ));
             }
             if !associations.insert(target.to_string()) {
-                return Err(vec![Diag::error(
-                    schema.span.clone(),
+                return Err(Diag::fail(
+                    &schema.span,
                     format!("conflicting surface property association for `{target}`"),
-                )]);
+                ));
             }
         }
     }
@@ -104,16 +104,16 @@ fn resolve_properties(
                 .iter()
                 .any(|s| s.property_block.as_ref() == Some(block))
             {
-                return Err(vec![Diag::error(
-                    contract.span.clone(),
+                return Err(Diag::fail(
+                    &contract.span,
                     format!("unknown surface defaults block `{block}`"),
-                )]);
+                ));
             }
         } else if schemas.len() != 1 {
-            return Err(vec![Diag::error(
-                contract.span.clone(),
+            return Err(Diag::fail(
+                &contract.span,
                 "multiple property schemas require @surface_defaults(block, property: value)",
-            )]);
+            ));
         }
     }
     let context = program.clone();
@@ -160,10 +160,10 @@ fn resolve_properties(
             resolve_schema(&mut isolated, schema, overrides)?;
             program.surfaces[index] = isolated.surfaces.remove(0);
         } else if !surface.property_blocks.is_empty() || overrides.contains_key(&surface.name) {
-            return Err(vec![Diag::error(
-                surface.name_span.clone(),
+            return Err(Diag::fail(
+                &surface.name_span,
                 "no property schema is associated with this surface contract",
-            )]);
+            ));
         }
     }
     Ok(())
@@ -178,10 +178,10 @@ fn resolve_schema(
     >,
 ) -> Result<(), Vec<Diag>> {
     if schema.entry.is_some() || !schema.plugs.is_empty() {
-        return Err(vec![Diag::error(
-            schema.span.clone(),
+        return Err(Diag::fail(
+            &schema.span,
             "surface property schemas contain configuration fields only",
-        )]);
+        ));
     }
     let block_name = schema.property_block.as_ref().expect("selected schema");
     // Defaults belong to active engine entry contracts, not particular entry names.
@@ -202,41 +202,41 @@ fn resolve_schema(
             continue;
         }
         let Some((kind, _)) = &contract.entry else {
-            return Err(vec![Diag::error(
-                contract.span.clone(),
+            return Err(Diag::fail(
+                &contract.span,
                 "@surface_defaults requires an @entry contract",
-            )]);
+            ));
         };
         let mut names = HashSet::new();
         for (name, value) in &contract.surface_defaults {
             if !names.insert(&name.node) {
-                return Err(vec![Diag::error(
-                    name.span.clone(),
+                return Err(Diag::fail(
+                    &name.span,
                     format!("duplicate surface default `{}`", name.node),
-                )]);
+                ));
             }
             if !schema
                 .config_params
                 .iter()
                 .any(|field| field.name == name.node)
             {
-                return Err(vec![Diag::error(
-                    name.span.clone(),
+                return Err(Diag::fail(
+                    &name.span,
                     format!("unknown surface default property `{}`", name.node),
-                )]);
+                ));
             }
             if active_kinds.contains(kind)
                 && entry_defaults
                     .insert(name.node.clone(), value.clone())
                     .is_some()
             {
-                return Err(vec![Diag::error(
-                    name.span.clone(),
+                return Err(Diag::fail(
+                    &name.span,
                     format!(
                         "ambiguous surface default `{}` from active entry contracts",
                         name.node
                     ),
-                )]);
+                ));
             }
         }
     }
@@ -245,7 +245,7 @@ fn resolve_schema(
         if surface.settings.is_some() {
             continue;
         }
-        let fail = |message: String| vec![Diag::error(surface.name_span.clone(), message)];
+        let fail = |message: String| Diag::fail(&surface.name_span, message);
         if surface.property_blocks.len() > 1 {
             return Err(fail("only one surface property block is allowed".into()));
         }

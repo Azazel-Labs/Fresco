@@ -29,9 +29,9 @@ pub(super) fn scalar_argument(
                 .settings_offset
                 .checked_add(
                     u32::try_from(index)
-                        .map_err(|_| fail(&value.span, "compute setting offset overflow"))?,
+                        .map_err(|_| Diag::fail(&value.span, "compute setting offset overflow"))?,
                 )
-                .ok_or_else(|| fail(&value.span, "compute setting offset overflow"))?;
+                .ok_or_else(|| Diag::fail(&value.span, "compute setting offset overflow"))?;
             Argument::Setting {
                 ty: setting.ty_name.clone(),
                 name: setting.name.clone(),
@@ -105,13 +105,15 @@ pub(super) fn instantiate(
         .pass
         .attrs
         .push(PipelineAttribute::synthetic("shader", vec![], 0..0));
-    let (_, reflection) = kernel.emit(context).map_err(|m| fail(&call.span, m))?;
+    let (_, reflection) = kernel
+        .emit(context)
+        .map_err(|m| Diag::fail(&call.span, m))?;
     let entry = reflection.entries.first().expect("validated compute entry");
     let reads = reflection
         .compute_shader_reads(&entry.entry)
-        .map_err(|m| fail(&call.span, m))?;
+        .map_err(|m| Diag::fail(&call.span, m))?;
     let layout = match super::super::compute_operations::resource_type(&output.ty, "write")
-        .map_err(|m| fail(&output.span, m))?
+        .map_err(|m| Diag::fail(&output.span, m))?
     {
         super::super::compute_operations::ResourceType::Buffer(element) => {
             let stride = reflection
@@ -119,7 +121,9 @@ pub(super) fn instantiate(
                 .iter()
                 .find(|b| b.name == output.name)
                 .and_then(|b| b.element_stride)
-                .ok_or_else(|| fail(&output.span, "owned output has no reflected buffer stride"))?;
+                .ok_or_else(|| {
+                    Diag::fail(&output.span, "owned output has no reflected buffer stride")
+                })?;
             fresco_artifact::ManifestComputeOutputLayout::Buffer { element, stride }
         }
         super::super::compute_operations::ResourceType::Image(format) => {
@@ -176,7 +180,7 @@ pub(super) fn instantiate(
             }
         } else {
             let renderer = context.selected_renderer().ok_or_else(|| {
-                fail(
+                Diag::fail(
                     &call.span,
                     "compute invocation requires a selected renderer",
                 )
@@ -186,7 +190,7 @@ pub(super) fn instantiate(
                 .iter()
                 .find(|p| p.contract == style.contract && p.renderer == renderer.name)
                 .ok_or_else(|| {
-                    fail(
+                    Diag::fail(
                         &call.span,
                         "compute input requires a selected renderer provider",
                     )
@@ -199,7 +203,7 @@ pub(super) fn instantiate(
                 .expect("validated contract");
             let (provided, provider_type) = if let Some((capability, member)) =
                 super::super::prepared_geometry::member(context, contract, &name)
-                    .map_err(|m| fail(&value.span, m))?
+                    .map_err(|m| Diag::fail(&value.span, m))?
             {
                 (
                     provider
@@ -232,10 +236,10 @@ pub(super) fn instantiate(
                         .as_str(),
                 )
             };
-            let provided =
-                provided.ok_or_else(|| fail(&value.span, "missing compute input provider"))?;
+            let provided = provided
+                .ok_or_else(|| Diag::fail(&value.span, "missing compute input provider"))?;
             let (resources, steps) =
-                super::super::recipes::reflect(renderer).map_err(|m| fail(&value.span, m))?;
+                super::super::recipes::reflect(renderer).map_err(|m| Diag::fail(&value.span, m))?;
             let resource = super::super::style_graph::bound_resource(
                 context,
                 &resources,
@@ -244,7 +248,7 @@ pub(super) fn instantiate(
                 provider_type,
                 None,
             )
-            .map_err(|m| fail(&value.span, m))?;
+            .map_err(|m| Diag::fail(&value.span, m))?;
             if reads.data.contains(&parameter.name) || reads.values.contains(&parameter.name) {
                 for step in &steps {
                     let writes = super::super::style_graph::bindings(context, step, None)

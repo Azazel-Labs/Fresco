@@ -1556,10 +1556,10 @@ fn load_import_functions(
             ctx.diags.push(FileDiagnostics::one(
                 canonical.clone(),
                 src.as_str(),
-                vec![Diag::error(
-                    imported.authored_entries[0].span.clone(),
+                Diag::fail(
+                    &imported.authored_entries[0].span,
                     "authored entries must be declared in the root module",
-                )],
+                ),
             ));
         }
         ctx.out_enums.extend(imported.enums);

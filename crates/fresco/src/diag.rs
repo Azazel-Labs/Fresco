@@ -66,6 +66,13 @@ impl Diag {
 }
 
 impl Diag {
+    /// A single error at `span`, as the diagnostic list fallible passes return.
+    pub fn fail(span: &Span, message: impl Into<String>) -> Vec<Diag> {
+        vec![Self::error(span.clone(), message)]
+    }
+}
+
+impl Diag {
     fn new(severity: Severity, span: Span, message: impl Into<String>) -> Self {
         Diag {
             severity,

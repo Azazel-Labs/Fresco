@@ -995,8 +995,8 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
         if points.len() < 2 {
             continue;
         }
-        let (_, steps) = super::recipes::reflect(pipeline)
-            .map_err(|m| vec![Diag::error(pipeline.span.clone(), m)])?;
+        let (_, steps) =
+            super::recipes::reflect(pipeline).map_err(|m| Diag::fail(&pipeline.span, m))?;
         for (index, a) in points.iter().enumerate() {
             for b in points.iter().skip(index + 1) {
                 let targets = |point: &String| -> BTreeSet<&String> {
@@ -1057,12 +1057,12 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                         .any(|n| incoming.args[1..].iter().all(|m| precedes(&steps, n, m)))
                 };
                 if !ordered(a, b) && !ordered(b, a) {
-                    return Err(vec![Diag::error(
-                        pipeline.span.clone(),
+                    return Err(Diag::fail(
+                        &pipeline.span,
                         format!(
                             "integration points `{a}` and `{b}` share attachments without ordered boundaries"
                         ),
-                    )]);
+                    ));
                 }
             }
         }
@@ -1327,10 +1327,10 @@ fn predicate(expression: &SExpr) -> Result<SExpr, Vec<Diag>> {
         Expr::Unary(op, a) => Expr::Unary(*op, Box::new(predicate(a)?)),
         Expr::Num(..) => expression.node.clone(),
         _ => {
-            return Err(vec![Diag::error(
-                expression.span.clone(),
+            return Err(Diag::fail(
+                &expression.span,
                 "style preconditions require a boolean expression over material properties",
-            )]);
+            ));
         }
     };
     Ok(result)
@@ -1340,17 +1340,17 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
     for pipeline in &program.pipelines {
         for marker in attrs_named(&pipeline.attrs, "__style_operation") {
             let [contract, _, point] = marker.args.as_slice() else {
-                return Err(vec![Diag::error(
-                    marker.span.clone(),
+                return Err(Diag::fail(
+                    &marker.span,
                     "invalid checked operation identity",
-                )]);
+                ));
             };
             let Some(contract) = program.style_contracts.iter().find(|c| c.name == *contract)
             else {
-                return Err(vec![Diag::error(
-                    marker.span.clone(),
+                return Err(Diag::fail(
+                    &marker.span,
                     "operation references an unknown typed contract",
-                )]);
+                ));
             };
             let check = || -> Result<(), String> {
                 let point = contract
@@ -1476,7 +1476,7 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                 }
                 Ok(())
             };
-            check().map_err(|m| vec![Diag::error(marker.span.clone(), m)])?;
+            check().map_err(|m| Diag::fail(&marker.span, m))?;
         }
     }
     Ok(())

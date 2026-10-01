@@ -602,10 +602,10 @@ pub(super) fn parameters(
         return if args.is_empty() {
             Ok((Vec::new(), Vec::new()))
         } else {
-            Err(vec![Diag::error(
-                args[0].value.span.clone(),
+            Err(Diag::fail(
+                &args[0].value.span,
                 "only styles accept settings",
-            )])
+            ))
         };
     };
     let fail = |span: Span, message: String| {
@@ -771,11 +771,11 @@ pub(super) fn check_selection(
             .find(|s| s.name == name)
             .and_then(|s| s.extends_name.as_deref());
     }
-    Err(vec![Diag::error(
-        surface.name_span.clone(),
+    Err(Diag::fail(
+        &surface.name_span,
         format!(
             "style contract `{}` requires material schema `{}`",
             contract.name, contract.schema
         ),
-    )])
+    ))
 }

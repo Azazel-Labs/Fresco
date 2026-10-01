@@ -30,16 +30,13 @@ pub(super) fn catalog(program: &Program, contract: &str) -> Result<Vec<String>, 
             continue;
         }
         let [attr] = attrs.as_slice() else {
-            return Err(vec![Diag::error(
-                record.span.clone(),
-                "duplicate @implementation",
-            )]);
+            return Err(Diag::fail(&record.span, "duplicate @implementation"));
         };
         if attr.args.len() != 1 || !record.fields.is_empty() {
-            return Err(vec![Diag::error(
-                record.span.clone(),
+            return Err(Diag::fail(
+                &record.span,
                 "@implementation requires one interface and a stateless record",
-            )]);
+            ));
         }
         if attr.args[0] != contract {
             continue;
@@ -50,13 +47,13 @@ pub(super) fn catalog(program: &Program, contract: &str) -> Result<Vec<String>, 
             .filter(|c| c.type_name == record.name && c.interface_name == contract)
             .collect();
         if conformances.len() != 1 || !symbols.insert(record.name.clone()) {
-            return Err(vec![Diag::error(
-                record.span.clone(),
+            return Err(Diag::fail(
+                &record.span,
                 format!(
                     "implementation `{}` requires one unambiguous conformance to `{contract}`",
                     record.name
                 ),
-            )]);
+            ));
         }
         if conformances[0].methods.iter().any(|method| {
             !method.type_params.is_empty()
@@ -66,10 +63,10 @@ pub(super) fn catalog(program: &Program, contract: &str) -> Result<Vec<String>, 
                     .iter()
                     .any(|p| p.keyword_only || p.default.is_some())
         }) {
-            return Err(vec![Diag::error(
-                record.span.clone(),
+            return Err(Diag::fail(
+                &record.span,
                 "registered implementations require concrete positional methods",
-            )]);
+            ));
         }
     }
     Ok(symbols.into_iter().collect())
@@ -95,10 +92,10 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
     for record in &program.structs {
         for attribute in &record.attrs {
             if attribute.name == "implementation" && attribute.args.len() != 1 {
-                return Err(vec![Diag::error(
-                    record.span.clone(),
+                return Err(Diag::fail(
+                    &record.span,
                     "@implementation requires one interface",
-                )]);
+                ));
             }
         }
     }
@@ -169,10 +166,10 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                     .iter()
                     .any(|p| p.keyword_only || p.default.is_some())
             {
-                return Err(vec![Diag::error(
-                    method.span.clone(),
+                return Err(Diag::fail(
+                    &method.span,
                     "dispatch implementations require concrete positional signatures",
-                )]);
+                ));
             }
             let mut function = method.clone();
             function.derivative_free = program.styles.iter().any(|style| &style.name == symbol);
@@ -191,7 +188,7 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                     value.as_object().expect("object"),
                     &style.span,
                 )
-                .map_err(|message| vec![Diag::error(style.span.clone(), message)])?
+                .map_err(|message| Diag::fail(&style.span, message))?
                 else {
                     unreachable!("style selection call")
                 };
@@ -219,10 +216,10 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                 function.body.splice(0..0, constants);
             }
             if program.functions.iter().any(|f| f.name == function.name) {
-                return Err(vec![Diag::error(
-                    method.span.clone(),
+                return Err(Diag::fail(
+                    &method.span,
                     "generated implementation symbol collision",
-                )]);
+                ));
             }
             program.functions.push(function);
         }
@@ -234,16 +231,16 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                 continue;
             }
             let [attr] = attrs.as_slice() else {
-                return Err(vec![Diag::error(hook.span.clone(), "duplicate @dispatch")]);
+                return Err(Diag::fail(&hook.span, "duplicate @dispatch"));
             };
             if !matches!(attr.args.len(), 2..=4)
                 || (attr.args.len() == 4 && attr.args[3] != "draw")
                 || hook.attrs.len() != 1
             {
-                return Err(vec![Diag::error(
-                    hook.span.clone(),
+                return Err(Diag::fail(
+                    &hook.span,
                     "@dispatch requires (interface, method[, settings_buffer[, draw]]) on an ordinary function",
-                )]);
+                ));
             }
             let contract = &attr.args[0];
             let method_name = &attr.args[1];
@@ -252,12 +249,7 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                 .iter()
                 .find(|i| &i.name == contract)
                 .and_then(|i| i.methods.iter().find(|m| &m.name == method_name))
-                .ok_or_else(|| {
-                    vec![Diag::error(
-                        hook.span.clone(),
-                        "unknown dispatch interface method",
-                    )]
-                })?;
+                .ok_or_else(|| Diag::fail(&hook.span, "unknown dispatch interface method"))?;
             let prefix_count = if attr.args.len() >= 3 { 2 } else { 1 };
             if prefix_count == 1
                 && program.styles.iter().any(|s| {
@@ -268,10 +260,10 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                         })
                 })
             {
-                return Err(vec![Diag::error(
-                    hook.span.clone(),
+                return Err(Diag::fail(
+                    &hook.span,
                     "selected style requires explicit settings buffer and record offset in @dispatch",
-                )]);
+                ));
             }
             if (prefix_count == 2 && hook.params.get(1).is_none_or(|p| p.ty_name != "u32"))
                 || hook.params.first().is_none_or(|p| p.ty_name != "u32")
@@ -283,10 +275,10 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
                 || hook.return_ty.as_ref().map(|t| &t.node)
                     != method.ret_ty.as_ref().map(|(t, _)| t)
             {
-                return Err(vec![Diag::error(
-                    hook.span.clone(),
+                return Err(Diag::fail(
+                    &hook.span,
                     "dispatch signature must prepend a u32 selector (and u32 settings offset when a buffer is supplied) to the exact interface signature",
-                )]);
+                ));
             }
             let arguments = hook.params[prefix_count..]
                 .iter()
@@ -380,7 +372,7 @@ pub(super) fn render_dispatch(hook: &mut PassFnHookDecl) -> Result<(), Vec<Diag>
         .map(|token| {
             token
                 .map(|token| (token, hook.span.clone()))
-                .map_err(|_| vec![Diag::error(hook.span.clone(), "invalid generated dispatch")])
+                .map_err(|_| Diag::fail(&hook.span, "invalid generated dispatch"))
         })
         .collect::<Result<Vec<_>, _>>()?;
     hook.body = plan.fallback.clone();
@@ -407,10 +399,10 @@ pub(super) fn specialize_draw_dispatch(
                 .iter()
                 .any(|case| !case.shading_inputs.is_empty())
             {
-                return Err(vec![Diag::error(
-                    hook.span.clone(),
+                return Err(Diag::fail(
+                    &hook.span,
                     "resource-capturing dispatch requires explicit draw scope",
-                )]);
+                ));
             }
             continue;
         }
@@ -427,10 +419,10 @@ pub(super) fn specialize_draw_dispatch(
             continue;
         };
         if selections.next().is_some() || !plan.cases.iter().any(|case| case.selector == selected) {
-            return Err(vec![Diag::error(
-                hook.span.clone(),
+            return Err(Diag::fail(
+                &hook.span,
                 "draw-scoped dispatch requires one unambiguous implementation case",
-            )]);
+            ));
         }
         plan.cases.retain(|case| case.selector == selected);
         let case = &mut plan.cases[0];
@@ -442,10 +434,10 @@ pub(super) fn specialize_draw_dispatch(
                         .and_then(|inputs| inputs.get(&input.name))
                         .copied()
                         .ok_or_else(|| {
-                            vec![Diag::error(
-                                input.span.clone(),
+                            Diag::fail(
+                                &input.span,
                                 format!("missing sampler for shading input `{}`", input.name),
-                            )]
+                            )
                         })?,
                 )
             } else {
@@ -455,10 +447,10 @@ pub(super) fn specialize_draw_dispatch(
                 .and_then(|s| s.shading_inputs.get(&plan.contract))
                 .and_then(|inputs| inputs.get(&input.name));
             if sampler.is_none() && resource.is_none() {
-                return Err(vec![Diag::error(
-                    input.span.clone(),
+                return Err(Diag::fail(
+                    &input.span,
                     format!("missing producer for shading input `{}`", input.name),
-                )]);
+                ));
             }
             let name = format!(
                 "__fresco_shading_{}_{selected}_{}",
@@ -468,10 +460,7 @@ pub(super) fn specialize_draw_dispatch(
                 let factory = attr_arg(&pass.attrs, "factory")
                     .and_then(|name| factories.iter().find(|f| &f.name == name))
                     .ok_or_else(|| {
-                        vec![Diag::error(
-                            pass.span.clone(),
-                            "shading capture requires a vertex factory",
-                        )]
+                        Diag::fail(&pass.span, "shading capture requires a vertex factory")
                     })?;
                 if pass
                     .bindings
@@ -479,10 +468,10 @@ pub(super) fn specialize_draw_dispatch(
                     .chain(factories.iter().flat_map(|f| &f.bindings))
                     .any(|b| b.name == name)
                 {
-                    return Err(vec![Diag::error(
-                        input.span.clone(),
+                    return Err(Diag::fail(
+                        &input.span,
                         "shading capture collides with an authored binding",
-                    )]);
+                    ));
                 }
                 let group = factory
                     .bindings
@@ -498,17 +487,12 @@ pub(super) fn specialize_draw_dispatch(
                     .collect();
                 let binding = (0..u32::MAX)
                     .find(|b| !occupied.contains(b))
-                    .ok_or_else(|| {
-                        vec![Diag::error(
-                            input.span.clone(),
-                            "shading binding space exhausted",
-                        )]
-                    })?;
+                    .ok_or_else(|| Diag::fail(&input.span, "shading binding space exhausted"))?;
                 let signature = if sampler.is_some() {
                     "sampler".into()
                 } else {
                     let ty = crate::resource_type::resource_type(&input.ty, "read")
-                        .map_err(|message| vec![Diag::error(input.span.clone(), message)])?;
+                        .map_err(|message| Diag::fail(&input.span, message))?;
                     super::compute_operations::resource_signature(&ty, false)
                 };
                 pass.bindings.push(PassBindingDecl {

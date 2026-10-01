@@ -16,7 +16,7 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
     program.structs = values;
     let mut names: BTreeSet<_> = program.structs.iter().map(|s| s.name.as_str()).collect();
     for resource in &program.resource_types {
-        let fail = |message: String| vec![Diag::error(resource.span.clone(), message)];
+        let fail = |message: String| Diag::fail(&resource.span, message);
         if !names.insert(&resource.name) {
             return Err(fail(format!("duplicate resource type `{}`", resource.name)));
         }
@@ -130,10 +130,10 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
             .iter()
             .any(|b| has_attr(&b.attrs, "geometry_resource"))
         {
-            return Err(vec![Diag::error(
-                pass.span.clone(),
+            return Err(Diag::fail(
+                &pass.span,
                 "geometry_resource is reserved for compiler-owned bindings",
-            )]);
+            ));
         }
         let preparations: Vec<_> = pass
             .hooks
@@ -141,24 +141,21 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
             .filter(|h| has_attr(&h.attrs, "prepare"))
             .collect();
         if preparations.len() > 1 {
-            return Err(vec![Diag::error(
-                pass.span.clone(),
+            return Err(Diag::fail(
+                &pass.span,
                 "mesh pass accepts one preparation function",
-            )]);
+            ));
         }
         if let Some(hook) = preparations.first() {
             let resource = find_attr(&hook.attrs, "prepare").expect("preparation attribute");
             let [name] = resource.args.as_slice() else {
-                return Err(vec![Diag::error(
-                    resource.span.clone(),
+                return Err(Diag::fail(
+                    &resource.span,
                     "@prepare requires one geometry resource type",
-                )]);
+                ));
             };
             let Some(resource) = program.resource_types.iter().find(|r| r.name == *name) else {
-                return Err(vec![Diag::error(
-                    hook.span.clone(),
-                    "unknown preparation resource type",
-                )]);
+                return Err(Diag::fail(&hook.span, "unknown preparation resource type"));
             };
             if hook.params.len() != 1
                 || !program
@@ -170,10 +167,10 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
                     .as_ref()
                     .is_none_or(|t| t.node != element(resource))
             {
-                return Err(vec![Diag::error(
-                    hook.span.clone(),
+                return Err(Diag::fail(
+                    &hook.span,
                     "preparation requires one declared vertex interface and the geometry vertex result",
-                )]);
+                ));
             }
             pass.vertex_interface = Some(Spanned {
                 node: hook.params[0].ty_name.clone(),
@@ -310,10 +307,10 @@ pub(super) fn select_draw(
         return Ok(None);
     };
     if parameters.len() != 1 {
-        return Err(vec![Diag::error(
-            parameter.span.clone(),
+        return Err(Diag::fail(
+            &parameter.span,
             "a draw requires exactly one geometry resource",
-        )]);
+        ));
     }
     select_resource(program, style, parameter, args).map(Some)
 }
@@ -375,7 +372,7 @@ pub(super) fn select_resource(
             parameter: parameter.name.clone(),
         }))
     };
-    check().map_err(|m| vec![Diag::error(parameter.span.clone(), m)])
+    check().map_err(|m| Diag::fail(&parameter.span, m))
 }
 
 fn geometry_binding(
@@ -392,10 +389,10 @@ fn geometry_binding(
         .iter_mut()
         .find(|b| b.name == name)
         .ok_or_else(|| {
-            vec![Diag::error(
-                pass.span.clone(),
+            Diag::fail(
+                &pass.span,
                 "geometry binding conflicts with a factory resource",
-            )]
+            )
         })?;
     binding.attrs.push(PipelineAttribute {
         name: "geometry_resource".into(),
@@ -465,12 +462,7 @@ pub(super) fn bind_draw(program: &Program, pass: &mut PassDecl) -> Result<String
                 let role = fields
                     .iter()
                     .position(|f| f.name == *member)
-                    .ok_or_else(|| {
-                        vec![Diag::error(
-                            span.clone(),
-                            "unknown geometry resource member",
-                        )]
-                    })?;
+                    .ok_or_else(|| Diag::fail(span, "unknown geometry resource member"))?;
                 uses_bounds |= role == 4;
                 rewritten.extend(
                     crate::lexer::lex_spanned(&replacements[role])
@@ -510,10 +502,10 @@ pub(super) fn bind_draw(program: &Program, pass: &mut PassDecl) -> Result<String
             || record.fields[1].ty_name != "vec3"
             || record.fields[2].ty_name != "bool"
         {
-            return Err(vec![Diag::error(
-                record.span.clone(),
+            return Err(Diag::fail(
+                &record.span,
                 "geometry bounds require minimum/maximum vec3 followed by a valid bool",
-            )]);
+            ));
         }
         let binding = format!("__geometry_{}_bounds", draw.parameter);
         geometry_binding(
@@ -577,10 +569,10 @@ pub(super) fn install(program: &mut Program) -> Result<(), Vec<Diag>> {
             if existing.producer_hook != draw.producer_hook
                 || existing.resource.name != draw.resource.name
             {
-                return Err(vec![Diag::error(
-                    program.passes[index].span.clone(),
+                return Err(Diag::fail(
+                    &program.passes[index].span,
                     "one mesh pass cannot supply incompatible geometry preparations",
-                )]);
+                ));
             }
             continue;
         }

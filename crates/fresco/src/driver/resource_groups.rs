@@ -8,10 +8,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
         if !has_attr(&pass.attrs, "factory")
             && pass.bindings.iter().any(|b| has_attr(&b.attrs, "sampler"))
         {
-            return Err(vec![Diag::error(
-                pass.span.clone(),
+            return Err(Diag::fail(
+                &pass.span,
                 "sampler presets require a factory execution scope",
-            )]);
+            ));
         }
         if !has_attr(&pass.attrs, "factory")
             && pass
@@ -19,16 +19,16 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 .iter()
                 .any(|b| has_attr(&b.attrs, "draw_data"))
         {
-            return Err(vec![Diag::error(
-                pass.span.clone(),
+            return Err(Diag::fail(
+                &pass.span,
                 "draw data requires a mesh factory execution scope",
-            )]);
+            ));
         }
     }
     let mut declarations = BTreeMap::new();
     let mut occupied = BTreeSet::new();
     for group in &program.groups {
-        let fail = |message| vec![Diag::error(group.span.clone(), message)];
+        let fail = |message| Diag::fail(&group.span, message);
         if declarations.contains_key(&group.name) {
             return Err(fail(format!("duplicate resource group `{}`", group.name)));
         }
@@ -77,25 +77,25 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     for group in &program.groups {
         for attr in attrs_named(&group.attrs, "allocate") {
             let [role] = attr.args.as_slice() else {
-                return Err(vec![Diag::error(
-                    attr.span.clone(),
+                return Err(Diag::fail(
+                    &attr.span,
                     "@allocate requires one resource class",
-                )]);
+                ));
             };
             let index = role_names
                 .iter()
                 .position(|name| *name == role)
                 .ok_or_else(|| {
-                    vec![Diag::error(
-                        attr.span.clone(),
+                    Diag::fail(
+                        &attr.span,
                         format!("unknown resource allocation class `{role}`"),
-                    )]
+                    )
                 })?;
             if !roles.insert(index) {
-                return Err(vec![Diag::error(
-                    attr.span.clone(),
+                return Err(Diag::fail(
+                    &attr.span,
                     format!("duplicate allocation for `{role}`"),
-                )]);
+                ));
             }
             program.resource_layout.0[index] = declarations[&group.name].expect("resolved group");
         }
@@ -136,10 +136,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                     )
                 }))
         {
-            return Err(vec![Diag::error(
-                binding.span.clone(),
+            return Err(Diag::fail(
+                &binding.span,
                 "@sampler requires one standard sampler preset, a sampler type, and no other binding source",
-            )]);
+            ));
         }
         let draw_data: Vec<_> = attrs_named(&binding.attrs, "draw_data").collect();
         if !draw_data.is_empty()
@@ -151,10 +151,10 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                     .iter()
                     .any(|a| matches!(a.name.as_str(), "source" | "geometry_resource")))
         {
-            return Err(vec![Diag::error(
-                binding.span.clone(),
+            return Err(Diag::fail(
+                &binding.span,
                 "@draw_data(instance_id) requires uniform<u32> and no other binding source",
-            )]);
+            ));
         }
         let groups: Vec<_> = attrs_named(&binding.attrs, "group").collect();
         let attr = match groups.as_slice() {
@@ -164,16 +164,16 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             }
             [attr] if attr.args.len() == 1 => *attr,
             _ => {
-                return Err(vec![Diag::error(
-                    binding.span.clone(),
+                return Err(Diag::fail(
+                    &binding.span,
                     "resource binding requires exactly one @group(name or index)",
-                )]);
+                ));
             }
         };
         let name = &attr.args[0];
         binding.group_index = Some(match name.parse::<u32>() {
             Ok(index) => index,
-            Err(_) => declarations.get(name).copied().flatten().ok_or_else(|| vec![Diag::error(attr.span.clone(), format!("unknown resource group `{name}`; declare the group or use an explicit numeric index"))])?,
+            Err(_) => declarations.get(name).copied().flatten().ok_or_else(|| Diag::fail(&attr.span, format!("unknown resource group `{name}`; declare the group or use an explicit numeric index")))?,
         });
     }
     for bindings in program
@@ -189,31 +189,19 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 [] => None,
                 [attr] if attr.args.len() == 1 => {
                     Some(attr.args[0].parse::<u32>().map_err(|_| {
-                        vec![Diag::error(
-                            attr.span.clone(),
-                            "binding index must be a nonnegative u32",
-                        )]
+                        Diag::fail(&attr.span, "binding index must be a nonnegative u32")
                     })?)
                 }
                 _ => {
-                    return Err(vec![Diag::error(
-                        binding.span.clone(),
-                        "requires one @binding(index)",
-                    )]);
+                    return Err(Diag::fail(&binding.span, "requires one @binding(index)"));
                 }
             };
             if let Some(index) = binding.binding_index {
                 let group = binding.group_index.ok_or_else(|| {
-                    vec![Diag::error(
-                        binding.span.clone(),
-                        "explicit binding requires a group",
-                    )]
+                    Diag::fail(&binding.span, "explicit binding requires a group")
                 })?;
                 if !used.insert((group, index)) {
-                    return Err(vec![Diag::error(
-                        binding.span.clone(),
-                        "duplicate resource binding",
-                    )]);
+                    return Err(Diag::fail(&binding.span, "duplicate resource binding"));
                 }
             }
         }
@@ -223,9 +211,9 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             {
                 let mut index = 0u32;
                 while used.contains(&(group, index)) {
-                    index = index.checked_add(1).ok_or_else(|| {
-                        vec![Diag::error(binding.span.clone(), "binding index overflow")]
-                    })?;
+                    index = index
+                        .checked_add(1)
+                        .ok_or_else(|| Diag::fail(&binding.span, "binding index overflow"))?;
                 }
                 binding.binding_index = Some(index);
                 used.insert((group, index));

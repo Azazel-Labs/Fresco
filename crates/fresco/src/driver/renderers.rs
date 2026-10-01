@@ -90,32 +90,32 @@ pub(super) fn select(program: &mut Program, requested: Option<&str>) -> Result<(
     let mut configured = BTreeSet::new();
     for attr in attrs_named(&pipeline.attrs, "configure") {
         let [name, value] = attr.expressions.as_slice() else {
-            return Err(vec![Diag::error(
-                attr.span.clone(),
+            return Err(Diag::fail(
+                &attr.span,
                 "@configure requires (constant, expression)",
-            )]);
+            ));
         };
         let Expr::Var(name) = &name.node else {
-            return Err(vec![Diag::error(
-                name.span.clone(),
+            return Err(Diag::fail(
+                &name.span,
                 "configuration target must be a constant name",
-            )]);
+            ));
         };
         if !configured.insert(name.clone()) {
-            return Err(vec![Diag::error(
-                attr.span.clone(),
+            return Err(Diag::fail(
+                &attr.span,
                 format!("duplicate configuration `{name}`"),
-            )]);
+            ));
         }
         let declaration = program
             .consts
             .iter_mut()
             .find(|c| c.name == *name)
             .ok_or_else(|| {
-                vec![Diag::error(
-                    attr.span.clone(),
+                Diag::fail(
+                    &attr.span,
                     format!("unknown renderer configuration constant `{name}`"),
-                )]
+                )
             })?;
         declaration.value = value.clone();
     }

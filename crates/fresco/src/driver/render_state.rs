@@ -46,7 +46,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             let mut result = ManifestRasterState::default();
             let mut seen = HashSet::new();
             for (name, expression) in &pass.state {
-                let fail = |message: String| vec![Diag::error(expression.span.clone(), message)];
+                let fail = |message: String| Diag::fail(&expression.span, message);
                 if !seen.insert(name) {
                     return Err(fail(format!("duplicate raster state `{name}`")));
                 }
@@ -130,10 +130,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 let implementation = find_attr(&step.attrs, "implementation_when");
                 let selected = if let Some(attr) = implementation {
                     let [contract, symbol] = attr.args.as_slice() else {
-                        return Err(vec![Diag::error(
-                            attr.span.clone(),
-                            "invalid implementation condition",
-                        )]);
+                        return Err(Diag::fail(&attr.span, "invalid implementation condition"));
                     };
                     surface.settings.as_ref().is_some_and(|settings| {
                         settings
@@ -147,30 +144,27 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 if selected {
                     for requirement in attrs_named(&step.attrs, "implementation_require") {
                         let [expression] = requirement.expressions.as_slice() else {
-                            return Err(vec![Diag::error(
-                                requirement.span.clone(),
+                            return Err(Diag::fail(
+                                &requirement.span,
                                 "contribution @require needs one boolean expression",
-                            )]);
+                            ));
                         };
                         if crate::check::compute::constant_scalar(&context, &bindings, expression)?
                             != 1.0
                         {
-                            return Err(vec![Diag::error(
-                                requirement.span.clone(),
+                            return Err(Diag::fail(
+                                &requirement.span,
                                 format!(
                                     "contribution requirement is not satisfied for surface `{}`",
                                     surface.name
                                 ),
-                            )]);
+                            ));
                         }
                     }
                 }
                 let conditions: Vec<_> = attrs_named(&step.attrs, "when").collect();
                 if conditions.len() > 1 {
-                    return Err(vec![Diag::error(
-                        step.span.clone(),
-                        "duplicate step condition",
-                    )]);
+                    return Err(Diag::fail(&step.span, "duplicate step condition"));
                 }
                 let mut enabled = selected
                     && step
@@ -179,18 +173,18 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                         .is_none_or(|i| i.material == surface.name);
                 for condition in &conditions {
                     let [expression] = condition.expressions.as_slice() else {
-                        return Err(vec![Diag::error(
-                            condition.span.clone(),
+                        return Err(Diag::fail(
+                            &condition.span,
                             "@when requires one constant expression",
-                        )]);
+                        ));
                     };
                     let value =
                         crate::check::compute::constant_scalar(&context, &bindings, expression)?;
                     if value != 0.0 && value != 1.0 {
-                        return Err(vec![Diag::error(
-                            expression.span.clone(),
+                        return Err(Diag::fail(
+                            &expression.span,
                             "step condition must be boolean",
-                        )]);
+                        ));
                     }
                     enabled &= value != 0.0;
                 }

@@ -38,10 +38,10 @@ pub(super) fn projection(
     let mut ty = root_ty.clone();
     for field in member.split('.') {
         ty = super::super::mesh_pass::field_type(&program.structs, &ty, field)
-            .map_err(|message| fail(&value.span, message))?;
+            .map_err(|message| Diag::fail(&value.span, message))?;
     }
     if !scalar(&ty) {
-        return Err(fail(
+        return Err(Diag::fail(
             &value.span,
             "operation projections must select scalar or vector shader values",
         ));
@@ -67,7 +67,7 @@ pub(super) fn reject_host(
         .dotted_path()
         .is_some_and(|name| projections.contains_key(name.split('.').next().expect("path")))
     {
-        return Err(fail(
+        return Err(Diag::fail(
             &value.span,
             "projected shader values cannot determine host allocation, dispatch, bounds, or preconditions",
         ));
@@ -97,7 +97,7 @@ pub(super) fn reject_host(
         }
         Expr::Num(..) | Expr::Var(..) => {}
         _ => {
-            return Err(fail(
+            return Err(Diag::fail(
                 &value.span,
                 "unsupported host expression for a projected shader value",
             ));

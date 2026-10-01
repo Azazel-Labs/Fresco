@@ -9,10 +9,10 @@ fn geometry(
 ) -> Result<String, Vec<Diag>> {
     let name = value
         .dotted_path()
-        .ok_or_else(|| fail(&value.span, "expected a prepared geometry bounds member"))?;
+        .ok_or_else(|| Diag::fail(&value.span, "expected a prepared geometry bounds member"))?;
     let (parameter, member) = name
         .split_once('.')
-        .ok_or_else(|| fail(&value.span, "expected a prepared geometry bounds member"))?;
+        .ok_or_else(|| Diag::fail(&value.span, "expected a prepared geometry bounds member"))?;
     let resource = operation
         .inputs
         .iter()
@@ -29,7 +29,7 @@ fn geometry(
             .iter()
             .any(|a| a.name == "geometry" && a.args.get(4).is_some_and(|role| role == member))
     }) {
-        return Err(fail(
+        return Err(Diag::fail(
             &value.span,
             "bounds must use the engine-declared prepared geometry bounds member",
         ));
@@ -49,13 +49,13 @@ pub(super) fn metadata(
                 recv, name, args, ..
             } = &value.node
             else {
-                return Err(fail(
+                return Err(Diag::fail(
                     &value.span,
                     "visibility requires uncullable or geometry.bounds.expand_world(amount)",
                 ));
             };
             if name != "expand_world" || args.len() != 1 || args[0].name.is_some() {
-                return Err(fail(
+                return Err(Diag::fail(
                     &value.span,
                     "bounds expansion requires one positional world-space distance",
                 ));
@@ -66,7 +66,7 @@ pub(super) fn metadata(
                 super::super::compute_operations::host_type(program, operation, amount)?.as_str(),
                 "f32" | "number"
             ) {
-                return Err(fail(
+                return Err(Diag::fail(
                     &amount.span,
                     "bounds expansion requires a host f32 distance",
                 ));
@@ -90,7 +90,7 @@ pub(super) fn metadata(
                 .dotted_path()
                 .and_then(|name| name.strip_suffix(".center").map(str::to_owned))
                 .ok_or_else(|| {
-                    fail(&value.span, "sort_position requires geometry.bounds.center")
+                    Diag::fail(&value.span, "sort_position requires geometry.bounds.center")
                 })?;
             geometry(
                 program,

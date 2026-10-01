@@ -29,7 +29,7 @@ pub(super) fn lower(
     value: &SExpr,
     expected: Option<Ty>,
 ) -> Result<Expression, Vec<Diag>> {
-    let error = |message: &str| vec![Diag::error(value.span.clone(), message)];
+    let error = |message: &str| Diag::fail(&value.span, message);
     let ty = super::compute_operations::host_type(program, operation, value)?;
     let literal = matches!(value.node, Expr::Num(..))
         || matches!(&value.node, Expr::Unary(UnOp::Neg, inner) if matches!(inner.node, Expr::Num(..)));

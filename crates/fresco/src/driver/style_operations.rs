@@ -9,9 +9,6 @@ mod captures;
 mod compute;
 
 const MAX_NODES: usize = 1024;
-fn fail(span: &Span, message: impl Into<String>) -> Vec<Diag> {
-    vec![Diag::error(span.clone(), message)]
-}
 fn scalar(ty: &str) -> bool {
     matches!(
         ty,
@@ -46,7 +43,7 @@ fn expression(source: &str) -> Result<SExpr, Vec<Diag>> {
         .parse(crate::parser::input(&tokens, text.len()..text.len()))
         .into_result()
         .map_err(|e| {
-            fail(
+            Diag::fail(
                 &(0..0),
                 format!("invalid generated operation expression: {e:?}"),
             )
@@ -75,7 +72,7 @@ fn constants(
                 .find(|s| s.name == p.name)
                 .expect("checked static setting");
             let source = literal(&p.default, &declaration.ty_name)
-                .map_err(|m| fail(&declaration.span, m))?;
+                .map_err(|m| Diag::fail(&declaration.span, m))?;
             Ok(Stmt::Const {
                 name: p.name.clone(),
                 name_span: declaration.name_span.clone(),
@@ -164,7 +161,7 @@ impl Graph<'_> {
         scope: &Scope,
     ) -> Result<fresco_artifact::types::SamplerPreset, Vec<Diag>> {
         let symbol = value.dotted_path().ok_or_else(|| {
-            fail(
+            Diag::fail(
                 &value.span,
                 "sampler binding requires an immutable standard sampler",
             )
@@ -186,7 +183,7 @@ impl Graph<'_> {
             .then(|| fresco_artifact::types::SamplerPreset::parse(&symbol))
             .flatten()
             .ok_or_else(|| {
-                fail(
+                Diag::fail(
                     &value.span,
                     "sampler binding requires an unshadowed standard sampler value",
                 )
@@ -204,7 +201,7 @@ impl Graph<'_> {
         for node in nodes {
             self.visited += 1;
             if self.visited > MAX_NODES {
-                return Err(fail(
+                return Err(Diag::fail(
                     &node.span,
                     "style graph exceeds the 1024-node construction limit",
                 ));
@@ -212,7 +209,7 @@ impl Graph<'_> {
             match &node.node {
                 StyleGraphNode::BindShading { name, value } => {
                     if !scope.per_self {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             "shading bindings require for self invocation identity",
                         ));
@@ -223,12 +220,12 @@ impl Graph<'_> {
                         .iter()
                         .find(|input| input.name == *name)
                         .ok_or_else(|| {
-                            fail(&node.span, format!("unknown shading input `{name}`"))
+                            Diag::fail(&node.span, format!("unknown shading input `{name}`"))
                         })?;
                     if compact_type(&input.ty) == "sampler" {
                         let preset = self.sampler_value(value, scope)?;
                         if active && self.shading_samplers.insert(name.clone(), preset).is_some() {
-                            return Err(fail(
+                            return Err(Diag::fail(
                                 &node.span,
                                 format!("shading input `{name}` is bound more than once"),
                             ));
@@ -239,17 +236,17 @@ impl Graph<'_> {
                         .dotted_path()
                         .and_then(|name| scope.handles.get(&name))
                         .ok_or_else(|| {
-                            fail(
+                            Diag::fail(
                                 &value.span,
                                 "shading binding requires a resource handle in lexical scope",
                             )
                         })?;
                     let expected = super::compute_operations::resource_type(&input.ty, "read")
-                        .map_err(|message| fail(&input.span, message))?;
+                        .map_err(|message| Diag::fail(&input.span, message))?;
                     let actual = super::compute_operations::resource_type(&handle.ty, "read")
-                        .map_err(|message| fail(&value.span, message))?;
+                        .map_err(|message| Diag::fail(&value.span, message))?;
                     if actual != expected {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &value.span,
                             format!("shading input `{name}` requires `{}`", input.ty),
                         ));
@@ -263,7 +260,7 @@ impl Graph<'_> {
                             )
                             .is_some()
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             format!("shading input `{name}` is bound more than once"),
                         ));
@@ -271,7 +268,7 @@ impl Graph<'_> {
                 }
                 StyleGraphNode::ForSelf(body) => {
                     if scope.per_self {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             "nested for self would duplicate invocation identity",
                         ));
@@ -286,7 +283,7 @@ impl Graph<'_> {
                     body,
                 } => {
                     if !scope.per_self || scope.point.is_some() {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             "at requires for self and cannot nest integration points",
                         ));
@@ -309,13 +306,13 @@ impl Graph<'_> {
                         || contract.inputs.iter().any(|i| i.name == *target)
                         || scope.handles.contains_key(target)
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             "integration target shadows an invocation input or setting",
                         ));
                     }
                     if !contract.points.iter().any(|p| p.name == *point) {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             format!("unknown integration point `{point}`"),
                         ));
@@ -354,7 +351,7 @@ impl Graph<'_> {
                     body,
                 } => {
                     let Expr::Range(start, end) = &range.node else {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &range.span,
                             "static for requires a bounded start..end range",
                         ));
@@ -375,7 +372,7 @@ impl Graph<'_> {
                         || end > f64::from(u32::MAX)
                         || end - start > MAX_NODES as f64
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &range.span,
                             "static for requires an ascending u32 range of at most 1024 iterations",
                         ));
@@ -393,7 +390,7 @@ impl Graph<'_> {
                         || scope.handles.contains_key(variable)
                         || self.port_binding(variable)
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             "static loop variable shadows a setting, loop, or resource handle",
                         ));
@@ -446,7 +443,7 @@ impl Graph<'_> {
                             })
                         })
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &node.span,
                             "graph constant shadows an existing graph binding",
                         ));
@@ -475,7 +472,7 @@ impl Graph<'_> {
                         unreachable!("graph parser checks calls");
                     };
                     if !const_args.is_empty() {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &value.span,
                             "operations use named value arguments, not template arguments",
                         ));
@@ -485,7 +482,9 @@ impl Graph<'_> {
                         .passes
                         .iter()
                         .find(|p| p.name == *name && p.operation.is_some())
-                        .ok_or_else(|| fail(&value.span, format!("unknown operation `{name}`")))?;
+                        .ok_or_else(|| {
+                            Diag::fail(&value.span, format!("unknown operation `{name}`"))
+                        })?;
                     let definition = operation.operation.as_ref().expect("operation");
                     let result_name = match &node.node {
                         StyleGraphNode::Let { name, .. } => Some(name),
@@ -494,13 +493,13 @@ impl Graph<'_> {
                     };
                     let (point, target) = if definition.compute.is_some() {
                         if !scope.per_self {
-                            return Err(fail(
+                            return Err(Diag::fail(
                                 &node.span,
                                 "compute calls require for self invocation identity",
                             ));
                         }
                         let name = result_name.ok_or_else(|| {
-                            fail(
+                            Diag::fail(
                                 &node.span,
                                 "compute calls return an owned resource; bind the result with let",
                             )
@@ -534,7 +533,7 @@ impl Graph<'_> {
                                 })
                             })
                         {
-                            return Err(fail(
+                            return Err(Diag::fail(
                                 &node.span,
                                 "compute result shadows an existing graph binding",
                             ));
@@ -543,13 +542,13 @@ impl Graph<'_> {
                         (String::new(), String::new())
                     } else {
                         if result_name.is_some() {
-                            return Err(fail(
+                            return Err(Diag::fail(
                                 &node.span,
                                 "draw operations do not return resource handles",
                             ));
                         }
                         if !scope.per_self {
-                            return Err(fail(
+                            return Err(Diag::fail(
                                 &node.span,
                                 "raster operation calls require for self invocation identity",
                             ));
@@ -565,7 +564,7 @@ impl Graph<'_> {
                             let mut selected = None;
                             for point in &contract.points {
                                 let port = super::style_graph::port(point)
-                                    .map_err(|message| fail(&node.span, message))?;
+                                    .map_err(|message| Diag::fail(&node.span, message))?;
                                 if let Some(port) = port
                                     && args.iter().any(|arg| {
                                         arg.value.dotted_path().is_some_and(|name| {
@@ -574,7 +573,7 @@ impl Graph<'_> {
                                     })
                                 {
                                     if selected.is_some() {
-                                        return Err(fail(
+                                        return Err(Diag::fail(
                                             &node.span,
                                             "operation resources select multiple integration boundaries; use one resource port",
                                         ));
@@ -582,7 +581,7 @@ impl Graph<'_> {
                                     selected = Some((point.name.clone(), port.to_owned()));
                                 }
                             }
-                            invocation_scope.point = Some(selected.ok_or_else(|| fail(&node.span,
+                            invocation_scope.point = Some(selected.ok_or_else(|| Diag::fail(&node.span,
                                 "raster operation calls require for self and at point as target, or attachments from a declared resource port"))?);
                             self.require(
                                 &Spanned {
@@ -690,7 +689,7 @@ impl Graph<'_> {
                     .and_then(|m| m.extends_name.as_deref());
             }
             if !compatible {
-                return Err(fail(
+                return Err(Diag::fail(
                     &pass.span,
                     format!(
                         "draw operation `{}` requires material schema `{required}`",
@@ -702,12 +701,11 @@ impl Graph<'_> {
         let mut names = BTreeSet::new();
         let mut attachments = BTreeSet::new();
         for arg in args {
-            let name = arg
-                .name
-                .as_ref()
-                .ok_or_else(|| fail(&arg.value.span, "draw operation arguments must be named"))?;
+            let name = arg.name.as_ref().ok_or_else(|| {
+                Diag::fail(&arg.value.span, "draw operation arguments must be named")
+            })?;
             if !names.insert(name) {
-                return Err(fail(
+                return Err(Diag::fail(
                     &arg.value.span,
                     format!("duplicate operation argument `{name}`"),
                 ));
@@ -717,7 +715,7 @@ impl Graph<'_> {
                 .iter()
                 .find(|p| p.name == *name)
                 .ok_or_else(|| {
-                    fail(
+                    Diag::fail(
                         &arg.value.span,
                         format!("unknown operation argument `{name}`"),
                     )
@@ -725,7 +723,7 @@ impl Graph<'_> {
             let ty = compact_type(&parameter.ty);
             if ty == "DrawRange" {
                 if !scope.per_self || arg.value.dotted_path().as_deref() != Some("self") {
-                    return Err(fail(
+                    return Err(Diag::fail(
                         &arg.value.span,
                         "DrawRange must be the current for self invocation",
                     ));
@@ -738,7 +736,7 @@ impl Graph<'_> {
                 {
                     let expected = if ty == "color" { "vec4" } else { &ty };
                     if projection.ty != expected {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &arg.value.span,
                             format!(
                                 "operation argument `{name}` requires `{ty}`, found `{}`",
@@ -752,7 +750,7 @@ impl Graph<'_> {
                     .and_then(|n| self.style.params.iter().find(|p| p.name == n))
                 {
                     if setting.ty_name != ty {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &arg.value.span,
                             format!(
                                 "operation argument `{name}` requires `{ty}`, found `{}`",
@@ -781,13 +779,13 @@ impl Graph<'_> {
                     .find(|c| c.name == self.style.contract)
                     .expect("contract");
                 let name = arg.value.dotted_path().ok_or_else(|| {
-                    fail(
+                    Diag::fail(
                         &arg.value.span,
                         "resource arguments must name contract inputs or target attachments",
                     )
                 })?;
                 let port_member = super::resource_ports::member(contract, &name)
-                    .map_err(|message| fail(&arg.value.span, message))?;
+                    .map_err(|message| Diag::fail(&arg.value.span, message))?;
                 let attachment_identity = port_member
                     .map(|(point, member)| (Some(point.name.clone()), member.to_owned()))
                     .or_else(|| {
@@ -798,20 +796,20 @@ impl Graph<'_> {
                     })
                     .unwrap_or_else(|| (None, name.clone()));
                 if ty.starts_with("attachment<") && !attachments.insert(attachment_identity) {
-                    return Err(fail(
+                    return Err(Diag::fail(
                         &arg.value.span,
                         "operation attachment arguments must not alias",
                     ));
                 }
                 let capability = super::prepared_geometry::member(self.program, contract, &name)
-                    .map_err(|m| fail(&arg.value.span, m))?;
+                    .map_err(|m| Diag::fail(&arg.value.span, m))?;
                 let actual = if let Some((point, member)) = port_member {
                     if !scope
                         .point
                         .as_ref()
                         .is_some_and(|(selected, _)| *selected == point.name)
                     {
-                        return Err(fail(
+                        return Err(Diag::fail(
                             &arg.value.span,
                             "resource port does not match the operation's integration boundary",
                         ));
@@ -865,7 +863,7 @@ impl Graph<'_> {
                     matches!((super::compute_operations::resource_type(actual, "read"), super::compute_operations::resource_type(&ty, "read")), (Ok(a), Ok(b)) if a == b)
                 });
                 if actual.as_deref().map(compact_type) != Some(ty.clone()) && !same_handle {
-                    return Err(fail(
+                    return Err(Diag::fail(
                         &arg.value.span,
                         format!("operation resource `{name}` does not provide `{ty}`"),
                     ));
@@ -883,7 +881,7 @@ impl Graph<'_> {
         captures::validate_host(operation, &projections)?;
         for parameter in &operation.inputs {
             if !names.contains(&parameter.name) {
-                return Err(fail(
+                return Err(Diag::fail(
                     &pass.span,
                     format!("missing operation argument `{}`", parameter.name),
                 ));
@@ -976,7 +974,7 @@ pub(super) fn prepare_selection(
         if !graph.shading_bindings.contains_key(&input.name)
             && !graph.shading_samplers.contains_key(&input.name)
         {
-            return Err(fail(
+            return Err(Diag::fail(
                 &input.span,
                 format!("missing binding for shading input `{}`", input.name),
             ));
@@ -1024,7 +1022,7 @@ pub(super) fn prepare_selection(
     }
     for (ordinal, call) in graph.calls.iter().enumerate() {
         if call.resources.values().any(|producer| *producer >= ordinal) {
-            return Err(fail(
+            return Err(Diag::fail(
                 &call.span,
                 "operation resource dependency must name an earlier producer",
             ));
@@ -1075,7 +1073,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 .count()
                 != 1
         {
-            return Err(fail(&pass.span, "duplicate draw operation name"));
+            return Err(Diag::fail(&pass.span, "duplicate draw operation name"));
         }
         let operation = pass.operation.as_ref().expect("definition");
         if pass
@@ -1083,29 +1081,32 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             .as_ref()
             .is_some_and(|name| !program.material_properties.iter().any(|m| &m.name == name))
         {
-            return Err(fail(&pass.span, "unknown draw operation material schema"));
+            return Err(Diag::fail(
+                &pass.span,
+                "unknown draw operation material schema",
+            ));
         }
         let mut inputs = BTreeSet::new();
         for parameter in &operation.inputs {
             if parameter.name.starts_with("__fresco_") {
-                return Err(fail(
+                return Err(Diag::fail(
                     &parameter.span,
                     "__fresco_ is reserved for compiler-owned operation bindings",
                 ));
             }
             if parameter.name.contains('.') {
-                return Err(fail(
+                return Err(Diag::fail(
                     &parameter.span,
                     "draw parameter names must be simple identifiers",
                 ));
             }
             if !inputs.insert(&parameter.name) {
-                return Err(fail(&parameter.span, "duplicate operation parameter"));
+                return Err(Diag::fail(&parameter.span, "duplicate operation parameter"));
             }
             let ty = compact_type(&parameter.ty);
             if ty.starts_with("attachment<") {
                 super::style_graph::attachment(&ty)
-                    .map_err(|message| fail(&parameter.span, message))?;
+                    .map_err(|message| Diag::fail(&parameter.span, message))?;
             }
             if !scalar(&ty)
                 && ty != "DrawRange"
@@ -1120,7 +1121,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 && !(ty == "sampler" && operation.compute.is_none())
                 && super::compute_operations::resource_type(&ty, "read").is_err()
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &parameter.span,
                     format!("unsupported draw operation input type `{ty}`"),
                 ));
@@ -1135,7 +1136,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             .as_ref()
             .and_then(SExpr::dotted_path)
             .ok_or_else(|| {
-                fail(
+                Diag::fail(
                     &pass.span,
                     "draw operation requires raster geometry_parameter",
                 )
@@ -1144,7 +1145,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             p.name == source
                 && (p.ty == "DrawRange" || program.resource_types.iter().any(|r| r.name == p.ty))
         }) {
-            return Err(fail(
+            return Err(Diag::fail(
                 &pass.span,
                 "raster source must be a DrawRange or a prepared geometry resource parameter",
             ));
@@ -1155,7 +1156,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 .iter()
                 .any(|p| p.name == source && p.ty == "DrawRange")
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &vertices.span,
                     "generated vertices require prepared geometry",
                 ));
@@ -1169,7 +1170,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     Ok(super::compute_operations::ResourceType::Buffer(_))
                 )
             }) {
-                return Err(fail(
+                return Err(Diag::fail(
                     &vertices.span,
                     "generated vertices must name a read-only buffer parameter",
                 ));
@@ -1178,7 +1179,10 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 super::compute_operations::host_type(program, operation, offset)?.as_str(),
                 "u32" | "number"
             ) {
-                return Err(fail(&offset.span, "generated vertex offset must be u32"));
+                return Err(Diag::fail(
+                    &offset.span,
+                    "generated vertex offset must be u32",
+                ));
             }
             super::compute_host::lower(
                 program,
@@ -1198,7 +1202,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 .iter()
                 .any(|a| a.name == "factory" && a.args.len() == 1)
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &pass.span,
                     "draw operation requires an explicit vertex factory",
                 ));
@@ -1208,15 +1212,15 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 .vertex_factories
                 .iter()
                 .find(|f| &f.name == factory_name)
-                .ok_or_else(|| fail(&pass.span, "unknown operation vertex factory"))?;
+                .ok_or_else(|| Diag::fail(&pass.span, "unknown operation vertex factory"))?;
             if !factory.hooks.iter().any(|h| h.name == "transform") {
-                return Err(fail(
+                return Err(Diag::fail(
                     &pass.span,
                     "operation factory requires a transform hook",
                 ));
             }
         } else if has_attr(&pass.attrs, "factory") {
-            return Err(fail(
+            return Err(Diag::fail(
                 &pass.span,
                 "prepared draws obtain their factory from the geometry producer",
             ));
@@ -1229,7 +1233,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 .count()
                 != 1
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &pass.span,
                     format!("draw operation requires exactly one @{kind} shader"),
                 ));
@@ -1239,7 +1243,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             if host_requirement(operation, requirement) {
                 if super::compute_operations::host_type(program, operation, requirement)? != "bool"
                 {
-                    return Err(fail(
+                    return Err(Diag::fail(
                         &requirement.span,
                         "draw preconditions require bool expressions",
                     ));
@@ -1261,7 +1265,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     c.capabilities.iter().any(|cap| cap.name == *name)
                         || c.points.iter().any(|p| p.name == *name)
                 }) {
-                    return Err(fail(
+                    return Err(Diag::fail(
                         &requirement.span,
                         format!("unknown operation requirement `{name}`"),
                     ));
@@ -1280,7 +1284,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                 || field.values.len() != 1
                 || field.values[0].dotted_path().as_deref() != Some("load_store")
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &field.span,
                     "operation attachments require unique attachment parameters with load_store",
                 ));
@@ -1292,7 +1296,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             .filter(|p| p.ty.starts_with("attachment<"))
         {
             if !attached.contains(&parameter.name) {
-                return Err(fail(
+                return Err(Diag::fail(
                     &parameter.span,
                     "missing explicit attachment preservation policy",
                 ));
@@ -1300,13 +1304,14 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
         }
         if operation.inputs.iter().any(|p| compact_type(&p.ty).ends_with(",test_only>"))
             && pass.state.iter().find(|(name, _)| name == "depth_write").is_some_and(|(_, value)| !matches!(&value.node, Expr::Var(name) if matches!(name.as_str(), "false" | "off"))) {
-            return Err(fail(&pass.span, "test_only attachments require operations to disable depth writes"));
+            return Err(Diag::fail(&pass.span, "test_only attachments require operations to disable depth writes"));
         }
-        super::mesh_pass::validate_operation(program, pass).map_err(|m| fail(&pass.span, m))?;
+        super::mesh_pass::validate_operation(program, pass)
+            .map_err(|m| Diag::fail(&pass.span, m))?;
         // Retained bodies must parse even when no call activates this declaration.
         for hook in &pass.hooks {
             crate::parser::executable_pass_hook_body(hook)
-                .map_err(|e| fail(&hook.span, format!("invalid draw shader body: {e:?}")))?;
+                .map_err(|e| Diag::fail(&hook.span, format!("invalid draw shader body: {e:?}")))?;
         }
     }
     Ok(())
@@ -1335,9 +1340,9 @@ fn instantiate(
     let point = format!("{}::{}", style.contract, call.point);
     let renderer = program
         .selected_renderer_mut()
-        .ok_or_else(|| fail(&call.span, "draw invocation requires a selected renderer"))?;
+        .ok_or_else(|| Diag::fail(&call.span, "draw invocation requires a selected renderer"))?;
     if !find_attr_with_first_arg(&renderer.attrs, "__style_point", &point).is_some() {
-        return Err(fail(
+        return Err(Diag::fail(
             &call.span,
             format!("selected renderer does not provide `{point}`"),
         ));
@@ -1349,7 +1354,7 @@ fn instantiate(
         .any(|p| context.interfaces.iter().any(|i| i.name == p.ty))
     {
         super::mesh_pass::validate_operation(context, definition)
-            .map_err(|m| fail(&definition.span, m))?
+            .map_err(|m| Diag::fail(&definition.span, m))?
     } else {
         super::mesh_pass::OperationUse::default()
     };
@@ -1484,7 +1489,7 @@ fn instantiate(
                         uses: &service_uses,
                     },
                 )
-                .map_err(|m| fail(&parameter.span, m))?,
+                .map_err(|m| Diag::fail(&parameter.span, m))?,
             );
             continue;
         }
@@ -1492,14 +1497,14 @@ fn instantiate(
             let preset = value
                 .dotted_path()
                 .and_then(|symbol| fresco_artifact::types::SamplerPreset::parse(&symbol))
-                .ok_or_else(|| fail(&value.span, "invalid checked sampler argument"))?;
+                .ok_or_else(|| Diag::fail(&value.span, "invalid checked sampler argument"))?;
             ensure_binding(&mut pass, context, &parameter.name, "sampler")?;
             let binding = pass
                 .bindings
                 .iter_mut()
                 .find(|binding| binding.name == parameter.name)
                 .ok_or_else(|| {
-                    fail(
+                    Diag::fail(
                         &parameter.span,
                         "operation sampler conflicts with a factory binding",
                     )
@@ -1509,7 +1514,7 @@ fn instantiate(
                 .iter()
                 .any(|attribute| !matches!(attribute.name.as_str(), "group" | "binding"))
             {
-                return Err(fail(
+                return Err(Diag::fail(
                     &parameter.span,
                     "operation sampler conflicts with an authored binding source",
                 ));
@@ -1524,7 +1529,7 @@ fn instantiate(
         if let Some(producer) = call.resources.get(&parameter.name) {
             let producer = compute::invocation_name(surface, style, *producer);
             let resource = super::compute_operations::resource_type(&ty, "read")
-                .map_err(|m| fail(&parameter.span, m))?;
+                .map_err(|m| Diag::fail(&parameter.span, m))?;
             ensure_binding(
                 &mut pass,
                 context,
@@ -1559,7 +1564,7 @@ fn instantiate(
                     .iter_mut()
                     .find(|b| b.name == binding)
                     .ok_or_else(|| {
-                        fail(
+                        Diag::fail(
                             &parameter.span,
                             "reserved operation dimension binding conflicts with factory",
                         )
@@ -1584,9 +1589,9 @@ fn instantiate(
                     .settings_offset
                     .checked_add(
                         u32::try_from(lane)
-                            .map_err(|_| fail(&call.span, "setting offset overflow"))?,
+                            .map_err(|_| Diag::fail(&call.span, "setting offset overflow"))?,
                     )
-                    .ok_or_else(|| fail(&call.span, "setting offset overflow"))?;
+                    .ok_or_else(|| Diag::fail(&call.span, "setting offset overflow"))?;
                 let value = format!("__operation_settings[u32({lane})]");
                 match setting.ty_name.as_str() {
                     "f32" => format!("{value}.x"),
@@ -1634,7 +1639,7 @@ fn instantiate(
                     &crate::check::compute::style_parameter_value(&context, &decl, value)?,
                     &ty,
                 )
-                .map_err(|m| fail(&value.span, m))?
+                .map_err(|m| Diag::fail(&value.span, m))?
             };
             let source = projection.map_or_else(
                 || source.clone(),
@@ -1653,7 +1658,7 @@ fn instantiate(
                 .find(|contract| contract.name == style.contract)
                 .expect("checked contract");
             let port_member = super::resource_ports::member(contract, &argument)
-                .map_err(|message| fail(&value.span, message))?;
+                .map_err(|message| Diag::fail(&value.span, message))?;
             let input = port_member
                 .map(|(_, member)| member)
                 .or_else(|| argument.strip_prefix(&format!("{}.", call.target)))
@@ -1770,7 +1775,7 @@ fn instantiate(
             .expect("validated generated vertex parameter");
         let invocation = reference.invocation.as_mut().expect("draw invocation");
         if !invocation.compute_inputs.contains_key(&binding) {
-            return Err(fail(
+            return Err(Diag::fail(
                 &vertices.span,
                 "generated vertices require an owned compute output",
             ));
@@ -1863,7 +1868,7 @@ pub(super) fn ensure_binding(
 ) -> Result<(), Vec<Diag>> {
     let factory = attr_arg(&pass.attrs, "factory")
         .and_then(|n| program.vertex_factories.iter().find(|f| f.name == *n))
-        .ok_or_else(|| fail(&pass.span, "unknown operation vertex factory"))?;
+        .ok_or_else(|| Diag::fail(&pass.span, "unknown operation vertex factory"))?;
     if let Some(binding) = pass
         .bindings
         .iter()
@@ -1871,7 +1876,7 @@ pub(super) fn ensure_binding(
         .find(|b| b.name == name)
     {
         if binding.value_signature.as_deref().map(compact_type) != Some(compact_type(ty)) {
-            return Err(fail(
+            return Err(Diag::fail(
                 &pass.span,
                 format!("operation binding `{name}` conflicts with factory type"),
             ));
@@ -1893,7 +1898,7 @@ pub(super) fn ensure_binding(
         .collect();
     let index = (0..u32::MAX)
         .find(|i| !occupied.contains(i))
-        .ok_or_else(|| fail(&pass.span, "operation binding space exhausted"))?;
+        .ok_or_else(|| Diag::fail(&pass.span, "operation binding space exhausted"))?;
     pass.bindings.push(PassBindingDecl {
         operation_alias: None,
         group_index: Some(group),
