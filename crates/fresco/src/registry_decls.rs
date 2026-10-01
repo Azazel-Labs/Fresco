@@ -29,11 +29,19 @@ type_decl!("coverage", Coverage, "coverage signal value");
 type_decl!("mask", Mask, "mask signal value");
 type_decl!("gradient", Gradient, "gradient construction value");
 type_decl!("bool", Bool, "boolean scalar value");
-type_decl!("coord", Coord, "canvas coordinate alias for vec2");
+type_decl!(
+    "coord",
+    Coord,
+    "standalone raster entry coordinate alias for vec2"
+);
 type_decl!("coord_like", CoordLike, "coordinate-like vec2 value");
 type_decl!("signal", Signal, "time signal scalar value");
 type_decl!("delta", Delta, "delta-time signal scalar value");
-type_decl!("resolution", Resolution, "canvas resolution alias for vec2");
+type_decl!(
+    "resolution",
+    Resolution,
+    "standalone raster entry resolution alias for vec2"
+);
 type_decl!("angle", Angle, "angle scalar value");
 type_decl!("length", Length, "length scalar value");
 
