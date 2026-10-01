@@ -115,13 +115,13 @@ pub struct CompiledProgram {
     /// Texture binding assignments: name → binding index in `@group(1)`.
     /// Sampler is always at `@group(1) @binding(0)`.
     pub tex_bindings: HashMap<String, u32>,
-    /// `canvas_name -> (target_id -> binding_index)` for compiler-internal
+    /// `entry_name -> (target_id -> binding_index)` for compiler-internal
     /// pass-target textures used by multi-pass replay.
     pub pass_target_bindings: HashMap<String, HashMap<usize, u32>>,
-    /// Path buffer binding assignments: `canvas_name:path_index` -> binding
+    /// Path buffer binding assignments: `entry_name:path_index` -> binding
     /// index in `@group(2)` for lowered storage-backed path segment tables.
     pub path_bindings: HashMap<String, u32>,
-    /// Dynamic array param binding assignments: `canvas_name:param_name` -> binding
+    /// Dynamic array param binding assignments: `entry_name:param_name` -> binding
     /// index in `@group(0)` for runtime-sized param storage buffers.
     pub param_bindings: HashMap<String, u32>,
     /// Struct-typed global `param` binding assignments: `global_param_name`
@@ -306,7 +306,7 @@ fn compile_with_loader(
     let parse_ms = elapsed_ms(parse_start);
     info!(
         ms = parse_ms,
-        canvases = program.canvases.len(),
+        raster_entries = program.raster_entries.len(),
         functions = program.functions.len(),
         "phase done: parse"
     );
@@ -839,7 +839,7 @@ pub(super) fn parse_syntax(
         method.source_file = filename.to_string();
     }
     // Standalone `.fr` files may contain helpers or library functions without
-    // declaring a canvas or surface entry point. Host preview tooling may pick
+    // declaring a raster entry or surface entry point. Host preview tooling may pick
     // one root entry when one exists, but the compiler should not reject such
     // modules just because they are not directly previewable.
     Ok(program)
@@ -1096,7 +1096,7 @@ fn resolve_imports(
         axes: root.axes.clone(),
         axis_defaults: root.axis_defaults.clone(),
         pipelines: root.pipelines.clone(),
-        canvases: root.canvases.clone(),
+        raster_entries: root.raster_entries.clone(),
         surfaces: root.surfaces.clone(),
         material_properties: root.material_properties.clone(),
         schema_programs: root.schema_programs.clone(),
@@ -1387,7 +1387,7 @@ fn load_implicit_engine_modules(
             }
         };
 
-        if !program.canvases.is_empty() || !program.authored_entries.is_empty() {
+        if !program.raster_entries.is_empty() || !program.authored_entries.is_empty() {
             diags.push(FileDiagnostics::one(
                 canonical.clone(),
                 src.as_str(),
@@ -1523,7 +1523,7 @@ fn load_import_functions(
                 .push((canonical.clone(), imported.pragmas.clone()));
         }
 
-        if !imported.canvases.is_empty() {
+        if !imported.raster_entries.is_empty() {
             ctx.diags.push(FileDiagnostics::one(
                 current_canonical,
                 current_src,
@@ -1672,11 +1672,11 @@ fn check_and_rewrite(
         &normalized_program.functions,
         &normalized_program.structs,
     )?;
-    for canvas in &normalized_program.canvases {
-        let _canvas_span = info_span!("check_rewrite_canvas", canvas = %canvas.name).entered();
+    for raster in &normalized_program.raster_entries {
+        let _entry_span = info_span!("check_rewrite_raster_entry", entry = %raster.name).entered();
         let check_start = Instant::now();
         let (mut hir, mut diags) = check::check(
-            &canvas.as_normalized_root_entry(),
+            &raster.as_normalized_root_entry(),
             &normalized_program.functions,
             &normalized_program.consts,
             &normalized_program.enums,
@@ -1922,15 +1922,15 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
         .collect();
     let interfaces = program.interfaces.clone();
 
-    let mut retained_canvases = Vec::with_capacity(program.canvases.len());
+    let mut retained_entries = Vec::with_capacity(program.raster_entries.len());
     let mut normalized_conformances = Vec::new();
     let mut diags = Vec::new();
 
-    for canvas in program.canvases.drain(..) {
+    for raster in program.raster_entries.drain(..) {
         let mut methods = Vec::new();
         let mut instance_params = Vec::new();
         let mut saw_unsupported_stmt = false;
-        for stmt in &canvas.body {
+        for stmt in &raster.body {
             match stmt {
                 crate::ast::Stmt::LocalFnDecl(method) => methods.push(method.clone()),
                 crate::ast::Stmt::Param { .. } => instance_params.push(stmt.clone()),
@@ -1938,17 +1938,17 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
             }
         }
 
-        let is_contract_instance = canvas.params.is_empty() && !methods.is_empty();
+        let is_contract_instance = raster.params.is_empty() && !methods.is_empty();
         if !is_contract_instance {
-            retained_canvases.push(canvas);
+            retained_entries.push(raster);
             continue;
         }
 
         if saw_unsupported_stmt {
             diags.push(
                 Diag::error(
-                    canvas.name_span.clone(),
-                    format!("contract-style canvas `{}` contains a statement that is neither an instance parameter nor a plug implementation", canvas.name),
+                    raster.name_span.clone(),
+                    format!("contract-style canvas `{}` contains a statement that is neither an instance parameter nor a plug implementation", raster.name),
                 )
                 .with_help(
                     "keep only `param ...` and `fn ...` declarations in this block, or use legacy `canvas name(uv: coord) -> color { ... }` entry syntax",
@@ -1974,21 +1974,21 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
         let Some(selected_interface) = selected_interface else {
             diags.push(
                 Diag::error(
-                    canvas.name_span.clone(),
+                    raster.name_span.clone(),
                     format!(
                         "contract-style canvas `{}` does not implement any declared renderer interface",
-                        canvas.name
+                        raster.name
                     ),
                 )
                 .with_help("implement every required plug from an engine-authored interface"),
             );
             continue;
         };
-        let canvas_iface_methods = &selected_interface.methods;
+        let entry_iface_methods = &selected_interface.methods;
 
-        let contract_entry_method_name = if canvas_iface_methods.len() == 1 {
-            canvas_iface_methods[0].name.clone()
-        } else if let Some(draw_method) = canvas_iface_methods
+        let contract_entry_method_name = if entry_iface_methods.len() == 1 {
+            entry_iface_methods[0].name.clone()
+        } else if let Some(draw_method) = entry_iface_methods
             .iter()
             .find(|method| method.name == "draw")
         {
@@ -2004,10 +2004,10 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
         else {
             diags.push(
                 Diag::error(
-                    canvas.name_span.clone(),
+                    raster.name_span.clone(),
                     format!(
                         "contract-style canvas `{}` must define contract entry `fn {}(...)`",
-                        canvas.name, contract_entry_method_name
+                        raster.name, contract_entry_method_name
                     ),
                 )
                 .with_help(
@@ -2043,7 +2043,7 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
                         call_span.clone(),
                         format!(
                             "contract-style canvas `{}` entry method `{}` must start with `coord` or `surf`, found `{}`",
-                            canvas.name, draw_method.name, primary_ty_name
+                            raster.name, draw_method.name, primary_ty_name
                         ),
                     )
                     .with_help(
@@ -2134,7 +2134,7 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
                         param.ty_span.clone(),
                         format!(
                             "contract-style canvas `{}` draw parameter `{}: {}` cannot be synthesized for lowering",
-                            canvas.name, param.name, param.ty_name
+                            raster.name, param.name, param.ty_name
                         ),
                     )
                     .with_help(
@@ -2151,13 +2151,13 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
         }
 
         normalized_conformances.push(crate::ast::ConformanceDecl {
-            type_name: canvas.name.clone(),
-            type_name_span: canvas.name_span.clone(),
+            type_name: raster.name.clone(),
+            type_name_span: raster.name_span.clone(),
             interface_name: selected_interface.name.clone(),
-            interface_name_span: canvas.name_span.clone(),
+            interface_name_span: raster.name_span.clone(),
             methods,
             body_checked_with_instance: true,
-            span: canvas.span,
+            span: raster.span,
         });
 
         let draw_call = crate::ast::Spanned {
@@ -2171,10 +2171,10 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
         };
 
         let normalized_root_entry = crate::ast::NormalizedRootEntry {
-            entry_kind: canvas.entry_kind.clone(),
-            kind: crate::ast::RootEntryKind::Canvas,
-            name: canvas.name,
-            name_span: canvas.name_span,
+            entry_kind: raster.entry_kind.clone(),
+            kind: crate::ast::RootEntryKind::Raster,
+            name: raster.name,
+            name_span: raster.name_span,
             params: {
                 let mut params = vec![crate::ast::NormalizedRootEntryParam {
                     name: uv_param_name,
@@ -2217,16 +2217,16 @@ fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), 
             span: call_span,
         };
 
-        retained_canvases.push(normalized_root_entry.into_canvas());
+        retained_entries.push(normalized_root_entry.into_raster_entry());
     }
 
-    program.canvases = retained_canvases;
+    program.raster_entries = retained_entries;
     program.conformances.extend(normalized_conformances);
 
     if diags.is_empty() { Ok(()) } else { Err(diags) }
 }
 
-/// Workbook result from a single-canvas workbook compile pass.
+/// Workbook result from a single-entry workbook compile pass.
 pub struct WorkbookCompileResult {
     #[allow(
         dead_code,
@@ -2276,7 +2276,7 @@ fn prepare_workbook_input(
 }
 
 fn is_previewable_root_entry(root_entry: &crate::ast::NormalizedRootEntry) -> bool {
-    matches!(root_entry.kind, crate::ast::RootEntryKind::Canvas)
+    matches!(root_entry.kind, crate::ast::RootEntryKind::Raster)
 }
 
 fn select_workbook_preview_entry(
@@ -2310,7 +2310,7 @@ fn select_workbook_preview_entry(
     }
 
     let kind_label = match first_root_entry.kind {
-        crate::ast::RootEntryKind::Canvas => "canvas",
+        crate::ast::RootEntryKind::Raster => "canvas",
         crate::ast::RootEntryKind::Surface => "surface",
     };
 
@@ -2330,7 +2330,7 @@ fn select_workbook_preview_entry(
 }
 
 /// Like `compile_with_options`, but runs the workbook check pass on the first
-/// (only) canvas with optional span capture.  Returns an un-lowered HIR so the
+/// previewable raster entry with optional span capture.  Returns an un-lowered HIR so the
 /// caller can mutate the root before lowering.
 pub fn compile_with_workbook(
     src: &str,
@@ -2433,7 +2433,7 @@ pub fn compile_variant_at_span(
     Ok(compiled)
 }
 
-/// Mutates `hir.root` so that the canvas renders just the captured value.
+/// Mutates `hir.root` so that the raster entry renders just the captured value.
 fn synthesize_variant_root(hir: &mut Hir, cap: check::SpanCapture) {
     use check::SpanCapture;
 

@@ -159,26 +159,6 @@ fn write_explain(
         let plan = pass_plan::build_for_hir(hir);
         writeln!(out, "== fresco --explain: canvas `{}` ==", hir.name)?;
 
-        // Footprint visualization section (§3.8, §24.1)
-        if let Some(chain) = &hir.canvas_space
-            && !chain.is_empty()
-        {
-            out.push_str("footprint Jacobian (§3.8, §24.1):\n");
-            out.push_str("  ┌           ┐\n");
-            out.push_str("  │ j11  j12  │  = [[∂x/∂px, ∂x/∂py],   (right-arrow, up-arrow)\n");
-            out.push_str(
-                "  │ j21  j22  │     [∂y/∂px, ∂y/∂py]]   (local space per output pixel step)\n",
-            );
-            out.push_str("  └           ┘\n");
-            writeln!(
-                out,
-                "  canvas_space chain: {} transform(s) — Jacobian computed via chain rule J(A·B) = J_B·J_A",
-                chain.len()
-            )?;
-            out.push_str("  footprint parallelogram: spanned by columns (j11,j21) and (j12,j22)\n");
-            out.push_str("  → wired up in lowering as named IR values for filtering\n");
-        }
-
         out.push_str("pass plan (phase-1 locality partitioner DAG):\n");
         for p in &plan.passes {
             let strategy_note = match p.kernel_strategy {
@@ -264,11 +244,7 @@ fn write_explain(
             let has_prefiltered_pattern = pattern_notes
                 .iter()
                 .any(|note| note.contains("prefiltered analytic"));
-            if hir.canvas_jacobian.is_some() {
-                out.push_str(
-                    "  footprint source: canvas_space Jacobian (computed from transform chain)\n",
-                );
-            } else if has_prefiltered_pattern {
+            if has_prefiltered_pattern {
                 out.push_str(
                     "  footprint source: symbolic Jacobian at pattern site (includes active in-space transforms)\n",
                 );

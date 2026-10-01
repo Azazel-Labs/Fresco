@@ -29,7 +29,7 @@ pub(super) struct FullscreenStage {
     pub validation_wgsl: String,
 }
 
-pub(super) fn for_canvas(
+pub(super) fn for_raster_entry(
     hir: &Hir,
     passes: &[PassDecl],
     pipelines: &[PipelineDecl],
@@ -561,7 +561,7 @@ fn helper_arguments(hir: &Hir) -> Result<String, String> {
 }
 
 fn helper_parameters(hir: &Hir) -> Result<String, String> {
-    let entry = hir.entry_context.as_ref().expect("registered canvas entry");
+    let entry = hir.entry_context.as_ref().expect("registered raster entry");
     let mut params = vec![format!("ctx: {}", entry.ty.name)];
     let mut index = 0usize;
     for param in &hir.params {

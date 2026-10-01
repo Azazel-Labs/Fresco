@@ -745,8 +745,8 @@ impl IrBuilder {
     /// Build an `IrBuilder` for a scatter body helper function.
     ///
     /// The helper has the signature:
-    /// `fn fresco_{canvas}_scatter_l{id}(p, px, aa, time, delta, res, inst_pos_x, inst_pos_y, inst_id,
-    ///  inst_index01, inst_age_norm, …canvas_params…) -> vec4<f32>`
+    /// `fn fresco_{entry}_scatter_l{id}(p, px, aa, time, delta, res, inst_pos_x, inst_pos_y, inst_id,
+    ///  inst_index01, inst_age_norm, …entry_params…) -> vec4<f32>`
     ///
     /// Returns the builder and a `ScatterInstanceCtx` wired to the instance args.
     pub(super) fn new_scatter_body(
@@ -771,7 +771,7 @@ impl IrBuilder {
         let inst_index01 = function.arg("inst_index01", t.f32_);
         let inst_age_norm = function.arg("inst_age_norm", t.f32_);
 
-        // Canvas params: scalars pass through directly; color params are
+        // Entry params: scalars pass through directly; color params are
         // decomposed into per-component f32 args to avoid aggregates.
         let mut param_scalars = HashMap::new();
         for param in params {

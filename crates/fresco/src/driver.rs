@@ -663,7 +663,7 @@ pub fn query_span_info_with_files(
 }
 
 /// Compile a variant shader that renders only the expression at
-/// `span_start..span_end` in the source canvas.
+/// `span_start..span_end` in the source raster entry.
 pub fn compile_variant(
     src: &str,
     filename: &str,

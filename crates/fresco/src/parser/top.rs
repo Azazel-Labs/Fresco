@@ -1,7 +1,7 @@
 use super::*;
 use crate::ast::{
-    Canvas, CanvasParam, ConstDecl, EvaluationContractBindingDecl, MaterialReturnTy,
-    PassFnHookDecl, PassFnHookParamDecl, SchemaEvaluatorVariantDecl, SchemaProgramDecl,
+    ConstDecl, EntryParam, EvaluationContractBindingDecl, MaterialReturnTy, PassFnHookDecl,
+    PassFnHookParamDecl, RasterEntry, SchemaEvaluatorVariantDecl, SchemaProgramDecl,
     StyleContractDecl, StyleDecl, StyleHookDecl, SurfaceDecl, TemplateConfigParamDecl,
     TemplateDecl, TemplatePlugDecl, VertexFactoryDecl, VertexFormatDecl, VertexInterfaceDecl,
     VertexInterfaceMemberDecl,
@@ -190,18 +190,18 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         })
         .boxed();
 
-    let canvas_param = ident_sp
+    let entry_param = ident_sp
         .clone()
         .then_ignore(just(Token::Colon))
         .then(type_ident_sp.clone())
-        .map(|((name, name_span), (ty_name, ty_span))| CanvasParam {
+        .map(|((name, name_span), (ty_name, ty_span))| EntryParam {
             name,
             name_span,
             ty_name,
             ty_span,
         })
         .boxed();
-    let canvas_params = canvas_param
+    let entry_params = entry_param
         .separated_by(comma_sep.clone())
         .allow_trailing()
         .collect::<Vec<_>>()
@@ -210,12 +210,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
 
     let entry_template_parts = ident_sp
         .clone()
-        .then(
-            canvas_params
-                .clone()
-                .or_not()
-                .map(Option::unwrap_or_default),
-        )
+        .then(entry_params.clone().or_not().map(Option::unwrap_or_default))
         .boxed();
 
     let template_attr = select! { Token::Attribute(name) => name.to_string() }
@@ -2209,7 +2204,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
     // surface Name(sp: surf, time: signal, ...) -> material { <body> }
     // surface Name(sp: surf, ...) -> material(unlit|<model_name>) { <body> }
     //
-    // The `surface` keyword is a first-class entry point parallel to `canvas`.
+    // The `surface` keyword is a first-class entry point parallel to raster entries.
     // The return type is always `material` (optionally with a variant in
     // parentheses).  The body is a plain statement block.
     let surface_property_block = ident
@@ -3526,7 +3521,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                             && entry.blocks.is_empty()
                             && entry.config.is_empty()
                         {
-                            program.canvases.push(Canvas {
+                            program.raster_entries.push(RasterEntry {
                                 entry_kind: entry.kind,
                                 declared_return_ty: entry.return_ty,
                                 name: entry.name,
@@ -3597,7 +3592,7 @@ mod tests {
     }
 
     #[test]
-    fn canvas_and_surface_share_the_same_entry_template_shape() {
+    fn raster_entry_and_surface_share_the_same_entry_template_shape() {
         let program = parse_program(
             r#"
             canvas preview(uv: coord) -> color {
@@ -3610,13 +3605,13 @@ mod tests {
             "#,
         );
 
-        assert_eq!(program.canvases.len(), 1);
+        assert_eq!(program.raster_entries.len(), 1);
         assert_eq!(program.surfaces.len(), 1);
-        assert_eq!(program.canvases[0].name, "preview");
+        assert_eq!(program.raster_entries[0].name, "preview");
         assert_eq!(program.surfaces[0].name, "base");
-        assert_eq!(program.canvases[0].params.len(), 1);
+        assert_eq!(program.raster_entries[0].params.len(), 1);
         assert_eq!(program.surfaces[0].params.len(), 1);
-        assert_eq!(program.canvases[0].body.len(), 1);
+        assert_eq!(program.raster_entries[0].body.len(), 1);
         assert_eq!(program.surfaces[0].body.len(), 1);
     }
 
@@ -3766,7 +3761,7 @@ mod tests {
         );
 
         assert_eq!(program.templates.len(), 1);
-        assert_eq!(program.canvases.len(), 1);
+        assert_eq!(program.raster_entries.len(), 1);
         assert_eq!(program.passes.len(), 1);
         assert_eq!(program.pipelines.len(), 1);
     }

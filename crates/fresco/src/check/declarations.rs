@@ -243,8 +243,6 @@ pub(super) fn create_checker_for_surface(
             name,
             params: Vec::new(),
             rendering_policy: options.rendering_policy(),
-            canvas_space: None,
-            canvas_jacobian: None,
             shapes: Vec::new(),
             layers: Vec::new(),
             layer_locality: Vec::new(),
@@ -1143,7 +1141,7 @@ pub fn check(
     .entered();
     info!("checker phase start: validate_entry_template_params");
     let mut prep_diags = Vec::new();
-    let contract = if matches!(entry.kind, RootEntryKind::Canvas) {
+    let contract = if matches!(entry.kind, RootEntryKind::Raster) {
         crate::context::raster_contract(&entry.entry_kind, interfaces, structs)?
     } else {
         None
@@ -1329,8 +1327,6 @@ pub fn check(
             entry_context: None,
             params: Vec::new(),
             rendering_policy: options.rendering_policy(),
-            canvas_space: None,
-            canvas_jacobian: None,
             shapes: Vec::new(),
             layers: Vec::new(),
             layer_locality: Vec::new(),
@@ -1991,7 +1987,7 @@ mod tests {
     ) -> NormalizedRootEntry {
         NormalizedRootEntry {
             entry_kind: "canvas".into(),
-            kind: RootEntryKind::Canvas,
+            kind: RootEntryKind::Raster,
             name: name.to_string(),
             name_span: span(0, 7),
             params: vec![NormalizedRootEntryParam {
@@ -2082,7 +2078,7 @@ mod tests {
     fn check_accepts_template_decl_as_reusable_entry_contract() {
         let entry = NormalizedRootEntry {
             entry_kind: "canvas".into(),
-            kind: RootEntryKind::Canvas,
+            kind: RootEntryKind::Raster,
             name: "fullscreen_effect".to_string(),
             name_span: span(0, 17),
             params: Vec::new(),

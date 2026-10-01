@@ -8,7 +8,7 @@
 //!   - `filtering(on); pattern` — force filtering (requires footprint)
 //!
 //! By default, patterns automatically enable filtering when a footprint is
-//! available (via `canvas_space` Jacobian).
+//! available (via the active `in space` Jacobian).
 
 use crate::ast::Expr;
 use crate::builtin;

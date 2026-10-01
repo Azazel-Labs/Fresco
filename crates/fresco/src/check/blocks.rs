@@ -1065,21 +1065,21 @@ impl Checker {
         &mut self,
         stmts: &[Stmt],
         block_span: &Span,
-        is_canvas_root: bool,
+        is_entry_root: bool,
         allow_empty: bool,
     ) -> Option<LayerId> {
         let diags_before_block = self.diags.len();
         let mut last: Option<(LayerId, Span)> = None;
         let mut produced_layers: Vec<(LayerId, Blend)> = Vec::new();
-        if is_canvas_root {
-            info!(stmts = stmts.len(), "checker block start: canvas root");
+        if is_entry_root {
+            info!(stmts = stmts.len(), "checker block start: entry root");
         } else {
             debug!(stmts = stmts.len(), "checker block start");
         }
 
         for (stmt_idx, stmt) in stmts.iter().enumerate() {
             let stmt_kind = stmt.kind();
-            if is_canvas_root {
+            if is_entry_root {
                 info!(idx = stmt_idx, kind = stmt_kind, "checker stmt start");
             } else {
                 debug!(idx = stmt_idx, kind = stmt_kind, "checker stmt start");
@@ -1097,7 +1097,7 @@ impl Checker {
                     span,
                     ..
                 } => {
-                    if !is_canvas_root {
+                    if !is_entry_root {
                         self.diags.push(
                             Diag::error(
                                 span.clone(),
@@ -1730,7 +1730,7 @@ impl Checker {
                     );
                 }
                 Stmt::CanvasSpace { chain, span } => {
-                    let _ = (chain, is_canvas_root);
+                    let _ = (chain, is_entry_root);
                     self.diags.push(
                         Diag::error(
                             span.clone(),
@@ -1820,7 +1820,7 @@ impl Checker {
                 Stmt::Block { body, span } => {
                     self.scopes.push(HashMap::new());
                     self.style_scopes.push(HashMap::new());
-                    let grouped = self.eval_block(body, span, is_canvas_root, false);
+                    let grouped = self.eval_block(body, span, is_entry_root, false);
                     self.scopes.pop();
                     self.style_scopes.pop();
 
@@ -2034,7 +2034,7 @@ impl Checker {
                 }
             }
 
-            if is_canvas_root {
+            if is_entry_root {
                 info!(
                     idx = stmt_idx,
                     kind = stmt_kind,
@@ -2070,18 +2070,15 @@ impl Checker {
             .skip(diags_before_block)
             .any(Diag::is_error)
         {
-            if is_canvas_root {
-                info!(
-                    diags = self.diags.len(),
-                    "checker block failed: canvas root"
-                );
+            if is_entry_root {
+                info!(diags = self.diags.len(), "checker block failed: entry root");
             } else {
                 debug!(diags = self.diags.len(), "checker block failed");
             }
             return None;
         }
         if produced_layers.len() > 1 {
-            if is_canvas_root {
+            if is_entry_root {
                 info!(
                     layers = produced_layers.len(),
                     "checker block done: composed root output"
@@ -2094,8 +2091,8 @@ impl Checker {
             }
             return Some(self.hir.layer(Layer::Compose(produced_layers)));
         }
-        if is_canvas_root {
-            info!(has_last = last.is_some(), "checker block done: canvas root");
+        if is_entry_root {
+            info!(has_last = last.is_some(), "checker block done: entry root");
         } else {
             debug!(has_last = last.is_some(), "checker block done");
         }
@@ -3196,7 +3193,7 @@ impl Checker {
 // ─── Local fn declaration registration ───────────────────────────────────────
 
 impl Checker {
-    /// Register a `fn` declaration encountered as a statement inside a canvas or fn body.
+    /// Register a `fn` declaration encountered as a statement inside an entry or fn body.
     ///
     /// Local fns are resolved with the same rules as top-level fns: they go into
     /// `self.fn_defs` and are available from the point of declaration forward (sequential

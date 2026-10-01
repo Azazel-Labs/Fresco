@@ -1,5 +1,5 @@
 //! Bind authored declaration vocabulary to engine interfaces after import resolution.
-use crate::ast::{Arg, Canvas, CanvasParam, Expr, FnDecl, Program, Spanned, Stmt};
+use crate::ast::{Arg, EntryParam, Expr, FnDecl, Program, RasterEntry, Spanned, Stmt};
 use crate::diag::Diag;
 use std::collections::{HashMap, HashSet};
 
@@ -90,34 +90,34 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 .is_some_and(|name| compute_interfaces.contains(name))
         })
         .collect();
-    for canvas in program
-        .canvases
-        .extract_if(.., |canvas| registrations.contains_key(&canvas.entry_kind))
+    for raster in program
+        .raster_entries
+        .extract_if(.., |raster| registrations.contains_key(&raster.entry_kind))
     {
         program.authored_entries.push(crate::ast::AuthoredEntry {
             config: Vec::new(),
-            kind: canvas.entry_kind,
-            name: canvas.name,
-            name_span: canvas.name_span,
-            params: canvas.params,
-            return_ty: canvas.declared_return_ty,
-            body: canvas.body,
+            kind: raster.entry_kind,
+            name: raster.name,
+            name_span: raster.name_span,
+            params: raster.params,
+            return_ty: raster.declared_return_ty,
+            body: raster.body,
             blocks: Vec::new(),
-            span: canvas.span,
+            span: raster.span,
         });
     }
-    for canvas in &program.canvases {
-        if let Some(interface) = registrations.get(&canvas.entry_kind)
-            && canvas.params.is_empty()
-            && canvas.body.is_empty()
+    for raster in &program.raster_entries {
+        if let Some(interface) = registrations.get(&raster.entry_kind)
+            && raster.params.is_empty()
+            && raster.body.is_empty()
         {
             let (_, method) = interface.entry.as_ref().expect("registered interface");
             return Err(Diag::fail(
-                &canvas.name_span,
+                &raster.name_span,
                 format!("missing required entry block `{method}`"),
             ));
         }
-        if let Some(ty) = &canvas.declared_return_ty
+        if let Some(ty) = &raster.declared_return_ty
             && ty.node != "color"
         {
             return Err(Diag::fail(
@@ -125,12 +125,12 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 "raster entry result type must be color",
             ));
         }
-        if let Some(interface) = registrations.get(&canvas.entry_kind)
+        if let Some(interface) = registrations.get(&raster.entry_kind)
             && interface.methods.len() != 1
-            && !canvas.params.is_empty()
+            && !raster.params.is_empty()
         {
             return Err(Diag::fail(
-                &canvas.name_span,
+                &raster.name_span,
                 "entry shorthand requires named blocks for all interface methods",
             ));
         }
@@ -652,7 +652,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 continue;
             }
             let param = &method.params[0];
-            let params = vec![CanvasParam {
+            let params = vec![EntryParam {
                 name: param.name.clone(),
                 name_span: entry.name_span.clone(),
                 ty_name: param.ty_name.clone(),
@@ -679,7 +679,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             }));
             (params, body)
         };
-        program.canvases.push(Canvas {
+        program.raster_entries.push(RasterEntry {
             entry_kind: entry.kind,
             declared_return_ty: entry.return_ty,
             name: entry.name,

@@ -103,7 +103,7 @@ builtin! {
 
         let pattern = if should_filter {
             // Compute footprint from Jacobian-derived span estimates.
-            let (j11, j12, j21, j22) = ctx.get_canvas_jacobian();
+            let (j11, j12, j21, j22) = ctx.footprint_jacobian();
                 let (span_x, span_y) = deriv::footprint_spans(&j11, &j12, &j21, &j22);
                 let px_uv = screen_px_uv(ctx);
                 let pixel_span_x = span_x * px_uv.clone();
@@ -189,7 +189,7 @@ builtin! {
 
         let pattern = if should_filter {
             // Compute footprint from Jacobian
-            let (j11, j12, j21, j22) = ctx.get_canvas_jacobian();
+            let (j11, j12, j21, j22) = ctx.footprint_jacobian();
                 let (span_x, span_y) = deriv::footprint_spans(&j11, &j12, &j21, &j22);
 
                 // Select the appropriate span based on axis direction

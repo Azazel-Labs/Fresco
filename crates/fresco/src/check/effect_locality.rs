@@ -26,8 +26,8 @@ const BUILTIN_EFFECT_NAMES: &[&str] = &[
 impl Checker {
     /// Register and check all user-defined effect declarations.
     ///
-    /// This runs before the canvas body is checked so that effect names are
-    /// available for pipe-call dispatch inside the canvas.
+    /// This runs before the entry body is checked so that effect names are
+    /// available for pipe-call dispatch inside the entry.
     pub(super) fn check_effect_decls(&mut self, effects: &[EffectDecl]) {
         for decl in effects {
             self.check_effect_decl(decl);
@@ -74,7 +74,7 @@ impl Checker {
         let param_types: Vec<String> = decl.params.iter().map(|p| p.ty_name.clone()).collect();
 
         // --- Check body in a new scope with symbolic param values -----------
-        // Push a scope so param names don't leak into the outer canvas scope.
+        // Push a scope so param names don't leak into the outer entry scope.
         self.scopes.push(HashMap::new());
         self.style_scopes.push(HashMap::new());
 

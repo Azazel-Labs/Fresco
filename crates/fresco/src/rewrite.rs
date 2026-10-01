@@ -10,14 +10,9 @@
 
 use crate::driver::pass_plan;
 use crate::hir::Sx;
-use crate::hir::{Hir, Layer, Locality, Xform};
+use crate::hir::{Hir, Layer, Locality};
 
 pub fn run(hir: &mut Hir) {
-    // --- footprint propagation analysis (§3.8, §24.1) --------------------
-    // Analyze the canvas_space transform chain and document how the footprint
-    // Jacobian matrix is computed for gradient-driven filtering.
-    analyze_footprint_propagation(hir);
-
     // --- rewrite: blur ∘ fill ⇒ soften (analytic) -----------------------
     // blur(r) over a fill(shape) rewrites to a widened coverage soften (§10.2).
     // blur(r) over a soften(shape) merges the two radii analytically (§10.3).
@@ -214,7 +209,7 @@ fn layer_locality(hir: &Hir, id: usize, memo: &mut [Option<Locality>]) -> Locali
 /// rule.  If the pattern matches and the optional `when` guard evaluates to a
 /// statically-true constant, the outer node is replaced with the result effect.
 ///
-/// Guards that depend on runtime values (canvas params, coordinates, time) are
+/// Guards that depend on runtime values (entry params, coordinates, time) are
 /// skipped conservatively; only guards that reduce to a constant after
 /// substituting the literal argument values are evaluated.  The first matching
 /// rule wins.
@@ -347,172 +342,4 @@ fn apply_user_defined_rewrites(hir: &mut Hir) {
             break; // First matching rule wins.
         }
     }
-}
-
-/// Analyze the canvas_space transform chain and document footprint propagation
-/// for gradient-driven filtering (§3.8, §24.1).
-///
-/// The footprint Jacobian matrix J represents how local space moves per output
-/// pixel step. For a chain of transforms `A · B · C`, the chain rule applies
-/// right-to-left (innermost to outermost): `J(A · B · C) = J_C · J_B · J_A`.
-///
-/// This function adds receipt notes documenting the transform chain
-/// and how the Jacobian is computed. The actual Jacobian values are computed
-/// and wired up in `lower/canvas.rs`.
-fn analyze_footprint_propagation(hir: &mut Hir) {
-    let Some(ref chain) = hir.canvas_space else {
-        // No canvas_space → identity Jacobian (implicit)
-        hir.notes.push(
-            "footprint: no canvas_space transforms → identity Jacobian (1 output px = 1 local unit)"
-                .into(),
-        );
-        return;
-    };
-
-    if chain.is_empty() {
-        return;
-    }
-
-    // Count transforms by type for summary
-    let mut rotate_count = 0usize;
-    let mut scale_count = 0usize;
-    let mut translate_count = 0usize;
-    let mut perspective_count = 0usize;
-    let mut repeat_count = 0usize;
-    let mut polar_count = 0usize;
-    let mut orientation_count = 0usize;
-    let mut aspect_count = 0usize;
-    let mut other_count = 0usize;
-
-    for xform in chain {
-        match xform {
-            Xform::Rotate { .. } => rotate_count += 1,
-            Xform::Scale { .. } => scale_count += 1,
-            Xform::Translate(_) | Xform::Translate3 { .. } => translate_count += 1,
-            Xform::Perspective { .. } => perspective_count += 1,
-            Xform::RepeatX(_)
-            | Xform::RepeatY(_)
-            | Xform::Repeat2D { .. }
-            | Xform::Cellular(_)
-            | Xform::RepeatRadial { .. } => repeat_count += 1,
-            Xform::Polar { .. } => polar_count += 1,
-            Xform::Orientation { .. } => orientation_count += 1,
-            Xform::Aspect(_) | Xform::Centered { .. } => aspect_count += 1,
-            _ => other_count += 1,
-        }
-    }
-
-    // Build summary note
-    let mut parts = Vec::new();
-    if rotate_count > 0 {
-        parts.push(format!("rotate×{rotate_count}"));
-    }
-    if scale_count > 0 {
-        parts.push(format!("scale×{scale_count}"));
-    }
-    if translate_count > 0 {
-        parts.push(format!("translate×{translate_count}"));
-    }
-    if orientation_count > 0 {
-        parts.push(format!("orientation×{orientation_count}"));
-    }
-    if aspect_count > 0 {
-        parts.push(format!("aspect×{aspect_count}"));
-    }
-    if perspective_count > 0 {
-        parts.push(format!("perspective×{perspective_count}"));
-    }
-    if repeat_count > 0 {
-        parts.push(format!("repeat×{repeat_count}"));
-    }
-    if polar_count > 0 {
-        parts.push(format!("polar×{polar_count}"));
-    }
-    if other_count > 0 {
-        parts.push(format!("other×{other_count}"));
-    }
-
-    let summary = parts.join(", ");
-    let total = chain.len();
-
-    // Receipt header
-    hir.notes.push(format!(
-        "footprint: canvas_space chain ({total} transform{}) → Jacobian J computed via chain rule (§3.8)",
-        if total == 1 { "" } else { "s" }
-    ));
-
-    // Transform breakdown
-    hir.notes
-        .push(format!("footprint: transform breakdown: {summary}"));
-
-    // Jacobian identity table receipt
-    let mut identity_transforms = Vec::new();
-    let mut analytic_transforms = Vec::new();
-    let mut placeholder_transforms = Vec::new();
-
-    if translate_count > 0 {
-        identity_transforms.push(format!("translate×{translate_count}"));
-    }
-    if rotate_count > 0 {
-        analytic_transforms.push(format!("rotate×{rotate_count} (R(-θ))"));
-    }
-    if scale_count > 0 {
-        analytic_transforms.push(format!("scale×{scale_count} (diag(1/k))"));
-    }
-    if orientation_count > 0 {
-        analytic_transforms.push(format!(
-            "orientation×{orientation_count} (y:down → diag(1,-1))"
-        ));
-    }
-    if aspect_count > 0 {
-        analytic_transforms.push(format!("aspect/centered×{aspect_count} (scale-derived)"));
-    }
-    if repeat_count > 0 {
-        identity_transforms.push(format!("repeat×{repeat_count} (piecewise I)"));
-    }
-    if polar_count > 0 {
-        placeholder_transforms.push(format!("polar×{polar_count} (→I, future work)"));
-    }
-    if perspective_count > 0 {
-        placeholder_transforms.push(format!("perspective×{perspective_count} (→I, future work)"));
-    }
-    if other_count > 0 {
-        placeholder_transforms.push(format!("other×{other_count} (→I, future phases)"));
-    }
-
-    if !identity_transforms.is_empty() {
-        hir.notes.push(format!(
-            "footprint: identity J: {} — no local space distortion",
-            identity_transforms.join(", ")
-        ));
-    }
-    if !analytic_transforms.is_empty() {
-        hir.notes.push(format!(
-            "footprint: analytic J: {} — exact derivatives (§3.8 identity table)",
-            analytic_transforms.join(", ")
-        ));
-    }
-    if !placeholder_transforms.is_empty() {
-        hir.notes.push(format!(
-            "footprint: placeholder J: {} — future refinement",
-            placeholder_transforms.join(", ")
-        ));
-    }
-
-    // Computation details
-    hir.notes.push(
-        "footprint: chain rule application: J(A·B·C) = J_C·J_B·J_A (right-to-left, innermost to outermost)"
-            .into(),
-    );
-
-    // Final wiring receipt
-    hir.notes.push(
-        "footprint: Jacobian matrix [[j11, j12], [j21, j22]] computed at root uv and wired up in lowering"
-            .into(),
-    );
-    hir.notes.push(
-        "footprint: matrix columns are (j11,j21) right-arrow and (j12,j22) up-arrow — \
-         parallelogram is the pixel footprint in local space"
-            .into(),
-    );
 }

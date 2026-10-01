@@ -785,11 +785,11 @@ fn parse_manifest_params(manifest_text: &str, fn_name: &str) -> Vec<ParamDef> {
     let Ok(manifest) = serde_json::from_str::<ManifestRoot>(manifest_text) else {
         return Vec::new();
     };
-    let canvas_name = fn_name.strip_prefix("fresco_").unwrap_or(fn_name);
+    let entry_name = fn_name.strip_prefix("fresco_").unwrap_or(fn_name);
     let canvas = manifest
         .canvases
         .iter()
-        .find(|entry| entry.name == canvas_name)
+        .find(|entry| entry.name == entry_name)
         .or_else(|| manifest.canvases.first());
 
     canvas
@@ -875,7 +875,7 @@ fn detect_fresco_entry_function(wgsl: &str) -> Option<String> {
     candidates
         .iter()
         .find(|(name, types)| {
-            !is_generated_helper_function_name(name) && is_canvas_entry_signature(types)
+            !is_generated_helper_function_name(name) && is_standalone_raster_entry_signature(types)
         })
         .map(|(name, _)| name.clone())
         .or_else(|| {
@@ -895,7 +895,7 @@ fn is_generated_helper_function_name(name: &str) -> bool {
     }
 }
 
-fn is_canvas_entry_signature(types: &[String]) -> bool {
+fn is_standalone_raster_entry_signature(types: &[String]) -> bool {
     let t = types
         .iter()
         .map(|item| compact_type(item))

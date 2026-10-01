@@ -20,7 +20,7 @@
 //! Scalar/array/texture-typed global `param` declarations don't go through
 //! this module at all — they're declared via [`Checker::declare_global_params`],
 //! which forwards straight to the same [`Checker::declare_param`] used for
-//! canvas/surface-scoped params, with full `var<uniform>` lowering already in
+//! entry-scoped params, with full `var<uniform>` lowering already in
 //! place. Only a `param` whose type is a struct ends up here, since it
 //! bundles multiple fields into one uniform buffer instead of one global per
 //! field.
@@ -250,7 +250,7 @@ impl Checker {
     }
 
     /// Declare every scalar/array/texture-typed global `param` into this
-    /// checking context, exactly like a canvas/surface-scoped `param`
+    /// checking context, exactly like an entry-scoped `param`
     /// statement (full `var<uniform>` lowering already applies uniformly).
     ///
     /// Struct-typed global params (e.g. `param frame: FrameGlobals`) are not
@@ -373,7 +373,7 @@ impl Checker {
     }
 
     /// The `time` runtime value, resolved by calling the FR-authored `time()`
-    /// function when the merged program defines one. Standalone canvases use
+    /// function when the merged program defines one. Standalone entries use
     /// their existing entry ABI arguments; absence of an engine is not a
     /// request to replace dynamic inputs with constants.
     pub(crate) fn runtime_time(&mut self) -> Sx {

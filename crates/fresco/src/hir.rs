@@ -15,7 +15,7 @@
 //! The `FilteringState` controls whether procedural patterns (checker, stripe)
 //! use analytic prefiltering to eliminate aliasing. The state can be set via
 //! the `|> filtering(on/off)` effect and defaults to `Auto`, which enables
-//! filtering when a footprint is available (via canvas_space Jacobian).
+//! filtering when a footprint is available (via the active `in space` Jacobian).
 
 use crate::ast::Span;
 use std::collections::HashMap;
@@ -1544,7 +1544,7 @@ impl SxVec {
     }
 }
 
-/// Inputs provided by the existing canvas/surface entry ABI when no engine accessor is declared.
+/// Inputs provided by the standalone raster/surface entry ABI when no engine accessor is declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EntryInput {
     Time,
@@ -1600,7 +1600,7 @@ pub enum Sx {
     CoordY,
     /// Footprint matrix element [0,0]: ∂x/∂output_x (Jacobian J₁₁).
     /// The x-component of the right-arrow: how local x changes per output pixel-step right.
-    /// NOTE: Computed and wired up from canvas_space in lowering.
+    /// NOTE: Resolved in lowering from the active `in space` Jacobian (identity outside one).
     /// These variants are constructed by the checker for filtering and gradient-driven effects.
     #[allow(dead_code, reason = "Constructed by checker for filtering")]
     FootprintJ11,
@@ -3176,7 +3176,7 @@ pub enum Xform {
     /// A partition of the plane, not overlapping scatter. Content is clipped
     /// to the selected owner; the enclosing layer is filtered across owners.
     Cellular(CellularSpace),
-    /// Radians; content rotates by +angle around canvas center, so the
+    /// Radians; content rotates by +angle around the frame center, so the
     /// sample point is rotated by -angle (the inversion of §3 / §12).
     Rotate {
         angle: Sx,
@@ -3188,7 +3188,7 @@ pub enum Xform {
         by: V2,
         z: Sx,
     },
-    /// Uniform scale around an optional pivot (defaults to canvas center `(0.5, 0.5)`).
+    /// Uniform scale around an optional pivot (defaults to the frame center `(0.5, 0.5)`).
     Scale {
         factor: Sx,
         around: V2,
@@ -3878,10 +3878,6 @@ pub struct Hir {
     pub params: Vec<Param>,
     /// Absent only in helper-only checking contexts that do not render.
     pub rendering_policy: Option<RenderingPolicy>,
-    pub canvas_space: Option<Vec<Xform>>,
-    /// Jacobian matrix from canvas_space chain for footprint computation.
-    /// Components are `(j11, j12, j21, j22)` representing the 2×2 derivative matrix.
-    pub canvas_jacobian: Option<(Sx, Sx, Sx, Sx)>,
     pub shapes: Vec<Shape>,
     pub layers: Vec<Layer>,
     pub layer_locality: Vec<Locality>,
@@ -3913,7 +3909,7 @@ pub struct Hir {
     /// Struct-typed global `param` declarations visible to this program, in
     /// declaration order: `(name, ty_name, fields)`. Carried for lowering
     /// (real `var<uniform>` buffer creation, shared across every
-    /// canvas/surface in the compile) and manifest emission.
+    /// raster entry/surface in the compile) and manifest emission.
     pub global_uniforms: Vec<crate::check::GlobalUniformDef>,
 }
 

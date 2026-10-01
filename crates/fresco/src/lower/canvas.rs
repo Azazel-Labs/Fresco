@@ -2,14 +2,14 @@ use super::*;
 use std::collections::HashSet;
 
 pub(super) fn lower_path_nearest_fn(
-    canvas_name: &str,
+    entry_name: &str,
     path_id: usize,
     table: &PathTableBinding,
     t: &TypeHandles,
     policy: LoweringPolicy,
 ) -> naga::Function {
     let mut function = FunctionBuilder::new(
-        format!("fresco_path_sample_{canvas_name}_p{path_id}"),
+        format!("fresco_path_sample_{entry_name}_p{path_id}"),
         policy,
     );
     let p = function.arg("p", t.v2);
@@ -486,14 +486,14 @@ pub(super) fn lower_path_nearest_fn(
 }
 
 pub(super) fn lower_path_arc_sample_fn(
-    canvas_name: &str,
+    entry_name: &str,
     path_id: usize,
     table: &PathTableBinding,
     t: &TypeHandles,
     policy: LoweringPolicy,
 ) -> naga::Function {
     let mut function = FunctionBuilder::new(
-        format!("fresco_path_arc_sample_{canvas_name}_p{path_id}"),
+        format!("fresco_path_arc_sample_{entry_name}_p{path_id}"),
         policy,
     );
     let s = function.arg("s", t.f32_);
@@ -1446,9 +1446,9 @@ impl<'a, 'h> UserHelperRuntimeCtx<'a, 'h> {
 /// The helper signature is:
 /// `(p: vec2, px: f32, aa: f32, time: f32,
 ///   inst_pos_x: f32, inst_pos_y: f32, inst_id: f32, inst_index01: f32,
-///   …canvas_params…) -> vec4<f32>`
+///   …entry_params…) -> vec4<f32>`
 ///
-/// This lets the main canvas call the helper once per instance (a tiny
+/// This lets the main entry call the helper once per instance (a tiny
 /// call site) rather than inlining the full body for every instance.
 #[expect(
     clippy::too_many_arguments,
@@ -1566,33 +1566,14 @@ fn lower_scene_fn_with_root(
     cx.ir.name(cx.ir.px, "px");
     cx.ir.name(cx.ir.aa, "aa");
 
-    // Compute the footprint Jacobian matrix from the canvas_space chain (§3.8, §24.1).
-    // The Jacobian represents the derivative of the composed sample mapping, and the
-    // parallelogram spanned by its columns is the footprint — the region of local space
-    // one output pixel covers. This drives gradient-driven antialiasing and filtering.
-    if let Some(xforms) = &hir.canvas_space {
-        let (j11_sx, j12_sx, j21_sx, j22_sx) = crate::deriv::jacobian(xforms);
-        // Lower the Jacobian Sx expressions to IR handles and store them
-        let j11_h = cx.sx_at(&j11_sx, cx.ir.uv);
-        let j12_h = cx.sx_at(&j12_sx, cx.ir.uv);
-        let j21_h = cx.sx_at(&j21_sx, cx.ir.uv);
-        let j22_h = cx.sx_at(&j22_sx, cx.ir.uv);
-        cx.ir.name(j11_h, "jacobian_j11");
-        cx.ir.name(j12_h, "jacobian_j12");
-        cx.ir.name(j21_h, "jacobian_j21");
-        cx.ir.name(j22_h, "jacobian_j22");
-        cx.ir.jacobian = Some([j11_h, j12_h, j21_h, j22_h]);
-    }
-
     // Fold the whole layer DAG down to a vec3 color at the root coordinate.
-    // `canvas_space` provides footprint information, but geometry transforms
-    // are explicit through `in space` blocks.
+    // Geometry transforms are explicit through `in space` blocks.
     let root_p = cx.ir.uv;
     cx.ir.name(root_p, "p_root");
     let rgb = match &hir.layers[scene_root] {
         Layer::Compose(entries) => cx.fold_compose_rgb_only(entries, root_p),
         _ => {
-            // Canvas output is flattened over black, just like the compose
+            // Entry output is flattened over black, just like the compose
             // path above. A standalone layer still contributes its coverage.
             let (rgb, alpha) = cx.layer_color(scene_root, root_p);
             let coverage = cx.ir.splat3(alpha);
@@ -1707,7 +1688,7 @@ pub(super) fn lower_scene_pass_fn(
     .0
 }
 
-fn lower_canvas_entry_fn_named(
+fn lower_raster_entry_fn_named(
     hir: &Hir,
     entry_name: &str,
     t: &TypeHandles,
@@ -1876,7 +1857,7 @@ fn lower_canvas_entry_fn_named(
     cx.ir.finish()
 }
 
-pub(super) fn lower_canvas_entry_fn(
+pub(super) fn lower_raster_entry_fn(
     hir: &Hir,
     t: &TypeHandles,
     policy: LoweringPolicy,
@@ -1884,7 +1865,7 @@ pub(super) fn lower_canvas_entry_fn(
     sampler_global: Option<Handle<naga::GlobalVariable>>,
     scene_fn: Handle<naga::Function>,
 ) -> naga::Function {
-    lower_canvas_entry_fn_named(
+    lower_raster_entry_fn_named(
         hir,
         &format!("fresco_{}", hir.name),
         t,
@@ -1895,7 +1876,7 @@ pub(super) fn lower_canvas_entry_fn(
     )
 }
 
-pub(super) fn lower_canvas_pass_entry_fn(
+pub(super) fn lower_raster_pass_entry_fn(
     hir: &Hir,
     pass_id: usize,
     t: &TypeHandles,
@@ -1904,7 +1885,7 @@ pub(super) fn lower_canvas_pass_entry_fn(
     sampler_global: Option<Handle<naga::GlobalVariable>>,
     scene_fn: Handle<naga::Function>,
 ) -> naga::Function {
-    lower_canvas_entry_fn_named(
+    lower_raster_entry_fn_named(
         hir,
         &format!("fresco_{}_pass{pass_id}_", hir.name),
         t,
@@ -2650,7 +2631,7 @@ canvas t(uv: coord, time: signal) -> color {
     }
 
     #[test]
-    fn single_pass_canvas_omits_redundant_pass_entry_wrapper() {
+    fn single_pass_raster_entry_omits_redundant_pass_entry_wrapper() {
         let src = r#"canvas t(uv: coord, time: signal) -> color {
     compose {
         fill(#0e1420)
@@ -2662,11 +2643,11 @@ canvas t(uv: coord, time: signal) -> color {
         let wgsl = compile_wgsl(src);
         assert!(
             !wgsl.contains("fn fresco_t_pass0_("),
-            "expected single-pass fused canvases to omit redundant pass wrapper\nwgsl:\n{wgsl}"
+            "expected single-pass fused raster entries to omit redundant pass wrapper\nwgsl:\n{wgsl}"
         );
         assert!(
             !wgsl.contains("fn fresco_scene_t_pass0_("),
-            "expected single-pass canvases to reuse the base scene helper instead of emitting a duplicate pass helper\nwgsl:\n{wgsl}"
+            "expected single-pass raster entries to reuse the base scene helper instead of emitting a duplicate pass helper\nwgsl:\n{wgsl}"
         );
     }
 

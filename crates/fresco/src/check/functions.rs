@@ -2737,7 +2737,7 @@ impl Checker {
         self.hir.user_helpers = saved_helpers;
         self.pending_user_helpers = saved_pending_helpers;
 
-        // Give whatever comes after this eager pass (the real canvas/surface
+        // Give whatever comes after this eager pass (the real raster entry/surface
         // body evaluation) a fresh timeout budget instead of inheriting a
         // permanently-tripped watchdog from validating unrelated functions.
         self.expr_timeout_reported = false;
@@ -4592,7 +4592,7 @@ pub struct WorkbookCheckResult {
 /// Like [`check`], but also records span→type information for every evaluated
 /// expression.  When `capture_range` is `Some((start, end))`, additionally
 /// captures the tightest-fitting expression value at that byte range so the
-/// caller can synthesize a variant canvas entry (§21.7).
+/// caller can synthesize a variant raster entry (§21.7).
 #[expect(
     clippy::too_many_arguments,
     reason = "This compiler boundary explicitly threads independent checking or lowering inputs."
@@ -4619,7 +4619,7 @@ pub fn check_with_workbook(
     )
     .entered();
     let mut prep_diags = Vec::new();
-    let contract = if matches!(entry.kind, RootEntryKind::Canvas) {
+    let contract = if matches!(entry.kind, RootEntryKind::Raster) {
         crate::context::raster_contract(&entry.entry_kind, interfaces, structs)?
     } else {
         None
@@ -4767,8 +4767,6 @@ pub fn check_with_workbook(
             name: entry.name.clone(),
             params: Vec::new(),
             rendering_policy: options.rendering_policy(),
-            canvas_space: None,
-            canvas_jacobian: None,
             shapes: Vec::new(),
             layers: Vec::new(),
             layer_locality: Vec::new(),

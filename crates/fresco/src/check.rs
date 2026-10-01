@@ -85,7 +85,7 @@ impl SpanValueKind {
 }
 
 /// The semantic value captured at a target span.  Carries enough information
-/// to synthesize a variant canvas entry returning that value (§21.7 rung 1).
+/// to synthesize a variant raster entry returning that value (§21.7 rung 1).
 #[derive(Debug, Clone)]
 pub enum SpanCapture {
     Layer(LayerId),
@@ -3215,7 +3215,7 @@ impl Checker {
     }
 
     /// Get symbolic footprint Jacobian terms for footprint computation.
-    pub(super) fn get_canvas_jacobian(&self) -> (Sx, Sx, Sx, Sx) {
+    pub(super) fn footprint_jacobian(&self) -> (Sx, Sx, Sx, Sx) {
         (
             Sx::FootprintJ11,
             Sx::FootprintJ12,

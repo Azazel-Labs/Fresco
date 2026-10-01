@@ -117,7 +117,7 @@ impl<'h> FnCtx<'h> {
     }
 
     /// One element of the footprint Jacobian (§3.8, §24.1), indexed row-major.
-    /// Contexts without canvas transforms (user helpers, scatter bodies) fall
+    /// Contexts without active space transforms (user helpers, scatter bodies) fall
     /// back to the identity element.
     fn footprint_element(&mut self, index: usize, identity: f32) -> Handle<Ex> {
         let prev_feature_tag = self.ir.set_feature_tag(Some("pattern_filtering"));
@@ -452,7 +452,7 @@ impl<'h> FnCtx<'h> {
             }
             Sx::CoordX => self.ir.x_of(p),
             Sx::CoordY => self.ir.y_of(p),
-            // Footprint matrix elements, from the canvas_space Jacobian when available.
+            // Footprint matrix elements, from the active `in space` Jacobian when available.
             Sx::FootprintJ11 => self.footprint_element(0, 1.0),
             Sx::FootprintJ12 => self.footprint_element(1, 0.0),
             Sx::FootprintJ21 => self.footprint_element(2, 0.0),

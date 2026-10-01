@@ -445,8 +445,6 @@ fn bridge_hir(material: &MaterialHir) -> Hir {
         name: material.name.clone(),
         params: material.params.clone(),
         rendering_policy: material.rendering_policy,
-        canvas_space: None,
-        canvas_jacobian: None,
         shapes: Vec::new(),
         layers: Vec::new(),
         layer_locality: Vec::new(),

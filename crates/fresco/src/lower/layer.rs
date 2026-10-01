@@ -413,7 +413,7 @@ impl<'h> FnCtx<'h> {
     }
 
     /// Arguments for a scatter body helper call: ambient inputs, the instance,
-    /// then every canvas param flattened to its scalar slots.
+    /// then every entry param flattened to its scalar slots.
     fn scatter_body_call_args(
         &self,
         p: Handle<Ex>,

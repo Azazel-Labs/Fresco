@@ -96,7 +96,7 @@ pub struct IntermediateTarget {
     pub id: usize,
     /// Image-format registry name (e.g. `"rgba16float"`).
     pub format: &'static str,
-    /// Resolution scale relative to the canvas output (1.0 = full res).
+    /// Resolution scale relative to the entry output (1.0 = full res).
     pub scale: f32,
     pub lifetime: TargetLifetime,
 }

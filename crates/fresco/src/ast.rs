@@ -397,7 +397,7 @@ pub enum Stmt {
         span: Span,
     },
     /// `canvas_space = a(...) . b(...)` — sets a default space conversion
-    /// for the whole canvas.
+    /// for the whole entry body (removed syntax; rejected by the checker).
     CanvasSpace {
         chain: Vec<SpaceItem>,
         span: Span,
@@ -451,7 +451,7 @@ pub enum Stmt {
     Break {
         span: Span,
     },
-    /// `fn name(params) -> ty { body }` declared inside a canvas or fn body.
+    /// `fn name(params) -> ty { body }` declared inside an entry or fn body.
     LocalFnDecl(FnDecl),
     Expr(SExpr),
 }
@@ -520,7 +520,7 @@ impl Stmt {
 }
 
 #[derive(Debug, Clone)]
-pub struct CanvasParam {
+pub struct EntryParam {
     pub name: String,
     pub name_span: Span,
     pub ty_name: String,
@@ -530,7 +530,8 @@ pub struct CanvasParam {
 /// The semantic class of a normalized root entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootEntryKind {
-    Canvas,
+    /// A single-body entry whose body resolves to a color result.
+    Raster,
     Surface,
 }
 
@@ -586,7 +587,7 @@ fn normalized_root_entry_param_role(ty_name: &str) -> RootEntryParamRole {
     }
 }
 
-fn normalized_root_entry_params(params: &[CanvasParam]) -> Vec<NormalizedRootEntryParam> {
+fn normalized_root_entry_params(params: &[EntryParam]) -> Vec<NormalizedRootEntryParam> {
     params
         .iter()
         .map(|param| NormalizedRootEntryParam {
@@ -597,24 +598,6 @@ fn normalized_root_entry_params(params: &[CanvasParam]) -> Vec<NormalizedRootEnt
             role: normalized_root_entry_param_role(&param.ty_name),
         })
         .collect()
-}
-
-/// A shared view over entry-point declarations that execute as a single body.
-#[expect(
-    dead_code,
-    reason = "EntryTemplate remains as staged syntax-only glue for parser-side entry bodies"
-)]
-///
-/// This is the first step of a broader restructuring that will let canvases,
-/// surfaces, and eventually other entry-style declarations share the same
-/// template contract while preserving their existing syntax and lowering hooks.
-#[derive(Debug, Clone)]
-pub struct EntryTemplate {
-    pub name: String,
-    pub name_span: Span,
-    pub params: Vec<CanvasParam>,
-    pub body: Vec<Stmt>,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -672,7 +655,7 @@ pub struct TemplateDecl {
     pub entry: Option<(String, String)>,
     pub name: String,
     pub name_span: Span,
-    pub params: Vec<CanvasParam>,
+    pub params: Vec<EntryParam>,
     pub plugs: Vec<TemplatePlugDecl>,
     pub config_params: Vec<TemplateConfigParamDecl>,
     pub span: Span,
@@ -688,7 +671,7 @@ pub struct AuthoredEntry {
     pub kind: String,
     pub name: String,
     pub name_span: Span,
-    pub params: Vec<CanvasParam>,
+    pub params: Vec<EntryParam>,
     pub return_ty: Option<Spanned<String>>,
     pub body: Vec<Stmt>,
     pub blocks: Vec<AuthoredEntryBlock>,
@@ -705,23 +688,29 @@ pub struct AuthoredEntryBlock {
     pub span: Span,
 }
 
+/// A single-body root entry whose body resolves to a color result.
+///
+/// Produced by the parser for `kind name(params) -> color { ... }` entries
+/// (standalone or engine-registered) and by entry-contract binding for
+/// engine-registered authored entries.
 #[derive(Debug, Clone)]
-pub struct Canvas {
+pub struct RasterEntry {
     pub entry_kind: String,
     pub declared_return_ty: Option<Spanned<String>>,
     pub name: String,
     pub name_span: Span,
-    /// Declared canvas parameters as `name: type` pairs — types are
-    /// documentation in v0;
-    /// the ABI is fixed: (uv: vec2f, time: f32, res: vec2f) -> vec4f.
-    pub params: Vec<CanvasParam>,
+    /// Declared entry parameters as `name: type` pairs. For standalone
+    /// entries (no engine registration) the parameter types select the
+    /// fixed legacy ABI roles (`coord`, `signal`, `delta`, `resolution`);
+    /// engine-registered entries take their ABI from the entry contract.
+    pub params: Vec<EntryParam>,
     pub body: Vec<Stmt>,
     pub span: Span,
 }
 
 impl NormalizedRootEntry {
-    pub fn into_canvas(self) -> Canvas {
-        Canvas {
+    pub fn into_raster_entry(self) -> RasterEntry {
+        RasterEntry {
             entry_kind: self.entry_kind,
             declared_return_ty: None,
             name: self.name,
@@ -729,7 +718,7 @@ impl NormalizedRootEntry {
             params: self
                 .params
                 .into_iter()
-                .map(|param| CanvasParam {
+                .map(|param| EntryParam {
                     name: param.name,
                     name_span: param.name_span,
                     ty_name: param.ty_name,
@@ -742,11 +731,11 @@ impl NormalizedRootEntry {
     }
 }
 
-impl Canvas {
+impl RasterEntry {
     pub fn as_normalized_root_entry(&self) -> NormalizedRootEntry {
         NormalizedRootEntry {
             entry_kind: self.entry_kind.clone(),
-            kind: RootEntryKind::Canvas,
+            kind: RootEntryKind::Raster,
             name: self.name.clone(),
             name_span: self.name_span.clone(),
             params: normalized_root_entry_params(&self.params),
@@ -951,7 +940,7 @@ pub struct SurfaceDecl {
     pub name: String,
     pub name_span: Span,
     /// Declared surface parameters (`sp: surf`, `time: signal`, etc.).
-    pub params: Vec<CanvasParam>,
+    pub params: Vec<EntryParam>,
     /// The material variant declared after `->`.
     pub material_ty: MaterialReturnTy,
     pub body: Vec<Stmt>,
@@ -1795,7 +1784,7 @@ pub struct Program {
     pub style_capabilities: Vec<StyleCapabilityDecl>,
     pub style_providers: Vec<StyleProviderDecl>,
     pub styles: Vec<StyleDecl>,
-    pub canvases: Vec<Canvas>,
+    pub raster_entries: Vec<RasterEntry>,
     pub surfaces: Vec<SurfaceDecl>,
     pub templates: Vec<TemplateDecl>,
     pub effects: Vec<EffectDecl>,
@@ -1803,46 +1792,24 @@ pub struct Program {
 
 #[derive(Debug, Clone, Copy)]
 pub enum RootEntryRef<'a> {
-    Canvas(&'a Canvas),
+    Raster(&'a RasterEntry),
     Surface(&'a SurfaceDecl),
 }
 
 impl<'a> RootEntryRef<'a> {
     pub fn as_normalized_root_entry(self) -> NormalizedRootEntry {
         match self {
-            Self::Canvas(canvas) => canvas.as_normalized_root_entry(),
+            Self::Raster(entry) => entry.as_normalized_root_entry(),
             Self::Surface(surface) => surface.as_normalized_root_entry(),
-        }
-    }
-
-    #[expect(
-        dead_code,
-        reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-    )]
-    pub fn name(self) -> &'a str {
-        match self {
-            Self::Canvas(canvas) => &canvas.name,
-            Self::Surface(surface) => &surface.name,
-        }
-    }
-
-    #[expect(
-        dead_code,
-        reason = "Retain compiler metadata and shared support APIs used by other compilation paths."
-    )]
-    pub fn kind(self) -> &'static str {
-        match self {
-            Self::Canvas(_) => "canvas",
-            Self::Surface(_) => "surface",
         }
     }
 }
 
 impl Program {
     pub fn root_entries(&self) -> impl Iterator<Item = RootEntryRef<'_>> {
-        self.canvases
+        self.raster_entries
             .iter()
-            .map(RootEntryRef::Canvas)
+            .map(RootEntryRef::Raster)
             .chain(self.surfaces.iter().map(RootEntryRef::Surface))
     }
 }
@@ -1885,7 +1852,7 @@ pub struct ConstDecl {
 /// optional here: a struct-typed global param (e.g. `param frame: FrameGlobals`)
 /// has no meaningful compile-time default since the host supplies every field
 /// at runtime. Scalar/array/texture-typed global params behave exactly like
-/// their canvas/surface-scoped counterparts and are declared into every
+/// their entry-scoped (raster entry/surface) counterparts and are declared into every
 /// checking context that references them.
 #[derive(Debug, Clone)]
 pub struct GlobalParamDecl {

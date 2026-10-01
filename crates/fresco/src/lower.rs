@@ -36,7 +36,7 @@ use crate::material_hir::MaterialHir;
 
 // Internal resource classes: parameters, textures, storage/path buffers, and globals.
 // ResourceLayout relocates these classes to engine-declared groups after lowering.
-pub(crate) const CANVAS_STORAGE_GROUP: u32 = 2;
+pub(crate) const STORAGE_BUFFER_GROUP: u32 = 2;
 
 mod canvas;
 mod cellular;
@@ -52,13 +52,13 @@ mod space;
 mod surface;
 
 use canvas::{
-    lower_canvas_entry_fn, lower_canvas_pass_entry_fn, lower_path_arc_sample_fn,
-    lower_path_nearest_fn, lower_scatter_body_fn, lower_scene_fn, lower_scene_pass_fn,
+    lower_path_arc_sample_fn, lower_path_nearest_fn, lower_raster_entry_fn,
+    lower_raster_pass_entry_fn, lower_scatter_body_fn, lower_scene_fn, lower_scene_pass_fn,
     lower_user_helper_fn,
 };
 
-pub(crate) fn pass_target_texture_name(canvas_name: &str, target_id: usize) -> String {
-    format!("__fresco_pass_target_{canvas_name}_{target_id}")
+pub(crate) fn pass_target_texture_name(entry_name: &str, target_id: usize) -> String {
+    format!("__fresco_pass_target_{entry_name}_{target_id}")
 }
 
 fn subgraph_stays_in_pass(
@@ -157,7 +157,7 @@ pub struct Stats {
 type GlowWarpCache =
     HashMap<(ShapeId, Handle<Ex>, Handle<Ex>, Handle<Ex>), (Handle<Ex>, Handle<Ex>)>;
 
-/// Output of the lowering pass: the naga module, per-canvas stats, and a map
+/// Output of the lowering pass: the naga module, per-entry stats, and a map
 /// from texture name to its binding index in the texture allocation class (sampler is binding 0).
 pub struct LoweringResult {
     pub module: naga::Module,
@@ -165,13 +165,13 @@ pub struct LoweringResult {
     /// `name -> binding_index` in `@group(1)`. The sampler is always at
     /// `@group(1) @binding(0)`; the first texture is at binding 1, etc.
     pub tex_bindings: HashMap<String, u32>,
-    /// `canvas_name -> (target_id -> binding_index)` for compiler-internal
+    /// `entry_name -> (target_id -> binding_index)` for compiler-internal
     /// pass-target textures used by multi-pass replay.
     pub pass_target_bindings: HashMap<String, HashMap<usize, u32>>,
-    /// `canvas_name:path_index -> binding_index` in `@group(2)` for path
+    /// `entry_name:path_index -> binding_index` in `@group(2)` for path
     /// segment tables lowered as storage buffers.
     pub path_bindings: HashMap<String, u32>,
-    /// `canvas_name:param_name -> binding_index` in `@group(0)` for dynamic
+    /// `entry_name:param_name -> binding_index` in `@group(0)` for dynamic
     /// array params lowered as storage buffers.
     pub param_bindings: HashMap<String, u32>,
     /// `global_param_name -> binding_index` in `@group(3)` for struct-typed
@@ -257,7 +257,7 @@ struct IrBuilder {
     px: Handle<Ex>,
     aa: Handle<Ex>,
     /// Footprint Jacobian matrix elements for gradient-driven filtering (§3.8, §24.1).
-    /// These are computed from the canvas_space chain and represent the derivative
+    /// These are composed from active `in space` transforms and represent the derivative
     /// of the sample mapping. The parallelogram spanned by the columns `[j11, j21]`
     /// and `[j12, j22]` is the footprint — the region of local space one output pixel covers.
     /// Stored row-major as `[j11, j12, j21, j22]`.
@@ -356,7 +356,7 @@ impl LowerCaches {
 struct FnCtx<'h> {
     hir: &'h Hir,
     ir: IrBuilder,
-    /// True when Sx::Param resolves to immutable canvas/runtime parameters.
+    /// True when Sx::Param resolves to immutable entry/runtime parameters.
     /// Helper and scatter-lowering contexts set this false because their
     /// param slots include mutable locals.
     params_are_immutable: bool,
@@ -492,13 +492,13 @@ struct CellGeometryCtx {
     dy: Handle<Ex>,
 }
 
-/// Lower all HIR canvases in one naga module, reading `FRESCO_LOWERING_POLICY`
+/// Lower all HIR raster entries and surfaces in one naga module, reading `FRESCO_LOWERING_POLICY`
 /// from the environment to choose between `Readable` (default) and `Compact`
 /// output. Prefer [`lower_all_with_policy`] when you need deterministic
 /// behaviour in tests or host-controlled rendering.
 /// Build one real `var<uniform>` struct-typed global per unique struct-typed
 /// global `param` (e.g. `param frame: FrameGlobals`), shared across every
-/// canvas/surface in the compile so `frame.time`-style field reads all
+/// raster entry/surface in the compile so `frame.time`-style field reads all
 /// resolve to the same naga global.
 ///
 /// Placed at `@group(3)`, one binding index per unique global name, to avoid
@@ -788,7 +788,7 @@ pub fn lower_all_with_policy(
         })
         .collect();
 
-    for (canvas_idx, (hir, pass_plan)) in hirs.iter().zip(pass_plans.iter()).enumerate() {
+    for (entry_idx, (hir, pass_plan)) in hirs.iter().zip(pass_plans.iter()).enumerate() {
         let mut t = t;
         if let Some(context) = &hir.entry_context {
             t.entry_context = Some(builder.register_context_type(&context.ty, &t).0);
@@ -840,7 +840,7 @@ pub fn lower_all_with_policy(
                             access: naga::StorageAccess::LOAD,
                         },
                         binding: Some(naga::ResourceBinding {
-                            group: CANVAS_STORAGE_GROUP,
+                            group: STORAGE_BUFFER_GROUP,
                             binding: next_storage_binding,
                         }),
                         ty: array_ty,
@@ -870,7 +870,7 @@ pub fn lower_all_with_policy(
 
             let array_ty = builder.module.types.insert(
                 naga::Type {
-                    name: Some(format!("FrescoPathSegArray_c{canvas_idx}_p{path_idx}")),
+                    name: Some(format!("FrescoPathSegArray_c{entry_idx}_p{path_idx}")),
                     inner: naga::TypeInner::Array {
                         base: path_seg_ty,
                         size: naga::ArraySize::Constant(seg_count),
@@ -985,7 +985,7 @@ pub fn lower_all_with_policy(
 
                     let constant = builder.module.constants.append(
                         naga::Constant {
-                            name: Some(format!("fresco_path_c{canvas_idx}_p{path_idx}")),
+                            name: Some(format!("fresco_path_c{entry_idx}_p{path_idx}")),
                             ty: array_ty,
                             init: array_init,
                         },
@@ -1003,12 +1003,12 @@ pub fn lower_all_with_policy(
                 crate::hir::PathStorageDecision::BufferExceedsConstThreshold => {
                     let global = builder.module.global_variables.append(
                         naga::GlobalVariable {
-                            name: Some(format!("fresco_path_buf_c{canvas_idx}_p{path_idx}")),
+                            name: Some(format!("fresco_path_buf_c{entry_idx}_p{path_idx}")),
                             space: naga::AddressSpace::Storage {
                                 access: naga::StorageAccess::LOAD,
                             },
                             binding: Some(naga::ResourceBinding {
-                                group: CANVAS_STORAGE_GROUP,
+                                group: STORAGE_BUFFER_GROUP,
                                 binding: next_storage_binding,
                             }),
                             ty: array_ty,
@@ -1161,7 +1161,7 @@ pub fn lower_all_with_policy(
         let base_scene_key = scene_function_dedup_key(&scene_fn);
         let base_scene_handle = builder.push_function(scene_fn);
         let mut scene_helper_cache = vec![(base_scene_key, base_scene_handle)];
-        let entry_fn = lower_canvas_entry_fn(
+        let entry_fn = lower_raster_entry_fn(
             hir,
             &t,
             policy,
@@ -1223,7 +1223,7 @@ pub fn lower_all_with_policy(
                     handle
                 }
             };
-            let entry_fn = lower_canvas_pass_entry_fn(
+            let entry_fn = lower_raster_pass_entry_fn(
                 hir,
                 pass.id,
                 &t,
@@ -1313,9 +1313,9 @@ mod tests {
             "expected parse success: {parse_errs:#?}"
         );
         let program = program.unwrap_or_default();
-        let canvas = &program.canvases[0];
+        let entry = &program.raster_entries[0];
         let (hir, diags) = crate::check::check(
-            &canvas.as_normalized_root_entry(),
+            &entry.as_normalized_root_entry(),
             &program.functions,
             &program.consts,
             &program.enums,
@@ -1420,9 +1420,9 @@ mod tests {
             "expected parse success: {parse_errs:#?}"
         );
         let program = program.unwrap_or_default();
-        let canvas = &program.canvases[0];
+        let entry = &program.raster_entries[0];
         let (hir, diags) = crate::check::check(
-            &canvas.as_normalized_root_entry(),
+            &entry.as_normalized_root_entry(),
             &program.functions,
             &program.consts,
             &program.enums,

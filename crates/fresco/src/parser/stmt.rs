@@ -1313,7 +1313,7 @@ fn stmt_parser_with_casts<'src>(preserve_casts: bool) -> PBox<'src, Stmt> {
         let expr_stmt = expr.clone().map(Stmt::Expr).boxed();
 
         // Local fn declaration: `fn name(params) -> ty { body }`
-        // Parsed as a statement so helpers can be defined inside canvas/fn bodies.
+        // Parsed as a statement so helpers can be defined inside entry/fn bodies.
         let local_fn_param = select! { Token::Attribute(name) if name == "context" => () }
             .or_not()
             .then(ident_sp

@@ -103,7 +103,7 @@ impl<'h> FnCtx<'h> {
             p = match xf {
                 Xform::Cellular(cells) => self.enter_cellular(p, cells),
                 Xform::Rotate { angle, around } => {
-                    // p' = C + R(-θ)(p - C), C = canvas center
+                    // p' = C + R(-θ)(p - C), C = frame center
                     let theta = self.sx_at(angle, p);
                     let ang = self.ir.neg(theta);
                     self.ir.name(ang, &format!("space_ang_t{index}"));

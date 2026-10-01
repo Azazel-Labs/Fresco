@@ -766,8 +766,6 @@ mod tests {
                 projective_footprint_max_px: 64.0,
                 shape_aa_style: ShapeAaStyle::Gradient,
             }),
-            canvas_space: None,
-            canvas_jacobian: None,
             shapes: Vec::new(),
             layers: Vec::new(),
             layer_locality: Vec::new(),

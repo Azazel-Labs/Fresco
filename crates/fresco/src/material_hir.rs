@@ -100,7 +100,7 @@ pub struct MaterialHir {
     pub notes: Vec<String>,
     /// Struct-typed global `param` declarations visible to this surface,
     /// carried for lowering (real `var<uniform>` buffer creation, shared
-    /// with canvas `Hir`s in the same compile) and manifest emission.
+    /// with raster entry `Hir`s in the same compile) and manifest emission.
     pub global_uniforms: Vec<crate::check::GlobalUniformDef>,
 }
 

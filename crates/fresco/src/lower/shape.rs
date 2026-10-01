@@ -344,7 +344,7 @@ impl<'h> FnCtx<'h> {
                 self.ir.mul(sum, inv2)
             }
             Shape::LineFamily { .. } | Shape::GridLine { .. } => {
-                // Line families are infinite; use canvas center as anchor.
+                // Line families are infinite; use the frame center as anchor.
                 let half = self.ir.lit(0.5);
                 let half_y = self.ir.lit(0.5);
                 self.ir.vec2(half, half_y)

@@ -455,7 +455,7 @@ pub fn render(
 
             let engine_stages = hirs
                 .iter()
-                .map(|hir| super::engine_pass::for_canvas(hir, pass_decls, pipelines))
+                .map(|hir| super::engine_pass::for_raster_entry(hir, pass_decls, pipelines))
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(EmitError::ExecutablePass)?;
             if engine_stages.iter().any(Option::is_some) {
@@ -936,35 +936,36 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
                             .collect::<Vec<_>>();
                         (!entries.is_empty()).then_some(entries)
                     };
-                    let engine_pass = super::engine_pass::for_canvas(hir, pass_decls, pipelines)
-                        .map_err(EmitError::ExecutablePass)?
-                        .map(|stage| ManifestEnginePass {
-                            pipeline: stage.pipeline,
-                            pass: stage.pass,
-                            interface: stage.interface,
-                            vertex_entry: stage.vertex_entry,
-                            fragment_entry: stage.fragment_entry,
-                            vertex_count: 3,
-                            instance_uniform_group: resource_layout.0[0],
-                            instance_uniform_binding: 0,
-                            variants: stage
-                                .variants
-                                .into_iter()
-                                .map(|variant| ManifestEnginePassVariant {
-                                    key: variant.key,
-                                    bindings: variant
-                                        .bindings
-                                        .into_iter()
-                                        .map(|(axis, value)| ManifestEnginePassVariantBinding {
-                                            axis,
-                                            value,
-                                        })
-                                        .collect(),
-                                    vertex_entry: variant.vertex_entry,
-                                    fragment_entry: variant.fragment_entry,
-                                })
-                                .collect(),
-                        });
+                    let engine_pass =
+                        super::engine_pass::for_raster_entry(hir, pass_decls, pipelines)
+                            .map_err(EmitError::ExecutablePass)?
+                            .map(|stage| ManifestEnginePass {
+                                pipeline: stage.pipeline,
+                                pass: stage.pass,
+                                interface: stage.interface,
+                                vertex_entry: stage.vertex_entry,
+                                fragment_entry: stage.fragment_entry,
+                                vertex_count: 3,
+                                instance_uniform_group: resource_layout.0[0],
+                                instance_uniform_binding: 0,
+                                variants: stage
+                                    .variants
+                                    .into_iter()
+                                    .map(|variant| ManifestEnginePassVariant {
+                                        key: variant.key,
+                                        bindings: variant
+                                            .bindings
+                                            .into_iter()
+                                            .map(|(axis, value)| ManifestEnginePassVariantBinding {
+                                                axis,
+                                                value,
+                                            })
+                                            .collect(),
+                                        vertex_entry: variant.vertex_entry,
+                                        fragment_entry: variant.fragment_entry,
+                                    })
+                                    .collect(),
+                            });
 
                     Ok(ManifestCanvas {
                         name: hir.name.clone(),

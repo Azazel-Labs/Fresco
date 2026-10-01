@@ -203,8 +203,8 @@ pub fn attach_leading_fn_docs(src: &str, program: &mut Program) {
         }
     }
 
-    for canvas in &mut program.canvases {
-        attach_docs_to_stmt_block(src, &mut canvas.body);
+    for entry in &mut program.raster_entries {
+        attach_docs_to_stmt_block(src, &mut entry.body);
     }
 
     for surface in &mut program.surfaces {
@@ -240,7 +240,7 @@ pub(crate) fn identifier_token(token: &Token) -> Option<&str> {
         Token::Layer => "layer",
         // Shading hooks use `surface` for their prepared material argument.
         Token::Surface => "surface",
-        // The interface-first canvas contract reuses `canvas` as a named contract type,
+        // The legacy interface-first contract form reuses `canvas` as a named contract type,
         // so it must also parse as an identifier in those contexts.
         Token::Canvas => "canvas",
         // `at` is also used as a named argument label (e.g. `stop(at: 0.0)`)
