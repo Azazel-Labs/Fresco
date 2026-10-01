@@ -1,5 +1,5 @@
 //! Resolve authored GPU state using the existing bounded constant evaluator.
-use crate::ast::find_attr;
+use crate::ast::{attrs_named, find_attr};
 use crate::{
     ast::{Expr, Program, Spanned, Stmt, SurfaceSettings},
     diag::Diag,
@@ -145,11 +145,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                     true
                 };
                 if selected {
-                    for requirement in step
-                        .attrs
-                        .iter()
-                        .filter(|a| a.name == "implementation_require")
-                    {
+                    for requirement in attrs_named(&step.attrs, "implementation_require") {
                         let [expression] = requirement.expressions.as_slice() else {
                             return Err(vec![Diag::error(
                                 requirement.span.clone(),
@@ -169,7 +165,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                         }
                     }
                 }
-                let conditions: Vec<_> = step.attrs.iter().filter(|a| a.name == "when").collect();
+                let conditions: Vec<_> = attrs_named(&step.attrs, "when").collect();
                 if conditions.len() > 1 {
                     return Err(vec![Diag::error(
                         step.span.clone(),

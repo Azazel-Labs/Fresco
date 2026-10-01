@@ -1,6 +1,5 @@
 //! Selected compute calls become independent, material-owned GPU programs.
 use super::*;
-use crate::ast::has_attr;
 use fresco_artifact::{
     ComputeScalarType, ManifestComputeArgument as Argument, ManifestComputeInvocation,
     ManifestComputeOutput,
@@ -102,7 +101,10 @@ pub(super) fn instantiate(
     )?;
     kernel.pass.name = invocation_name(surface, style, ordinal as usize);
     kernel.pass.material_name = None;
-    kernel.pass.attrs.push(attr("shader", vec![]));
+    kernel
+        .pass
+        .attrs
+        .push(PipelineAttribute::synthetic("shader", vec![], 0..0));
     let (_, reflection) = kernel.emit(context).map_err(|m| fail(&call.span, m))?;
     let entry = reflection.entries.first().expect("validated compute entry");
     let reads = reflection
@@ -173,16 +175,12 @@ pub(super) fn instantiate(
                 resource_type: geometry.resource.name,
             }
         } else {
-            let renderer = context
-                .pipelines
-                .iter()
-                .find(|p| has_attr(&p.attrs, "selected_renderer"))
-                .ok_or_else(|| {
-                    fail(
-                        &call.span,
-                        "compute invocation requires a selected renderer",
-                    )
-                })?;
+            let renderer = context.selected_renderer().ok_or_else(|| {
+                fail(
+                    &call.span,
+                    "compute invocation requires a selected renderer",
+                )
+            })?;
             let provider = context
                 .style_providers
                 .iter()

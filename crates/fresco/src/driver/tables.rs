@@ -1,4 +1,5 @@
 //! Engine-declared, bundle-local tables of specialized surface records.
+use crate::ast::attrs_named;
 use crate::{
     ast::{Expr, StructDecl},
     material_hir::MaterialHir,
@@ -12,7 +13,7 @@ pub(super) fn build(
 ) -> Result<Vec<ManifestTable>, String> {
     let mut tables = Vec::new();
     for record in structs {
-        let attrs: Vec<_> = record.attrs.iter().filter(|a| a.name == "table").collect();
+        let attrs: Vec<_> = attrs_named(&record.attrs, "table").collect();
         if attrs.is_empty() {
             continue;
         }

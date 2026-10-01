@@ -1,5 +1,5 @@
 //! Engine-owned mesh preparation and resource aggregate contracts.
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, find_attr, has_attr};
 use crate::{ast::*, diag::Diag};
 use std::collections::BTreeSet;
 
@@ -251,8 +251,7 @@ pub(super) fn producer<'a>(
     if !program.vertex_interfaces.iter().any(|i| i.name == *input) {
         return Err("preparation input must be a declared vertex interface".into());
     }
-    let declared = find_attr(&pass.attrs, "factory")
-        .and_then(|a| a.args.first())
+    let declared = attr_arg(&pass.attrs, "factory")
         .ok_or("preparation pass must declare its vertex factory")?;
     if factory.is_some_and(|f| f != declared) {
         return Err(format!(
@@ -356,9 +355,7 @@ pub(super) fn select_resource(
         let (capability, _) = member(program, contract, &name)?
             .ok_or("prepared geometry must be supplied by an engine capability")?;
         let renderer = program
-            .pipelines
-            .iter()
-            .find(|p| has_attr(&p.attrs, "selected_renderer"))
+            .selected_renderer()
             .ok_or("prepared geometry requires a selected renderer")?;
         let provider = program
             .style_providers

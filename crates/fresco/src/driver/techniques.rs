@@ -1,6 +1,6 @@
 //! Reusable executable pipelines independent of renderer and material selection.
 use crate::ast::PipelineDecl;
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, attrs_named, has_attr};
 use fresco_artifact::{
     ManifestDispatchExtent, ManifestDrawCount, ManifestGpuProgram, ManifestImageExtent,
     ManifestResourceSource, ManifestResourceType, ManifestTechnique, ManifestTechniqueOperation,
@@ -47,11 +47,7 @@ fn build(
     pipeline: &PipelineDecl,
     programs: &[ManifestGpuProgram],
 ) -> Result<ManifestTechnique, String> {
-    let marker: Vec<_> = pipeline
-        .attrs
-        .iter()
-        .filter(|a| a.name == "technique")
-        .collect();
+    let marker: Vec<_> = attrs_named(&pipeline.attrs, "technique").collect();
     if marker.len() != 1 || !marker[0].args.is_empty() {
         return Err("requires one argument-free @technique".into());
     }
@@ -152,8 +148,7 @@ fn build(
     let mut instances = BTreeMap::new();
     let mut enabled = BTreeMap::new();
     for reference in &mut recipe.pass_refs {
-        let name = find_attr(&reference.attrs, "node")
-            .and_then(|a| a.args.first())
+        let name = attr_arg(&reference.attrs, "node")
             .unwrap_or(&reference.name)
             .clone();
         if reference
@@ -679,7 +674,7 @@ pub(super) fn metadata(
     attrs: &[crate::ast::PipelineAttribute],
 ) -> Result<BTreeMap<String, String>, String> {
     let mut values = BTreeMap::new();
-    for attr in attrs.iter().filter(|a| a.name == "meta") {
+    for attr in attrs_named(attrs, "meta") {
         if attr.args.len() != 2
             || values
                 .insert(attr.args[0].clone(), attr.args[1].clone())

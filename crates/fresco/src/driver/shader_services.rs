@@ -1,4 +1,5 @@
 //! Link explicitly exported shader services through typed renderer providers.
+use crate::ast::find_attr_with_first_arg;
 use crate::ast::*;
 use fresco_artifact::{ManifestRecipeResource, ManifestRecipeStep};
 use std::collections::BTreeSet;
@@ -86,17 +87,6 @@ pub(super) fn source(
         node,
         pass: pass.name.clone(),
     })
-}
-
-fn attribute(name: &str, args: Vec<String>) -> PipelineAttribute {
-    PipelineAttribute {
-        name: name.into(),
-        args,
-        expressions: Vec::new(),
-        name_span: 0..0,
-        args_span: None,
-        span: 0..0,
-    }
 }
 
 /// Rewrite only resolved call sites. Source spans preserve overload resolution,
@@ -240,16 +230,10 @@ pub(super) fn link(
         Some((&parameter.ty, &methods)),
         &prefix,
     )?;
-    let incoming = renderer
-        .attrs
-        .iter()
-        .find(|a| a.name == "__style_incoming" && a.args.first().is_some_and(|n| n == point))
+    let incoming = find_attr_with_first_arg(&renderer.attrs, "__style_incoming", point)
         .ok_or("service invocation requires an explicit integration boundary")?;
     let mut incoming = incoming.args[1..].to_vec();
-    if let Some(queue) = renderer
-        .attrs
-        .iter()
-        .find(|a| a.name == "__style_queue" && a.args.first().is_some_and(|n| n == point))
+    if let Some(queue) = find_attr_with_first_arg(&renderer.attrs, "__style_queue", point)
         .and_then(|a| a.args.get(1))
     {
         let members: BTreeSet<_> = steps
@@ -315,7 +299,7 @@ pub(super) fn link(
         });
         super::style_operations::ensure_binding(pass, program, &linked_name, ty)
             .map_err(|d| format!("invalid service binding: {d:?}"))?;
-        renderer.attrs.push(attribute(
+        renderer.attrs.push(PipelineAttribute::synthetic(
             "__style_input",
             vec![
                 point.into(),
@@ -323,11 +307,18 @@ pub(super) fn link(
                 resource.clone(),
                 ty.clone(),
             ],
+            0..0,
         ));
-        attributes.push(attribute("input", vec![linked_name.clone(), ty.clone()]));
-        reference
-            .attrs
-            .push(attribute("bind", vec![linked_name.clone(), linked_name]));
+        attributes.push(PipelineAttribute::synthetic(
+            "input",
+            vec![linked_name.clone(), ty.clone()],
+            0..0,
+        ));
+        reference.attrs.push(PipelineAttribute::synthetic(
+            "bind",
+            vec![linked_name.clone(), linked_name],
+            0..0,
+        ));
     }
     Ok(closure.hooks)
 }

@@ -1,5 +1,5 @@
 //! Resolve authored group symbols independently of engine vocabulary.
-use crate::ast::has_attr;
+use crate::ast::{attrs_named, has_attr};
 use crate::{ast::Program, diag::Diag};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -40,7 +40,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 )));
             }
         }
-        let indices: Vec<_> = group.attrs.iter().filter(|a| a.name == "group").collect();
+        let indices: Vec<_> = attrs_named(&group.attrs, "group").collect();
         let index = match indices.as_slice() {
             [] => None,
             [attr] if attr.name == "group" && attr.args.len() == 1 => {
@@ -75,7 +75,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     let mut roles = BTreeSet::new();
     let role_names = ["parameters", "textures", "storage", "globals"];
     for group in &program.groups {
-        for attr in group.attrs.iter().filter(|a| a.name == "allocate") {
+        for attr in attrs_named(&group.attrs, "allocate") {
             let [role] = attr.args.as_slice() else {
                 return Err(vec![Diag::error(
                     attr.span.clone(),
@@ -119,11 +119,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
         .flat_map(|f| &mut f.bindings)
         .chain(program.passes.iter_mut().flat_map(|p| &mut p.bindings))
     {
-        let samplers: Vec<_> = binding
-            .attrs
-            .iter()
-            .filter(|a| a.name == "sampler")
-            .collect();
+        let samplers: Vec<_> = attrs_named(&binding.attrs, "sampler").collect();
         if !samplers.is_empty()
             && (samplers.len() != 1
                 || samplers[0].args.len() != 1
@@ -145,11 +141,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 "@sampler requires one standard sampler preset, a sampler type, and no other binding source",
             )]);
         }
-        let draw_data: Vec<_> = binding
-            .attrs
-            .iter()
-            .filter(|a| a.name == "draw_data")
-            .collect();
+        let draw_data: Vec<_> = attrs_named(&binding.attrs, "draw_data").collect();
         if !draw_data.is_empty()
             && (draw_data.len() != 1
                 || draw_data[0].args.as_slice() != ["instance_id"]
@@ -164,7 +156,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 "@draw_data(instance_id) requires uniform<u32> and no other binding source",
             )]);
         }
-        let groups: Vec<_> = binding.attrs.iter().filter(|a| a.name == "group").collect();
+        let groups: Vec<_> = attrs_named(&binding.attrs, "group").collect();
         let attr = match groups.as_slice() {
             [] => {
                 binding.group_index = None;
@@ -192,11 +184,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     {
         let mut used = BTreeSet::new();
         for binding in bindings.iter_mut() {
-            let attrs: Vec<_> = binding
-                .attrs
-                .iter()
-                .filter(|a| a.name == "binding")
-                .collect();
+            let attrs: Vec<_> = attrs_named(&binding.attrs, "binding").collect();
             binding.binding_index = match attrs.as_slice() {
                 [] => None,
                 [attr] if attr.args.len() == 1 => {

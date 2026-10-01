@@ -103,9 +103,7 @@ pub(super) fn for_surface(
     formats: &[VertexFormatDecl],
     factories: &[VertexFactoryDecl],
 ) -> Result<Vec<MeshStage>, String> {
-    let selected = pipelines
-        .iter()
-        .find(|p| has_attr(&p.attrs, "selected_renderer"));
+    let selected = pipelines.iter().find(|p| p.is_selected_renderer());
     let eligible: Vec<_> = passes
         .iter()
         .filter(|pass| {

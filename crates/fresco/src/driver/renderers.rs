@@ -1,5 +1,5 @@
 //! Engine-authored renderer catalog and compile configuration selection.
-use crate::ast::has_attr;
+use crate::ast::{attrs_named, has_attr};
 use crate::{
     ast::{Expr, PipelineAttribute, PipelineDecl, Program},
     diag::Diag,
@@ -11,11 +11,7 @@ pub(super) fn catalog(pipelines: &[PipelineDecl]) -> Result<Vec<ManifestRenderer
     let mut result = Vec::new();
     let mut ids = BTreeSet::new();
     for pipeline in pipelines {
-        let attrs: Vec<_> = pipeline
-            .attrs
-            .iter()
-            .filter(|a| a.name == "renderer")
-            .collect();
+        let attrs: Vec<_> = attrs_named(&pipeline.attrs, "renderer").collect();
         if attrs.is_empty() {
             continue;
         }
@@ -28,11 +24,7 @@ pub(super) fn catalog(pipelines: &[PipelineDecl]) -> Result<Vec<ManifestRenderer
         if !ids.insert(attr.args[0].clone()) {
             return Err(format!("duplicate renderer `{}`", attr.args[0]));
         }
-        let defaults: Vec<_> = pipeline
-            .attrs
-            .iter()
-            .filter(|a| a.name == "default")
-            .collect();
+        let defaults: Vec<_> = attrs_named(&pipeline.attrs, "default").collect();
         if defaults.len() > 1 || defaults.iter().any(|a| !a.args.is_empty()) {
             return Err("renderer requires at most one argument-free @default".into());
         }
@@ -44,7 +36,7 @@ pub(super) fn catalog(pipelines: &[PipelineDecl]) -> Result<Vec<ManifestRenderer
             id: attr.args[0].clone(),
             label: attr.args[1].clone(),
             pipeline: pipeline.name.clone(),
-            selected: has_attr(&pipeline.attrs, "selected_renderer"),
+            selected: pipeline.is_selected_renderer(),
             default: has_attr(&pipeline.attrs, "default"),
             passes: pipeline.passes.iter().map(|p| p.node.clone()).collect(),
         });
@@ -96,7 +88,7 @@ pub(super) fn select(program: &mut Program, requested: Option<&str>) -> Result<(
         .find(|p| p.name == selected.pipeline)
         .expect("catalog pipeline");
     let mut configured = BTreeSet::new();
-    for attr in pipeline.attrs.iter().filter(|a| a.name == "configure") {
+    for attr in attrs_named(&pipeline.attrs, "configure") {
         let [name, value] = attr.expressions.as_slice() else {
             return Err(vec![Diag::error(
                 attr.span.clone(),

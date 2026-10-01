@@ -1452,6 +1452,53 @@ pub fn find_attr<'a>(attrs: &'a [PipelineAttribute], name: &str) -> Option<&'a P
     attrs.iter().find(|attr| attr.name == name)
 }
 
+/// Every attribute in `attrs` named `name`, in source order.
+pub fn attrs_named<'a>(
+    attrs: &'a [PipelineAttribute],
+    name: &'a str,
+) -> impl Iterator<Item = &'a PipelineAttribute> + 'a {
+    attrs.iter().filter(move |attr| attr.name == name)
+}
+
+/// The first argument of the first attribute in `attrs` named `name`.
+#[must_use]
+pub fn attr_arg<'a>(attrs: &'a [PipelineAttribute], name: &str) -> Option<&'a String> {
+    find_attr(attrs, name).and_then(|attr| attr.args.first())
+}
+
+/// The first attribute in `attrs` named `name` whose first argument is `first`.
+#[must_use]
+pub fn find_attr_with_first_arg<'a>(
+    attrs: &'a [PipelineAttribute],
+    name: &str,
+    first: &str,
+) -> Option<&'a PipelineAttribute> {
+    attrs
+        .iter()
+        .find(|attr| attr.name == name && attr.first_arg_is(first))
+}
+
+impl PipelineAttribute {
+    /// A compiler-synthesized attribute with no checked expressions.
+    #[must_use]
+    pub fn synthetic(name: &str, args: Vec<String>, span: Span) -> Self {
+        Self {
+            name: name.into(),
+            args,
+            expressions: Vec::new(),
+            name_span: span.clone(),
+            args_span: None,
+            span,
+        }
+    }
+
+    /// Whether this attribute's first argument is `value`.
+    #[must_use]
+    pub fn first_arg_is(&self, value: &str) -> bool {
+        self.args.first().is_some_and(|arg| arg == value)
+    }
+}
+
 /// A staged binding-like declaration in a pass body.
 #[derive(Debug, Clone)]
 pub struct PassBindingDecl {
@@ -1646,6 +1693,14 @@ pub struct PipelineDecl {
     pub span: Span,
 }
 
+impl PipelineDecl {
+    /// Whether renderer selection marked this pipeline as the executable renderer.
+    #[must_use]
+    pub fn is_selected_renderer(&self) -> bool {
+        has_attr(&self.attrs, "selected_renderer")
+    }
+}
+
 /// Authored resource namespace; optional explicit GPU group assignment.
 #[derive(Debug, Clone)]
 pub struct ResourceGroupDecl {
@@ -1745,6 +1800,23 @@ impl Program {
             .iter()
             .map(RootEntryRef::Canvas)
             .chain(self.surfaces.iter().map(RootEntryRef::Surface))
+    }
+}
+
+impl Program {
+    /// The pipeline renderer selection marked executable, if any.
+    #[must_use]
+    pub fn selected_renderer(&self) -> Option<&PipelineDecl> {
+        self.pipelines
+            .iter()
+            .find(|pipeline| pipeline.is_selected_renderer())
+    }
+
+    /// Mutable access to the selected renderer pipeline, if any.
+    pub fn selected_renderer_mut(&mut self) -> Option<&mut PipelineDecl> {
+        self.pipelines
+            .iter_mut()
+            .find(|pipeline| pipeline.is_selected_renderer())
     }
 }
 

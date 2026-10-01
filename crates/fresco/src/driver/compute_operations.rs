@@ -241,11 +241,15 @@ pub(super) fn shader_definition_projected(
         let index = u32::try_from(pass.bindings.len())
             .map_err(|_| fail(&pass.span, "compute binding count overflow"))?;
         let mut attrs = vec![
-            attribute("group", vec!["0".into()], &pass.span),
-            attribute("binding", vec![index.to_string()], &pass.span),
+            PipelineAttribute::synthetic("group", vec!["0".into()], pass.span.clone()),
+            PipelineAttribute::synthetic("binding", vec![index.to_string()], pass.span.clone()),
         ];
         if write {
-            attrs.push(attribute("access", vec!["write".into()], &pass.span));
+            attrs.push(PipelineAttribute::synthetic(
+                "access",
+                vec!["write".into()],
+                pass.span.clone(),
+            ));
         }
         pass.bindings.push(PassBindingDecl {
             operation_alias: None,
@@ -514,13 +518,16 @@ pub(super) fn shader_definition_projected(
         let mut capture = prelude.clone();
         if has_attr(&hook.attrs, "compute") {
             let parameter = &mut hook.params[0];
-            parameter.attrs.push(attribute(
+            parameter.attrs.push(PipelineAttribute::synthetic(
                 "builtin",
                 vec!["global_invocation_id".into()],
-                &parameter.name_span,
+                parameter.name_span.clone(),
             ));
-            hook.attrs
-                .push(attribute("workgroup_size", workgroup.clone(), &hook.span));
+            hook.attrs.push(PipelineAttribute::synthetic(
+                "workgroup_size",
+                workgroup.clone(),
+                hook.span.clone(),
+            ));
             let id = &parameter.name;
             capture.push_str(&format!("if {id}.x >= __fresco_dispatch.x || {id}.y >= __fresco_dispatch.y || {id}.z >= __fresco_dispatch.z {{ return }}\n"));
         } else if !hook.attrs.is_empty() {
@@ -747,17 +754,6 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
     let shader = shader_definition(program, pass)?;
     shader.emit(program).map_err(|m| fail(&pass.span, m))?;
     Ok(())
-}
-
-fn attribute(name: &str, args: Vec<String>, span: &Span) -> PipelineAttribute {
-    PipelineAttribute {
-        name: name.into(),
-        args,
-        expressions: vec![],
-        name_span: span.clone(),
-        args_span: None,
-        span: span.clone(),
-    }
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! Named, stateless interface implementations and explicitly bound GPU dispatch.
 //! All contract and method names are authored vocabulary.
-use crate::ast::find_attr;
 use crate::ast::*;
+use crate::ast::{attr_arg, attrs_named};
 use crate::diag::Diag;
 use logos::Logos;
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,11 +25,7 @@ pub(super) fn catalog(program: &Program, contract: &str) -> Result<Vec<String>, 
     }
     let mut symbols = BTreeSet::new();
     for record in &program.structs {
-        let attrs: Vec<_> = record
-            .attrs
-            .iter()
-            .filter(|a| a.name == "implementation")
-            .collect();
+        let attrs: Vec<_> = attrs_named(&record.attrs, "implementation").collect();
         if attrs.is_empty() {
             continue;
         }
@@ -233,7 +229,7 @@ pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
     }
     for pass in &mut program.passes {
         for hook in &mut pass.hooks {
-            let attrs: Vec<_> = hook.attrs.iter().filter(|a| a.name == "dispatch").collect();
+            let attrs: Vec<_> = attrs_named(&hook.attrs, "dispatch").collect();
             if attrs.is_empty() {
                 continue;
             }
@@ -469,8 +465,7 @@ pub(super) fn specialize_draw_dispatch(
                 plan.contract, input.name
             );
             if declared_captures.insert(name.clone()) {
-                let factory = find_attr(&pass.attrs, "factory")
-                    .and_then(|a| a.args.first())
+                let factory = attr_arg(&pass.attrs, "factory")
                     .and_then(|name| factories.iter().find(|f| &f.name == name))
                     .ok_or_else(|| {
                         vec![Diag::error(

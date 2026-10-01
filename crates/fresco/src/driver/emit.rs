@@ -1,4 +1,4 @@
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, find_attr, has_attr};
 use std::collections::{BTreeSet, HashMap};
 use std::str::FromStr;
 
@@ -193,9 +193,7 @@ fn manifest_vertex_factories(
                 .bindings
                 .iter()
                 .map(|binding| {
-                    let group = find_attr(&binding.attrs, "group")
-                        .and_then(|attribute| attribute.args.first())
-                        .map(String::as_str);
+                    let group = attr_arg(&binding.attrs, "group").map(String::as_str);
                     let group_index = binding.group_index;
                     let binding_index = binding.binding_index;
                     ManifestVertexFactoryBinding {
@@ -206,9 +204,7 @@ fn manifest_vertex_factories(
                         draw_data: has_attr(&binding.attrs, "draw_data")
                             .then_some(fresco_artifact::ManifestDrawData::InstanceId),
                         geometry: None,
-                        source: find_attr(&binding.attrs, "source")
-                            .and_then(|a| a.args.first())
-                            .cloned(),
+                        source: attr_arg(&binding.attrs, "source").cloned(),
                         name: binding.name.clone(),
                         group: group.map(str::to_owned),
                         group_index,
@@ -1113,9 +1109,7 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
                                 group_index: b.group_index,
                                 binding: b.binding_index,
                                 signature: b.value_signature.clone(),
-                                source: find_attr(&b.attrs, "source")
-                                    .and_then(|a| a.args.first())
-                                    .cloned(),
+                                source: attr_arg(&b.attrs, "source").cloned(),
                             })
                             .collect(),
                         entries: stage.entries,

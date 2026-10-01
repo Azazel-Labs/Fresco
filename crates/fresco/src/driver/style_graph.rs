@@ -1,5 +1,5 @@
 //! Validate engine graph contracts before lowering their explicit integration points.
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, attrs_named, has_attr};
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestRecipeResource, ManifestRecipeStep};
 use std::collections::{BTreeMap, BTreeSet};
@@ -157,16 +157,6 @@ pub(super) fn precedes(steps: &[ManifestRecipeStep], before: &str, after: &str) 
     }
     false
 }
-fn attr(name: &str, args: Vec<String>) -> PipelineAttribute {
-    PipelineAttribute {
-        name: name.into(),
-        args,
-        expressions: vec![],
-        name_span: 0..0,
-        args_span: None,
-        span: 0..0,
-    }
-}
 pub(super) fn bindings<'a>(
     program: &'a Program,
     step: &ManifestRecipeStep,
@@ -176,9 +166,7 @@ pub(super) fn bindings<'a>(
         return vec![];
     };
     let mut result: Vec<_> = pass.bindings.iter().collect();
-    let declared = find_attr(&pass.attrs, "factory")
-        .and_then(|a| a.args.first())
-        .map(String::as_str);
+    let declared = attr_arg(&pass.attrs, "factory").map(String::as_str);
     let selected = if step.is_draw_scoped() {
         factory_override.or(declared)
     } else {
@@ -754,21 +742,29 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
             }
         }
         let key = format!("{}::{}", contract.name, point.name);
-        lowered.push(attr("__style_point", vec![key.clone()]));
+        lowered.push(PipelineAttribute::synthetic(
+            "__style_point",
+            vec![key.clone()],
+            0..0,
+        ));
         if let Some(queue) = &queue {
-            lowered.push(attr("__style_queue", vec![key.clone(), queue.clone()]));
+            lowered.push(PipelineAttribute::synthetic(
+                "__style_queue",
+                vec![key.clone(), queue.clone()],
+                0..0,
+            ));
         }
         let mut join = vec![key.clone()];
         join.extend(incoming.clone());
-        lowered.push(attr("__style_incoming", join));
+        lowered.push(PipelineAttribute::synthetic("__style_incoming", join, 0..0));
         let mut next = vec![key.clone()];
         next.extend(outgoing.clone());
-        lowered.push(attr("__style_outgoing", next));
+        lowered.push(PipelineAttribute::synthetic("__style_outgoing", next, 0..0));
         for input in &contract.inputs {
             if program.interfaces.iter().any(|i| i.name == input.ty) {
                 continue;
             }
-            lowered.push(attr(
+            lowered.push(PipelineAttribute::synthetic(
                 "__style_input",
                 vec![
                     key.clone(),
@@ -776,6 +772,7 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
                     inputs[&input.name].clone(),
                     compact(&input.ty),
                 ],
+                0..0,
             ));
         }
         let mut attachment_resources = BTreeSet::new();
@@ -916,7 +913,7 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
                     "attachment `{resource}` has no downstream consumer"
                 ));
             }
-            lowered.push(attr(
+            lowered.push(PipelineAttribute::synthetic(
                 "__style_input",
                 vec![
                     key.clone(),
@@ -924,6 +921,7 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
                     resource.clone(),
                     compact(&member.ty_name),
                 ],
+                0..0,
             ));
             if let Some(port) = port(point)? {
                 let storage_writers = steps
@@ -1153,22 +1151,18 @@ pub(super) fn requirements(program: &Program) -> Result<(), Vec<Diag>> {
             {
                 continue;
             }
-            let renderer = program
-                .pipelines
-                .iter()
-                .find(|p| has_attr(&p.attrs, "selected_renderer"))
-                .ok_or_else(|| {
-                    vec![
-                        Diag::error(
-                            style.name_span.clone(),
-                            format!(
-                                "style `{}` requires a `{}` provider and an executable renderer",
-                                style.name, style.contract
-                            ),
-                        )
-                        .with_file(&style.source_file),
-                    ]
-                })?;
+            let renderer = program.selected_renderer().ok_or_else(|| {
+                vec![
+                    Diag::error(
+                        style.name_span.clone(),
+                        format!(
+                            "style `{}` requires a `{}` provider and an executable renderer",
+                            style.name, style.contract
+                        ),
+                    )
+                    .with_file(&style.source_file),
+                ]
+            })?;
             let provider = program
                 .style_providers
                 .iter()
@@ -1345,11 +1339,7 @@ fn predicate(expression: &SExpr) -> Result<SExpr, Vec<Diag>> {
 
 pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
     for pipeline in &program.pipelines {
-        for marker in pipeline
-            .attrs
-            .iter()
-            .filter(|a| a.name == "__style_operation")
-        {
+        for marker in attrs_named(&pipeline.attrs, "__style_operation") {
             let [contract, _, point] = marker.args.as_slice() else {
                 return Err(vec![Diag::error(
                     marker.span.clone(),
@@ -1408,7 +1398,7 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                 }
                 let mut validation = pipeline.clone();
                 validation.attrs.clear();
-                for input in pipeline.attrs.iter().filter(|a| a.name == "input") {
+                for input in attrs_named(&pipeline.attrs, "input") {
                     let [name, ty] = input.args.as_slice() else {
                         return Err("contribution input requires name and type".into());
                     };
@@ -1417,9 +1407,11 @@ pub(super) fn operation_inputs(program: &Program) -> Result<(), Vec<Diag>> {
                             "incompatible contribution input `{name}` of type `{ty}`"
                         ));
                     }
-                    validation
-                        .attrs
-                        .push(attr("external", vec![name.clone(), ty.clone()]));
+                    validation.attrs.push(PipelineAttribute::synthetic(
+                        "external",
+                        vec![name.clone(), ty.clone()],
+                        0..0,
+                    ));
                 }
                 let (_, steps) = super::recipes::reflect(&validation)?;
                 for step in &steps {
@@ -1839,9 +1831,11 @@ provide Response for renderer {
         .vertex_factories
         .remove(0);
         factory.bindings = std::mem::take(&mut program.passes[0].bindings);
-        program.passes[0]
-            .attrs
-            .push(attr("factory", vec![factory.name.clone()]));
+        program.passes[0].attrs.push(PipelineAttribute::synthetic(
+            "factory",
+            vec![factory.name.clone()],
+            0..0,
+        ));
         let mut incompatible = factory.clone();
         incompatible.name = "different_layout".into();
         incompatible.bindings[0].value_signature = Some("uniform<vec4>".into());

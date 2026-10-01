@@ -20,9 +20,7 @@ pub(in crate::driver) fn build(
     {
         return Ok(Vec::new());
     }
-    let selected = pipelines
-        .iter()
-        .find(|p| has_attr(&p.attrs, "selected_renderer"));
+    let selected = pipelines.iter().find(|p| p.is_selected_renderer());
     passes
         .iter()
         .filter(|pass| {

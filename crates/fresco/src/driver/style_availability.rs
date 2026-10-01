@@ -1,14 +1,10 @@
 //! Compatibility reflection uses the same selected graph expansion as compilation.
 //! Probes never mutate the executable program or instantiate runtime work.
-use crate::ast::has_attr;
 use crate::ast::{Expr, MaterialReturnTy, Program, Spanned};
 use fresco_artifact::{ManifestCapabilityAvailability, ManifestImplementationAvailability};
 
 pub(super) fn reflect(program: &mut Program, context: &Program) {
-    let renderer = context
-        .pipelines
-        .iter()
-        .find(|p| has_attr(&p.attrs, "selected_renderer"));
+    let renderer = context.selected_renderer();
     for surface in &mut program.surfaces {
         let original = context
             .surfaces

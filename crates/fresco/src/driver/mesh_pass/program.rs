@@ -1,6 +1,6 @@
 //! Typed, explicitly bound raster functions. Engine code owns evaluation order.
 use super::*;
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, attrs_named, has_attr};
 use fresco_artifact::{ManifestRasterEntry, ManifestStageOutput};
 
 fn canonical(name: &str) -> String {
@@ -1241,7 +1241,7 @@ pub(super) fn emit(
             })
             .collect::<Result<Vec<_>, String>>()?
             .join(", ");
-        let evaluators: Vec<_> = hook.attrs.iter().filter(|a| a.name == "evaluate").collect();
+        let evaluators: Vec<_> = attrs_named(&hook.attrs, "evaluate").collect();
         let body = if !evaluators.is_empty() {
             let [attr] = evaluators.as_slice() else {
                 return Err("duplicate evaluator binding".into());
@@ -1406,7 +1406,7 @@ pub(in crate::driver) fn service_closure(
         hooks: Vec::new(),
         resources: BTreeSet::new(),
     };
-    let exports: Vec<_> = pass.attrs.iter().filter(|a| a.name == "service").collect();
+    let exports: Vec<_> = attrs_named(&pass.attrs, "service").collect();
     let iterator_roots: Vec<_> = pass
         .hooks
         .iter()
@@ -1421,8 +1421,7 @@ pub(in crate::driver) fn service_closure(
     if exports.is_empty() && (iterator_roots.is_empty() || pass.operation.is_some()) {
         return Ok(linked);
     }
-    let factory = find_attr(&pass.attrs, "factory")
-        .and_then(|a| a.args.first())
+    let factory = attr_arg(&pass.attrs, "factory")
         .map(|name| {
             program
                 .vertex_factories

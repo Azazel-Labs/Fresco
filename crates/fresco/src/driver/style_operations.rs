@@ -1,5 +1,5 @@
 //! Instantiate authored draw operations from a statically constructed style graph.
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, attrs_named, find_attr, find_attr_with_first_arg, has_attr};
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestImplementationSelection, ManifestStyleInvocation};
 use std::collections::{BTreeMap, BTreeSet};
@@ -8,16 +8,6 @@ mod captures;
 mod compute;
 
 const MAX_NODES: usize = 1024;
-fn attr(name: &str, args: Vec<String>) -> PipelineAttribute {
-    PipelineAttribute {
-        name: name.into(),
-        args,
-        expressions: vec![],
-        name_span: 0..0,
-        args_span: None,
-        span: 0..0,
-    }
-}
 fn fail(span: &Span, message: impl Into<String>) -> Vec<Diag> {
     vec![Diag::error(span.clone(), message)]
 }
@@ -1214,9 +1204,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     "draw operation requires an explicit vertex factory",
                 ));
             }
-            let factory_name = find_attr(&pass.attrs, "factory")
-                .and_then(|a| a.args.first())
-                .expect("checked factory attribute");
+            let factory_name = attr_arg(&pass.attrs, "factory").expect("checked factory attribute");
             let factory = program
                 .vertex_factories
                 .iter()
@@ -1347,15 +1335,9 @@ fn instantiate(
     }
     let point = format!("{}::{}", style.contract, call.point);
     let renderer = program
-        .pipelines
-        .iter_mut()
-        .find(|p| has_attr(&p.attrs, "selected_renderer"))
+        .selected_renderer_mut()
         .ok_or_else(|| fail(&call.span, "draw invocation requires a selected renderer"))?;
-    if !renderer
-        .attrs
-        .iter()
-        .any(|a| a.name == "__style_point" && a.args.first() == Some(&point))
-    {
+    if !find_attr_with_first_arg(&renderer.attrs, "__style_point", &point).is_some() {
         return Err(fail(
             &call.span,
             format!("selected renderer does not provide `{point}`"),
@@ -1383,7 +1365,7 @@ fn instantiate(
             .find(|p| p.name == geometry.producer_pass)
             .expect("checked preparation pass");
         pass.attrs
-            .extend(source.attrs.iter().filter(|a| a.name == "factory").cloned());
+            .extend(attrs_named(&source.attrs, "factory").cloned());
     }
     // Reusable operations have concrete defaults independent of material state.
     for (key, value) in [
@@ -1448,12 +1430,15 @@ fn instantiate(
         .expect("fragment")
         .name
         .clone();
-    reference
-        .attrs
-        .push(attr("draw", vec![vertex, fragment, "mesh".into()]));
-    let mut attributes = vec![attr(
+    reference.attrs.push(PipelineAttribute::synthetic(
+        "draw",
+        vec![vertex, fragment, "mesh".into()],
+        0..0,
+    ));
+    let mut attributes = vec![PipelineAttribute::synthetic(
         "__style_operation",
         vec![style.contract.clone(), style.name.clone(), point.clone()],
+        0..0,
     )];
     let mut prelude = super::prepared_geometry::bind_draw(context, &mut pass)?;
     let projections = captures::arguments(context, style, call)?;
@@ -1529,9 +1514,11 @@ fn instantiate(
                     "operation sampler conflicts with an authored binding source",
                 ));
             }
-            binding
-                .attrs
-                .push(attr("sampler", vec![preset.name().into()]));
+            binding.attrs.push(PipelineAttribute::synthetic(
+                "sampler",
+                vec![preset.name().into()],
+                0..0,
+            ));
             continue;
         }
         if let Some(producer) = call.resources.get(&parameter.name) {
@@ -1618,18 +1605,18 @@ fn instantiate(
                     &binding,
                     &format!("uniform<{}>", projection.root_ty),
                 )?;
-                if !attributes
-                    .iter()
-                    .any(|a| a.name == "input" && a.args.first() == Some(&projection.root))
-                {
-                    attributes.push(attr(
+                if find_attr_with_first_arg(&attributes, "input", &projection.root).is_none() {
+                    attributes.push(PipelineAttribute::synthetic(
                         "input",
                         vec![projection.root.clone(), projection.root_ty.clone()],
+                        0..0,
                     ));
                 }
-                reference
-                    .attrs
-                    .push(attr("bind", vec![binding.clone(), projection.root.clone()]));
+                reference.attrs.push(PipelineAttribute::synthetic(
+                    "bind",
+                    vec![binding.clone(), projection.root.clone()],
+                    0..0,
+                ));
                 binding
             } else {
                 let context = constant_program(context, &call.bindings);
@@ -1671,24 +1658,32 @@ fn instantiate(
                 .or_else(|| argument.strip_prefix(&format!("{}.", call.target)))
                 .unwrap_or(&argument)
                 .to_string();
-            if !attributes
-                .iter()
-                .any(|a| a.name == "input" && a.args.first() == Some(&input))
-            {
-                attributes.push(attr("input", vec![input.clone(), ty.clone()]));
+            if find_attr_with_first_arg(&attributes, "input", &input).is_none() {
+                attributes.push(PipelineAttribute::synthetic(
+                    "input",
+                    vec![input.clone(), ty.clone()],
+                    0..0,
+                ));
             }
             if ty.starts_with("attachment<") {
                 if ty.starts_with("attachment<depth") {
-                    reference.attrs.push(attr("depth", vec![input.clone()]));
+                    reference.attrs.push(PipelineAttribute::synthetic(
+                        "depth",
+                        vec![input.clone()],
+                        0..0,
+                    ));
                 } else {
-                    reference
-                        .attrs
-                        .push(attr("color", vec![color.to_string(), input.clone()]));
+                    reference.attrs.push(PipelineAttribute::synthetic(
+                        "color",
+                        vec![color.to_string(), input.clone()],
+                        0..0,
+                    ));
                     color += 1;
                 }
-                reference.attrs.push(attr(
+                reference.attrs.push(PipelineAttribute::synthetic(
                     "attachment",
                     vec![input, "load".into(), "store".into()],
+                    0..0,
                 ));
             } else {
                 ensure_binding(
@@ -1697,9 +1692,11 @@ fn instantiate(
                     &parameter.name,
                     &format!("uniform<{ty}>"),
                 )?;
-                reference
-                    .attrs
-                    .push(attr("bind", vec![parameter.name.clone(), input]));
+                reference.attrs.push(PipelineAttribute::synthetic(
+                    "bind",
+                    vec![parameter.name.clone(), input],
+                    0..0,
+                ));
             }
         }
     }
@@ -1796,9 +1793,10 @@ fn instantiate(
         }) {
             existing.args[0].clone()
         } else {
-            renderer.attrs.push(attr(
+            renderer.attrs.push(PipelineAttribute::synthetic(
                 "external",
                 vec![input.clone(), "style_parameters".into()],
+                0..0,
             ));
             input.clone()
         };
@@ -1807,15 +1805,22 @@ fn instantiate(
                 && a.args.first() == Some(&point)
                 && a.args.get(1) == Some(&input)
         }) {
-            renderer.attrs.push(attr(
+            renderer.attrs.push(PipelineAttribute::synthetic(
                 "__style_input",
                 vec![point, input.clone(), resource, "buffer<vec4>".into()],
+                0..0,
             ));
         }
-        attributes.push(attr("input", vec![input.clone(), "buffer<vec4>".into()]));
-        reference
-            .attrs
-            .push(attr("bind", vec!["__operation_settings".into(), input]));
+        attributes.push(PipelineAttribute::synthetic(
+            "input",
+            vec![input.clone(), "buffer<vec4>".into()],
+            0..0,
+        ));
+        reference.attrs.push(PipelineAttribute::synthetic(
+            "bind",
+            vec!["__operation_settings".into(), input],
+            0..0,
+        ));
     }
     for hook in &mut pass.hooks {
         let tokens = crate::lexer::lex_spanned(&prelude)
@@ -1853,8 +1858,7 @@ pub(super) fn ensure_binding(
     name: &str,
     ty: &str,
 ) -> Result<(), Vec<Diag>> {
-    let factory = find_attr(&pass.attrs, "factory")
-        .and_then(|a| a.args.first())
+    let factory = attr_arg(&pass.attrs, "factory")
         .and_then(|n| program.vertex_factories.iter().find(|f| f.name == *n))
         .ok_or_else(|| fail(&pass.span, "unknown operation vertex factory"))?;
     if let Some(binding) = pass
@@ -1894,8 +1898,8 @@ pub(super) fn ensure_binding(
         name: name.into(),
         name_span: pass.span.clone(),
         attrs: vec![
-            attr("group", vec![group.to_string()]),
-            attr("binding", vec![index.to_string()]),
+            PipelineAttribute::synthetic("group", vec![group.to_string()], 0..0),
+            PipelineAttribute::synthetic("binding", vec![index.to_string()], 0..0),
         ],
         value_signature: Some(ty.into()),
         span: pass.span.clone(),

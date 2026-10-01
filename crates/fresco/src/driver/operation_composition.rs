@@ -1,6 +1,6 @@
 //! Compose compiler-generated operation invocations at checked provider boundaries.
 //! These private graph records are not an alternative authoring syntax.
-use crate::ast::{find_attr, has_attr};
+use crate::ast::{attr_arg, attrs_named, find_attr_with_first_arg, has_attr};
 use crate::{
     ast::{PipelineAttribute, Program, Spanned},
     diag::Diag,
@@ -41,25 +41,14 @@ pub(super) fn reject_legacy_syntax(program: &Program) -> Result<(), Vec<Diag>> {
     }
 }
 
-fn attribute(name: &str, args: Vec<String>) -> PipelineAttribute {
-    PipelineAttribute {
-        name: name.into(),
-        args,
-        expressions: vec![],
-        name_span: 0..0,
-        args_span: None,
-        span: 0..0,
-    }
-}
 fn node(reference: &crate::ast::PipelinePassRef) -> String {
-    find_attr(&reference.attrs, "node")
-        .and_then(|a| a.args.first())
+    attr_arg(&reference.attrs, "node")
         .unwrap_or(&reference.name)
         .clone()
 }
 
 fn queue(reference: &crate::ast::PipelinePassRef) -> Option<&String> {
-    find_attr(&reference.attrs, "transparent_queue").and_then(|attr| attr.args.first())
+    attr_arg(&reference.attrs, "transparent_queue")
 }
 
 pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
@@ -69,7 +58,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
     // Validate published ports even if no implementation currently consumes them.
     for pipeline in &program.pipelines {
         let mut stages = BTreeSet::new();
-        for attr in pipeline.attrs.iter().filter(|a| a.name == "__style_point") {
+        for attr in attrs_named(&pipeline.attrs, "__style_point") {
             let [name] = attr.args.as_slice() else {
                 return Err("invalid checked operation point identity".into());
             };
@@ -78,7 +67,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
             }
         }
         let mut ports = BTreeSet::new();
-        for attr in pipeline.attrs.iter().filter(|a| a.name == "__style_input") {
+        for attr in attrs_named(&pipeline.attrs, "__style_input") {
             let [stage, name, resource, _ty] = attr.args.as_slice() else {
                 return Err("invalid checked operation input binding".into());
             };
@@ -128,11 +117,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
         .map(|s| (s.contract.clone(), s.symbol.clone()))
         .collect();
     for contribution in &contributions {
-        let markers: Vec<_> = contribution
-            .attrs
-            .iter()
-            .filter(|a| a.name == "__style_operation")
-            .collect();
+        let markers: Vec<_> = attrs_named(&contribution.attrs, "__style_operation").collect();
         let [marker] = markers.as_slice() else {
             return Err(
                 "operation graph requires one checked contract/implementation/point identity"
@@ -171,9 +156,11 @@ fn compose(program: &mut Program) -> Result<(), String> {
                     {
                         return Err("duplicate contribution input".into());
                     }
-                    validation
-                        .attrs
-                        .push(attribute("external", attr.args.clone()));
+                    validation.attrs.push(PipelineAttribute::synthetic(
+                        "external",
+                        attr.args.clone(),
+                        0..0,
+                    ));
                 }
                 _ => return Err(format!("unsupported contribution attribute @{}", attr.name)),
             }
@@ -198,12 +185,12 @@ fn compose(program: &mut Program) -> Result<(), String> {
         for pipeline in program
             .pipelines
             .iter_mut()
-            .filter(|p| has_attr(&p.attrs, "selected_renderer"))
+            .filter(|p| p.is_selected_renderer())
         {
             let ports: Vec<_> = pipeline
                 .attrs
                 .iter()
-                .filter(|a| a.name == "__style_point" && a.args.first() == Some(port))
+                .filter(|a| a.name == "__style_point" && a.first_arg_is(port))
                 .cloned()
                 .collect();
             let [_stage] = ports.as_slice() else {
@@ -211,28 +198,22 @@ fn compose(program: &mut Program) -> Result<(), String> {
                     "selected pipeline must provide exactly one stage `{port}` for `{symbol}`"
                 ));
             };
-            let transparent_queue = pipeline
-                .attrs
-                .iter()
-                .find(|a| a.name == "__style_queue" && a.args.first() == Some(port))
-                .and_then(|a| a.args.get(1))
-                .cloned();
+            let transparent_queue =
+                find_attr_with_first_arg(&pipeline.attrs, "__style_queue", port)
+                    .and_then(|a| a.args.get(1))
+                    .cloned();
             if transparent_queue.is_some() && steps.iter().any(|step| !step.after.is_empty()) {
                 return Err(
                     "globally sorted contributions cannot impose internal node ordering".into(),
                 );
             }
-            let mut incoming: Vec<_> = pipeline
-                .attrs
-                .iter()
-                .find(|a| a.name == "__style_incoming" && a.args.first() == Some(port))
-                .ok_or("operation point is missing its checked incoming boundary")?
-                .args[1..]
-                .to_vec();
-            let outgoing_boundary = pipeline
-                .attrs
-                .iter()
-                .find(|a| a.name == "__style_outgoing" && a.args.first() == Some(port));
+            let mut incoming: Vec<_> =
+                find_attr_with_first_arg(&pipeline.attrs, "__style_incoming", port)
+                    .ok_or("operation point is missing its checked incoming boundary")?
+                    .args[1..]
+                    .to_vec();
+            let outgoing_boundary =
+                find_attr_with_first_arg(&pipeline.attrs, "__style_outgoing", port);
             let outgoing: Vec<_> = outgoing_boundary
                 .ok_or("operation point is missing its checked outgoing boundary")?
                 .args[1..]
@@ -252,11 +233,8 @@ fn compose(program: &mut Program) -> Result<(), String> {
                     .iter()
                     .filter(|reference| queue(reference) == Some(name))
                 {
-                    for dependency in reference
-                        .attrs
-                        .iter()
-                        .filter(|attr| attr.name == "after")
-                        .filter_map(|attr| attr.args.first())
+                    for dependency in
+                        attrs_named(&reference.attrs, "after").filter_map(|attr| attr.args.first())
                     {
                         if !incoming.contains(dependency) {
                             incoming.push(dependency.clone());
@@ -269,12 +247,13 @@ fn compose(program: &mut Program) -> Result<(), String> {
                     .filter(|reference| queue(reference) == Some(name))
                 {
                     for dependency in &incoming {
-                        if !reference.attrs.iter().any(|attr| {
-                            attr.name == "after" && attr.args.first() == Some(dependency)
-                        }) {
-                            reference
-                                .attrs
-                                .push(attribute("after", vec![dependency.clone()]));
+                        if find_attr_with_first_arg(&reference.attrs, "after", dependency).is_none()
+                        {
+                            reference.attrs.push(PipelineAttribute::synthetic(
+                                "after",
+                                vec![dependency.clone()],
+                                0..0,
+                            ));
                         }
                     }
                 }
@@ -283,7 +262,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
             for attr in pipeline
                 .attrs
                 .iter()
-                .filter(|a| a.name == "__style_input" && a.args.first() == Some(port))
+                .filter(|a| a.name == "__style_input" && a.first_arg_is(port))
             {
                 let [_, name, resource, ty] = attr.args.as_slice() else {
                     return Err("invalid checked operation input binding".into());
@@ -339,9 +318,11 @@ fn compose(program: &mut Program) -> Result<(), String> {
                     || queue(reference).is_some_and(|name| outgoing_queues.contains(name))
                 {
                     for terminal in &terminals {
-                        reference
-                            .attrs
-                            .push(attribute("after", vec![terminal.clone()]));
+                        reference.attrs.push(PipelineAttribute::synthetic(
+                            "after",
+                            vec![terminal.clone()],
+                            0..0,
+                        ));
                     }
                 }
             }
@@ -373,22 +354,29 @@ fn compose(program: &mut Program) -> Result<(), String> {
                         attr.args[0].clone_from(target);
                     }
                 }
-                reference
-                    .attrs
-                    .push(attribute("node", vec![nodes[&original_node].clone()]));
+                reference.attrs.push(PipelineAttribute::synthetic(
+                    "node",
+                    vec![nodes[&original_node].clone()],
+                    0..0,
+                ));
                 if let Some(name) = &transparent_queue {
-                    reference
-                        .attrs
-                        .push(attribute("transparent_queue", vec![name.clone()]));
+                    reference.attrs.push(PipelineAttribute::synthetic(
+                        "transparent_queue",
+                        vec![name.clone()],
+                        0..0,
+                    ));
                 }
                 for dependency in incoming.iter().chain(&previous_nodes) {
-                    reference
-                        .attrs
-                        .push(attribute("after", vec![dependency.clone()]));
+                    reference.attrs.push(PipelineAttribute::synthetic(
+                        "after",
+                        vec![dependency.clone()],
+                        0..0,
+                    ));
                 }
-                reference.attrs.push(attribute(
+                reference.attrs.push(PipelineAttribute::synthetic(
                     "implementation_when",
                     vec![contract.clone(), symbol.clone()],
+                    0..0,
                 ));
                 expanded.push(reference);
             }
