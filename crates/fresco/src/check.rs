@@ -3430,20 +3430,13 @@ impl Checker {
 
     pub(super) fn scatter_rand_unit(&self, call_span: &Span) -> Option<Sx> {
         let scope = self.scatter_rand_scopes.last()?;
-        let id = Sx::Add(Box::new(Sx::ScatterInstanceId), Box::new(Sx::Lit(1.0)));
+        let id = Sx::ScatterInstanceId + Sx::Lit(1.0);
         let seed_term = Sx::Lit(scope.seed as f32 * 78.233);
         let salt_term = Sx::Lit(Self::scatter_rand_call_salt(call_span) as f32 * 37.719);
-        let phase = Sx::Add(
-            Box::new(Sx::Add(
-                Box::new(Sx::Mul(Box::new(id), Box::new(Sx::Lit(12.9898)))),
-                Box::new(seed_term),
-            )),
-            Box::new(salt_term),
-        );
-        Some(Sx::Fract(Box::new(Sx::Mul(
-            Box::new(Sx::Sin(Box::new(phase))),
-            Box::new(Sx::Lit(43_758.547)),
-        ))))
+        let phase = id * Sx::Lit(12.9898) + seed_term + salt_term;
+        Some(Sx::Fract(Box::new(
+            Sx::Sin(Box::new(phase)) * Sx::Lit(43_758.547),
+        )))
     }
 
     fn scatter_rand_call_salt(call_span: &Span) -> u32 {
@@ -3960,8 +3953,7 @@ fn scalar_lit(v: f64, unit: Unit) -> Sx {
     // `vmin`/`vmax` before falling back to this function) — treat the
     // viewport as square for this const-only path.
     let viewport_ratio = || Sx::Lit(1.0);
-    let viewport_scale =
-        |percent: f32, axis_factor: Sx| Sx::Mul(Box::new(lit(percent)), Box::new(axis_factor));
+    let viewport_scale = |percent: f32, axis_factor: Sx| lit(percent) * axis_factor;
 
     match unit {
         Unit::Deg => lit((v * PI / 180.0) as f32),
@@ -3994,9 +3986,8 @@ impl Checker {
 
         let lit = |x: f32| Sx::Lit(x);
         let (res_x, res_y) = self.runtime_resolution();
-        let viewport_ratio = Sx::Div(Box::new(res_x), Box::new(res_y));
-        let viewport_scale =
-            |percent: f32, axis_factor: Sx| Sx::Mul(Box::new(lit(percent)), Box::new(axis_factor));
+        let viewport_ratio = res_x / res_y;
+        let viewport_scale = |percent: f32, axis_factor: Sx| lit(percent) * axis_factor;
 
         match unit {
             Unit::Vw => viewport_scale((v * 0.01) as f32, viewport_ratio),

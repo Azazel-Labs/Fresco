@@ -822,14 +822,14 @@ impl Checker {
             (Sx::Lit(0.0), _) | (_, Sx::Lit(0.0)) => Sx::Lit(0.0),
             (Sx::Lit(1.0), _) => b,
             (_, Sx::Lit(1.0)) => a,
-            _ => Sx::Mul(Box::new(a), Box::new(b)),
+            _ => a * b,
         }
     }
 
     fn inline_mask_not(a: Sx) -> Sx {
         match a {
             Sx::Lit(v) => Sx::Lit(1.0 - v),
-            other => Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(other)),
+            other => Sx::Lit(1.0) - other,
         }
     }
 

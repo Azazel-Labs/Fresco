@@ -135,8 +135,8 @@ fn require_small_non_negative_int(
 }
 
 fn sx_mod_floor(x: Sx, m: Sx) -> Sx {
-    let q = Sx::Floor(Box::new(Sx::Div(Box::new(x.clone()), Box::new(m.clone()))));
-    Sx::Sub(Box::new(x), Box::new(Sx::Mul(Box::new(q), Box::new(m))))
+    let q = Sx::Floor(Box::new(x.clone() / m.clone()));
+    x - q * m
 }
 
 fn sx_unpack_u8_from_u32(word: Sx, byte_index: i64) -> Sx {
@@ -162,10 +162,7 @@ fn sx_unpack_u8_from_u32(word: Sx, byte_index: i64) -> Sx {
         return Scalar::cast(byte, Kind::F32);
     }
     let shift = 1_i64 << (byte_index * 8);
-    let shifted = Sx::Floor(Box::new(Sx::Div(
-        Box::new(word),
-        Box::new(Sx::Lit(shift as f32)),
-    )));
+    let shifted = Sx::Floor(Box::new(word / Sx::Lit(shift as f32)));
     sx_mod_floor(shifted, Sx::Lit(256.0))
 }
 
@@ -247,13 +244,7 @@ fn color_luma([r, g, b, _a]: &[Sx; 4]) -> Sx {
     let wr = Sx::Lit(0.2126);
     let wg = Sx::Lit(0.7152);
     let wb = Sx::Lit(0.0722);
-    Sx::Add(
-        Box::new(Sx::Add(
-            Box::new(Sx::Mul(Box::new(r.clone()), Box::new(wr))),
-            Box::new(Sx::Mul(Box::new(g.clone()), Box::new(wg))),
-        )),
-        Box::new(Sx::Mul(Box::new(b.clone()), Box::new(wb))),
-    )
+    r.clone() * wr + g.clone() * wg + b.clone() * wb
 }
 
 fn clamp01(value: Sx) -> Sx {
@@ -697,7 +688,7 @@ builtin! {
         caps = PURE,
     },
     check = |_ctx, x| {
-        Value::Scalar(Sx::Div(Box::new(Sx::Lit(1.0)), Box::new(x)))
+        Value::Scalar(Sx::Lit(1.0) / x)
     }
 }
 
@@ -825,7 +816,7 @@ builtin! {
                     Value::Scalar(Sx::Lit(((xl as i64) >> si) as f32))
                 } else {
                     let denom = Sx::Lit((1_i64 << si) as f32);
-                    Value::Scalar(Sx::Floor(Box::new(Sx::Div(Box::new(xs), Box::new(denom)))))
+                    Value::Scalar(Sx::Floor(Box::new(xs / denom)))
                 }
             }
             (Some(_), Some(_)) => {
@@ -892,18 +883,9 @@ builtin! {
                 let mask = mask_lit as i64;
                 if mask > 0 && (mask & (mask - 1)) == 0 {
                     let mask_sx = Sx::Lit(mask as f32);
-                    let scaled = Sx::Floor(Box::new(Sx::Div(
-                        Box::new(a_sx),
-                        Box::new(mask_sx.clone()),
-                    )));
-                    let parity = Sx::Mul(
-                        Box::new(Sx::Lit(2.0)),
-                        Box::new(Sx::Fract(Box::new(Sx::Mul(
-                            Box::new(scaled),
-                            Box::new(Sx::Lit(0.5)),
-                        )))),
-                    );
-                    Value::Scalar(Sx::Mul(Box::new(mask_sx), Box::new(parity)))
+                    let scaled = Sx::Floor(Box::new(a_sx / mask_sx.clone()));
+                    let parity = Sx::Lit(2.0) * Sx::Fract(Box::new(scaled * Sx::Lit(0.5)));
+                    Value::Scalar(mask_sx * parity)
                 } else {
                     ctx.diags.push(
                         crate::diag::Diag::error(
@@ -1042,10 +1024,7 @@ builtin! {
 
         let two_pow_lsb = (1_i64 << lsb_i) as f32;
         let two_pow_bits = (1_i64 << bits_i) as f32;
-        let shifted = Sx::Floor(Box::new(Sx::Div(
-            Box::new(xv),
-            Box::new(Sx::Lit(two_pow_lsb)),
-        )));
+        let shifted = Sx::Floor(Box::new(xv / Sx::Lit(two_pow_lsb)));
         Value::Scalar(sx_mod_floor(shifted, Sx::Lit(two_pow_bits)))
     }
 }
@@ -1064,7 +1043,7 @@ builtin! {
         let Some(byte_i) = require_small_non_negative_int(ctx, byte, "`unpack_unorm8` byte", 3) else { return Some(Value::Error) };
         let Some(packed_sx) = ctx.as_scalar(packed) else { return Some(Value::Error) };
         let raw = sx_unpack_u8_from_u32(packed_sx, byte_i);
-        Value::Scalar(Sx::Div(Box::new(raw), Box::new(Sx::Lit(255.0))))
+        Value::Scalar(raw / Sx::Lit(255.0))
     }
 }
 
@@ -1084,19 +1063,10 @@ builtin! {
 
         let raw = sx_unpack_u8_from_u32(packed_sx, byte_i);
         let is_signed = Sx::Ge(Box::new(raw.clone()), Box::new(Sx::Lit(128.0)));
-        let signed = Sx::Add(
-            Box::new(Sx::Mul(
-                Box::new(is_signed.clone()),
-                Box::new(Sx::Sub(Box::new(raw.clone()), Box::new(Sx::Lit(256.0)))),
-            )),
-            Box::new(Sx::Mul(
-                Box::new(Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(is_signed))),
-                Box::new(raw),
-            )),
-        );
+        let signed = is_signed.clone() * (raw.clone() - Sx::Lit(256.0)) + (Sx::Lit(1.0) - is_signed) * raw;
 
         Value::Scalar(Sx::Clamp(
-            Box::new(Sx::Div(Box::new(signed), Box::new(Sx::Lit(127.0)))),
+            Box::new(signed / Sx::Lit(127.0)),
             Box::new(Sx::Lit(-1.0)),
             Box::new(Sx::Lit(1.0)),
         ))
@@ -1123,10 +1093,7 @@ builtin! {
 
         let to_byte = |v: Sx| {
             let clamped = Sx::Clamp(Box::new(v), Box::new(Sx::Lit(0.0)), Box::new(Sx::Lit(1.0)));
-            Sx::Floor(Box::new(Sx::Add(
-                Box::new(Sx::Mul(Box::new(clamped), Box::new(Sx::Lit(255.0)))),
-                Box::new(Sx::Lit(0.5)),
-            )))
+            Sx::Floor(Box::new(clamped * Sx::Lit(255.0) + Sx::Lit(0.5)))
         };
 
         let rb = to_byte(rs);
@@ -1134,16 +1101,7 @@ builtin! {
         let bb = to_byte(bs);
         let ab = to_byte(as_);
 
-        let packed = Sx::Add(
-            Box::new(Sx::Add(
-                Box::new(Sx::Add(
-                    Box::new(rb),
-                    Box::new(Sx::Mul(Box::new(gb), Box::new(Sx::Lit(256.0)))),
-                )),
-                Box::new(Sx::Mul(Box::new(bb), Box::new(Sx::Lit(65_536.0)))),
-            )),
-            Box::new(Sx::Mul(Box::new(ab), Box::new(Sx::Lit(16_777_216.0)))),
-        );
+        let packed = rb + gb * Sx::Lit(256.0) + bb * Sx::Lit(65_536.0) + ab * Sx::Lit(16_777_216.0);
 
         Value::Scalar(packed)
     }
@@ -2377,13 +2335,10 @@ fn saturate_color_check_impl(
         match require_color_transform_args(ctx, color, by.clone(), "saturate") {
             Some([r, g, b, a]) => {
                 let grey = color_luma(&[r.clone(), g.clone(), b.clone(), a.clone()]);
-                let factor = Sx::Add(Box::new(Sx::Lit(1.0)), Box::new(by));
+                let factor = Sx::Lit(1.0) + by;
                 let sat = |channel: Sx| {
-                    let delta = Sx::Sub(Box::new(channel), Box::new(grey.clone()));
-                    clamp01(Sx::Add(
-                        Box::new(grey.clone()),
-                        Box::new(Sx::Mul(Box::new(delta), Box::new(factor.clone()))),
-                    ))
+                    let delta = channel - grey.clone();
+                    clamp01(grey.clone() + delta * factor.clone())
                 };
                 Value::ColorField {
                     rgba: [sat(r), sat(g), sat(b), a],

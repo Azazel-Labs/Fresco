@@ -103,10 +103,7 @@ builtin! {
             ("linear", "out")
         };
 
-        let phase_time = Sx::Add(
-            Box::new(Sx::Div(Box::new(ctx.runtime_time()), Box::new(period))),
-            Box::new(phase),
-        );
+        let phase_time = ctx.runtime_time() / period + phase;
 
         let phase01_raw = Sx::Fract(Box::new(phase_time.clone()));
         let phase01 = if phase_shaping {
@@ -114,43 +111,25 @@ builtin! {
         } else {
             Sx::Fract(Box::new(phase_time))
         };
-        let theta = Sx::Mul(Box::new(Sx::Lit(TAU)), Box::new(phase01.clone()));
+        let theta = Sx::Lit(TAU) * phase01.clone();
 
         let wave01 = match variant {
             "saw" => phase01,
             "triangle" => {
                 let saw = phase01;
-                let two_saw = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(saw));
-                let centered = Sx::Sub(Box::new(two_saw), Box::new(Sx::Lit(1.0)));
-                Sx::Sub(
-                    Box::new(Sx::Lit(1.0)),
-                    Box::new(Sx::Abs(Box::new(centered))),
-                )
+                let two_saw = Sx::Lit(2.0) * saw;
+                let centered = two_saw - Sx::Lit(1.0);
+                Sx::Lit(1.0) - Sx::Abs(Box::new(centered))
             }
-            "square" => Sx::Add(
-                Box::new(Sx::Lit(0.5)),
-                Box::new(Sx::Mul(
-                    Box::new(Sx::Lit(0.5)),
-                    Box::new(Sx::Sign(Box::new(Sx::Sin(Box::new(theta))))),
-                )),
-            ),
+            "square" => Sx::Lit(0.5) + Sx::Lit(0.5) * Sx::Sign(Box::new(Sx::Sin(Box::new(theta)))),
             _ => {
                 // sine (default)
-                Sx::Add(
-                    Box::new(Sx::Lit(0.5)),
-                    Box::new(Sx::Mul(
-                        Box::new(Sx::Lit(0.5)),
-                        Box::new(Sx::Sin(Box::new(theta))),
-                    )),
-                )
+                Sx::Lit(0.5) + Sx::Lit(0.5) * Sx::Sin(Box::new(theta))
             }
         };
 
-        let range = Sx::Sub(Box::new(hi), Box::new(lo.clone()));
-        let value = Sx::Add(
-            Box::new(lo),
-            Box::new(Sx::Mul(Box::new(range), Box::new(wave01))),
-        );
+        let range = hi - lo.clone();
+        let value = lo + range * wave01;
 
         let ease_note = if phase_shaping {
             format!(", ease: {}", Checker::signal_ease_label(transition, mode))
@@ -212,12 +191,9 @@ builtin! {
         )?;
         let ease_label = Checker::signal_ease_label(transition, mode);
 
-        let phase = Sx::Fract(Box::new(Sx::Div(Box::new(ctx.runtime_time()), Box::new(every))));
-        let t = Checker::sx_clamp01(Sx::Div(Box::new(phase), Box::new(width)));
-        let value = Sx::Sub(
-            Box::new(Sx::Lit(1.0)),
-            Box::new(Checker::sx_ease(t, transition, mode)),
-        );
+        let phase = Sx::Fract(Box::new(ctx.runtime_time() / every));
+        let t = Checker::sx_clamp01(phase / width);
+        let value = Sx::Lit(1.0) - Checker::sx_ease(t, transition, mode);
 
         ctx.hir.notes.push(format!(
             "signal: pulse(ease: {ease_label}) lowered as a closed-form periodic decay window in v0"
@@ -248,10 +224,7 @@ builtin! {
         )?;
         let ease_label = Checker::signal_ease_label(transition, mode);
 
-        let raw = Sx::Div(
-            Box::new(Sx::Sub(Box::new(ctx.runtime_time()), Box::new(from))),
-            Box::new(over),
-        );
+        let raw = (ctx.runtime_time() - from) / over;
         let t = Checker::sx_clamp01(raw);
         let value = Checker::sx_ease(t, transition, mode);
 

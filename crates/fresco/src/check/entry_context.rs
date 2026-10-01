@@ -18,10 +18,7 @@ impl Checker {
         self.hir.layer(Layer::InSpace {
             inner,
             xforms: vec![Xform::Warp {
-                by: (
-                    Sx::Sub(Box::new(Sx::CoordX), Box::new(x)),
-                    Sx::Sub(Box::new(Sx::CoordY), Box::new(y)),
-                ),
+                by: (Sx::CoordX - x, Sx::CoordY - y),
             }],
         })
     }

@@ -2,7 +2,7 @@
 
 use crate::builtin;
 use crate::check::{Checker, Value};
-use crate::hir::{Shape, Sx};
+use crate::hir::Shape;
 
 builtin! {
     name = "round",
@@ -64,7 +64,7 @@ builtin! {
     check = |ctx, radius| {
         let out = ctx.hir.shape(Shape::Offset {
             inner: _receiver,
-            delta: Sx::Neg(Box::new(radius)),
+            delta: -radius,
         });
         ctx.note_shape_exactness(out, "erode");
         Value::Shape(out)

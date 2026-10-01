@@ -74,17 +74,8 @@ fn vec2_reflect(i: (Sx, Sx), n: (Sx, Sx)) -> (Sx, Sx) {
     let (ix, iy) = i;
     let (nx, ny) = n;
     let dot_in = vec2_dot((ix.clone(), iy.clone()), (nx.clone(), ny.clone()));
-    let scale = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(dot_in));
-    (
-        Sx::Sub(
-            Box::new(ix),
-            Box::new(Sx::Mul(Box::new(scale.clone()), Box::new(nx))),
-        ),
-        Sx::Sub(
-            Box::new(iy),
-            Box::new(Sx::Mul(Box::new(scale), Box::new(ny))),
-        ),
-    )
+    let scale = Sx::Lit(2.0) * dot_in;
+    (ix - scale.clone() * nx, iy - scale * ny)
 }
 
 fn vec3_reflect(i: (Sx, Sx, Sx), n: (Sx, Sx, Sx)) -> (Sx, Sx, Sx) {
@@ -94,20 +85,11 @@ fn vec3_reflect(i: (Sx, Sx, Sx), n: (Sx, Sx, Sx)) -> (Sx, Sx, Sx) {
         (ix.clone(), iy.clone(), iz.clone()),
         (nx.clone(), ny.clone(), nz.clone()),
     );
-    let scale = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(dot_in));
+    let scale = Sx::Lit(2.0) * dot_in;
     (
-        Sx::Sub(
-            Box::new(ix),
-            Box::new(Sx::Mul(Box::new(scale.clone()), Box::new(nx))),
-        ),
-        Sx::Sub(
-            Box::new(iy),
-            Box::new(Sx::Mul(Box::new(scale.clone()), Box::new(ny))),
-        ),
-        Sx::Sub(
-            Box::new(iz),
-            Box::new(Sx::Mul(Box::new(scale), Box::new(nz))),
-        ),
+        ix - scale.clone() * nx,
+        iy - scale.clone() * ny,
+        iz - scale * nz,
     )
 }
 
@@ -118,41 +100,23 @@ fn vec4_reflect(i: (Sx, Sx, Sx, Sx), n: (Sx, Sx, Sx, Sx)) -> (Sx, Sx, Sx, Sx) {
         (ix.clone(), iy.clone(), iz.clone(), iw.clone()),
         (nx.clone(), ny.clone(), nz.clone(), nw.clone()),
     );
-    let scale = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(dot_in));
+    let scale = Sx::Lit(2.0) * dot_in;
     (
-        Sx::Sub(
-            Box::new(ix),
-            Box::new(Sx::Mul(Box::new(scale.clone()), Box::new(nx))),
-        ),
-        Sx::Sub(
-            Box::new(iy),
-            Box::new(Sx::Mul(Box::new(scale.clone()), Box::new(ny))),
-        ),
-        Sx::Sub(
-            Box::new(iz),
-            Box::new(Sx::Mul(Box::new(scale.clone()), Box::new(nz))),
-        ),
-        Sx::Sub(
-            Box::new(iw),
-            Box::new(Sx::Mul(Box::new(scale), Box::new(nw))),
-        ),
+        ix - scale.clone() * nx,
+        iy - scale.clone() * ny,
+        iz - scale.clone() * nz,
+        iw - scale * nw,
     )
 }
 
 fn refract_coeff(dot_in: Sx, eta: Sx) -> (Sx, Sx) {
     let one = Sx::Lit(1.0);
-    let dot_in2 = Sx::Mul(Box::new(dot_in.clone()), Box::new(dot_in.clone()));
-    let eta2 = Sx::Mul(Box::new(eta.clone()), Box::new(eta.clone()));
-    let term = Sx::Sub(Box::new(one.clone()), Box::new(dot_in2));
-    let k = Sx::Sub(
-        Box::new(one),
-        Box::new(Sx::Mul(Box::new(eta2), Box::new(term))),
-    );
+    let dot_in2 = dot_in.clone() * dot_in.clone();
+    let eta2 = eta.clone() * eta.clone();
+    let term = one.clone() - dot_in2;
+    let k = one - eta2 * term;
     let sqrt_k = Sx::Sqrt(Box::new(k.clone()));
-    let coeff = Sx::Add(
-        Box::new(Sx::Mul(Box::new(eta), Box::new(dot_in))),
-        Box::new(sqrt_k),
-    );
+    let coeff = eta * dot_in + sqrt_k;
     (coeff, k)
 }
 
@@ -267,27 +231,27 @@ builtin! {
         let bv = ctx.eval(b).unwrap_or(Value::Error);
         match (av, bv) {
             (Value::Vec2((ax, ay)), Value::Vec2((bx, by))) => {
-                let dx = Sx::Sub(Box::new(ax), Box::new(bx));
-                let dy = Sx::Sub(Box::new(ay), Box::new(by));
+                let dx = ax - bx;
+                let dy = ay - by;
                 Value::Scalar(Sx::Sqrt(Box::new(vec2_dot(
                     (dx.clone(), dy.clone()),
                     (dx, dy),
                 ))))
             }
             (Value::Vec3((ax, ay, az)), Value::Vec3((bx, by, bz))) => {
-                let dx = Sx::Sub(Box::new(ax), Box::new(bx));
-                let dy = Sx::Sub(Box::new(ay), Box::new(by));
-                let dz = Sx::Sub(Box::new(az), Box::new(bz));
+                let dx = ax - bx;
+                let dy = ay - by;
+                let dz = az - bz;
                 Value::Scalar(Sx::Sqrt(Box::new(vec3_dot(
                     (dx.clone(), dy.clone(), dz.clone()),
                     (dx, dy, dz),
                 ))))
             }
             (Value::Vec4((ax, ay, az, aw)), Value::Vec4((bx, by, bz, bw))) => {
-                let dx = Sx::Sub(Box::new(ax), Box::new(bx));
-                let dy = Sx::Sub(Box::new(ay), Box::new(by));
-                let dz = Sx::Sub(Box::new(az), Box::new(bz));
-                let dw = Sx::Sub(Box::new(aw), Box::new(bw));
+                let dx = ax - bx;
+                let dy = ay - by;
+                let dz = az - bz;
+                let dw = aw - bw;
                 Value::Scalar(Sx::Sqrt(Box::new(vec4_dot(
                     (dx.clone(), dy.clone(), dz.clone(), dw.clone()),
                     (dx, dy, dz, dw),
@@ -327,23 +291,14 @@ builtin! {
         let bv = ctx.eval(b).unwrap_or(Value::Error);
         match (av, bv) {
             (Value::Vec2((ax, ay)), Value::Vec2((bx, by))) => {
-                let lhs = Sx::Mul(Box::new(ax), Box::new(by));
-                let rhs = Sx::Mul(Box::new(ay), Box::new(bx));
-                Value::Scalar(Sx::Sub(Box::new(lhs), Box::new(rhs)))
+                let lhs = ax * by;
+                let rhs = ay * bx;
+                Value::Scalar(lhs - rhs)
             }
             (Value::Vec3((ax, ay, az)), Value::Vec3((bx, by, bz))) => {
-                let cx = Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(ay.clone()), Box::new(bz.clone()))),
-                    Box::new(Sx::Mul(Box::new(az.clone()), Box::new(by.clone()))),
-                );
-                let cy = Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(az), Box::new(bx.clone()))),
-                    Box::new(Sx::Mul(Box::new(ax.clone()), Box::new(bz))),
-                );
-                let cz = Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(ax), Box::new(by))),
-                    Box::new(Sx::Mul(Box::new(ay), Box::new(bx))),
-                );
+                let cx = ay.clone() * bz.clone() - az.clone() * by.clone();
+                let cy = az * bx.clone() - ax.clone() * bz;
+                let cz = ax * by - ay * bx;
                 Value::Vec3((cx, cy, cz))
             }
             (Value::Error, _) | (_, Value::Error) => Value::Error,
@@ -422,20 +377,8 @@ builtin! {
                 (Value::Vec2((ix, iy)), Value::Vec2((nx, ny))) => {
                     let dot_in = vec2_dot((ix.clone(), iy.clone()), (nx.clone(), ny.clone()));
                     let (coeff, k) = refract_coeff(dot_in, eta_s.clone());
-                    let out_x = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s.clone()), Box::new(ix))),
-                            Box::new(Sx::Mul(Box::new(coeff.clone()), Box::new(nx))),
-                        )),
-                        Box::new(refract_mask(k.clone())),
-                    );
-                    let out_y = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s), Box::new(iy))),
-                            Box::new(Sx::Mul(Box::new(coeff), Box::new(ny))),
-                        )),
-                        Box::new(refract_mask(k)),
-                    );
+                    let out_x = (eta_s.clone() * ix - coeff.clone() * nx) * refract_mask(k.clone());
+                    let out_y = (eta_s * iy - coeff * ny) * refract_mask(k);
                     Value::Vec2((out_x, out_y))
                 }
                 (Value::Vec3((ix, iy, iz)), Value::Vec3((nx, ny, nz))) => {
@@ -445,27 +388,9 @@ builtin! {
                     );
                     let (coeff, k) = refract_coeff(dot_in, eta_s.clone());
                     let m = refract_mask(k);
-                    let out_x = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s.clone()), Box::new(ix))),
-                            Box::new(Sx::Mul(Box::new(coeff.clone()), Box::new(nx))),
-                        )),
-                        Box::new(m.clone()),
-                    );
-                    let out_y = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s.clone()), Box::new(iy))),
-                            Box::new(Sx::Mul(Box::new(coeff.clone()), Box::new(ny))),
-                        )),
-                        Box::new(m.clone()),
-                    );
-                    let out_z = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s), Box::new(iz))),
-                            Box::new(Sx::Mul(Box::new(coeff), Box::new(nz))),
-                        )),
-                        Box::new(m),
-                    );
+                    let out_x = (eta_s.clone() * ix - coeff.clone() * nx) * m.clone();
+                    let out_y = (eta_s.clone() * iy - coeff.clone() * ny) * m.clone();
+                    let out_z = (eta_s * iz - coeff * nz) * m;
                     Value::Vec3((out_x, out_y, out_z))
                 }
                 (Value::Vec4((ix, iy, iz, iw)), Value::Vec4((nx, ny, nz, nw))) => {
@@ -475,34 +400,10 @@ builtin! {
                     );
                     let (coeff, k) = refract_coeff(dot_in, eta_s.clone());
                     let m = refract_mask(k);
-                    let out_x = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s.clone()), Box::new(ix))),
-                            Box::new(Sx::Mul(Box::new(coeff.clone()), Box::new(nx))),
-                        )),
-                        Box::new(m.clone()),
-                    );
-                    let out_y = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s.clone()), Box::new(iy))),
-                            Box::new(Sx::Mul(Box::new(coeff.clone()), Box::new(ny))),
-                        )),
-                        Box::new(m.clone()),
-                    );
-                    let out_z = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s.clone()), Box::new(iz))),
-                            Box::new(Sx::Mul(Box::new(coeff.clone()), Box::new(nz))),
-                        )),
-                        Box::new(m.clone()),
-                    );
-                    let out_w = Sx::Mul(
-                        Box::new(Sx::Sub(
-                            Box::new(Sx::Mul(Box::new(eta_s), Box::new(iw))),
-                            Box::new(Sx::Mul(Box::new(coeff), Box::new(nw))),
-                        )),
-                        Box::new(m),
-                    );
+                    let out_x = (eta_s.clone() * ix - coeff.clone() * nx) * m.clone();
+                    let out_y = (eta_s.clone() * iy - coeff.clone() * ny) * m.clone();
+                    let out_z = (eta_s.clone() * iz - coeff.clone() * nz) * m.clone();
+                    let out_w = (eta_s * iw - coeff * nw) * m;
                     Value::Vec4((out_x, out_y, out_z, out_w))
                 }
                 (Value::Error, _) | (_, Value::Error) => Value::Error,

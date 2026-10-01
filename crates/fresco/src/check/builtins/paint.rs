@@ -99,23 +99,23 @@ fn shape_from_closed_path(ctx: &mut Checker, profile_id: usize) -> Option<usize>
 fn path_stroke_coverage(ctx: &mut Checker, path_id: usize, width: Sx) -> Sx {
     ctx.record_path_channel_demand(path_id, "dist");
     let dist = Sx::PathDist { path_id };
-    let half = Sx::Mul(Box::new(width), Box::new(Sx::Lit(0.5)));
+    let half = width * Sx::Lit(0.5);
     let aa = Sx::Max(
         Box::new(Sx::PxLit(1.0)),
         Box::new(Sx::Fwidth(Box::new(dist.clone()))),
     );
-    let hi = Sx::Add(Box::new(half.clone()), Box::new(aa));
+    let hi = half.clone() + aa;
     let edge = Sx::SmoothStep(Box::new(half), Box::new(hi), Box::new(dist));
-    Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(edge))
+    Sx::Lit(1.0) - edge
 }
 
 fn premultiply_color(color: [Sx; 4], coverage: Sx) -> Layer {
     let [r, g, b, a] = color;
     Layer::ColorExpr {
-        r: Sx::Mul(Box::new(r), Box::new(coverage.clone())),
-        g: Sx::Mul(Box::new(g), Box::new(coverage.clone())),
-        b: Sx::Mul(Box::new(b), Box::new(coverage.clone())),
-        a: Sx::Mul(Box::new(a), Box::new(coverage)),
+        r: (r * coverage.clone()),
+        g: (g * coverage.clone()),
+        b: (b * coverage.clone()),
+        a: (a * coverage),
     }
 }
 

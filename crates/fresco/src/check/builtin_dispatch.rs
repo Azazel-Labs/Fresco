@@ -460,15 +460,15 @@ impl Checker {
     }
 
     fn sx_floor(x: Sx) -> Sx {
-        Sx::Sub(Box::new(x.clone()), Box::new(Sx::Fract(Box::new(x))))
+        x.clone() - Sx::Fract(Box::new(x))
     }
 
     fn sx_square(x: Sx) -> Sx {
-        Sx::Mul(Box::new(x.clone()), Box::new(x))
+        x.clone() * x
     }
 
     fn sx_cube(x: Sx) -> Sx {
-        Sx::Mul(Box::new(Self::sx_square(x.clone())), Box::new(x))
+        Self::sx_square(x.clone()) * x
     }
 
     fn sx_quart(x: Sx) -> Sx {
@@ -476,7 +476,7 @@ impl Checker {
     }
 
     fn sx_quint(x: Sx) -> Sx {
-        Sx::Mul(Box::new(Self::sx_quart(x.clone())), Box::new(x))
+        Self::sx_quart(x.clone()) * x
     }
 
     fn sx_pow2(x: Sx) -> Sx {
@@ -488,54 +488,36 @@ impl Checker {
     }
 
     fn sx_select(mask01: Sx, when_zero: Sx, when_one: Sx) -> Sx {
-        let inv = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(mask01.clone()));
-        Sx::Add(
-            Box::new(Sx::Mul(Box::new(when_zero), Box::new(inv))),
-            Box::new(Sx::Mul(Box::new(when_one), Box::new(mask01))),
-        )
+        let inv = Sx::Lit(1.0) - mask01.clone();
+        when_zero * inv + when_one * mask01
     }
 
     pub(crate) fn sx_clamp01(x: Sx) -> Sx {
         let one = Sx::Lit(1.0);
-        let max0 = Sx::Mul(
-            Box::new(Sx::Lit(0.5)),
-            Box::new(Sx::Add(Box::new(x.clone()), Box::new(Sx::Abs(Box::new(x))))),
-        );
-        let delta = Sx::Sub(Box::new(max0.clone()), Box::new(one.clone()));
-        Sx::Mul(
-            Box::new(Sx::Lit(0.5)),
-            Box::new(Sx::Sub(
-                Box::new(Sx::Add(Box::new(max0), Box::new(one))),
-                Box::new(Sx::Abs(Box::new(delta))),
-            )),
-        )
+        let max0 = Sx::Lit(0.5) * (x.clone() + Sx::Abs(Box::new(x)));
+        let delta = max0.clone() - one.clone();
+        Sx::Lit(0.5) * (max0 + one - Sx::Abs(Box::new(delta)))
     }
 
     fn sx_ease_in_transition(t: Sx, transition: &str) -> Sx {
         match transition {
             "sine" => {
                 // easeInSine: 1 - cos((t * pi) / 2)
-                let angle = Sx::Mul(Box::new(Sx::Lit(std::f32::consts::FRAC_PI_2)), Box::new(t));
-                Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(Sx::Cos(Box::new(angle))))
+                let angle = Sx::Lit(std::f32::consts::FRAC_PI_2) * t;
+                Sx::Lit(1.0) - Sx::Cos(Box::new(angle))
             }
             "quad" => Self::sx_square(t),
             "cubic" => Self::sx_cube(t),
             "quart" => Self::sx_quart(t),
             "quint" => Self::sx_quint(t),
             "expo" => {
-                let exp = Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(Sx::Lit(10.0)), Box::new(t))),
-                    Box::new(Sx::Lit(10.0)),
-                );
+                let exp = Sx::Lit(10.0) * t - Sx::Lit(10.0);
                 Self::sx_pow2(exp)
             }
             "circ" => {
-                let one_minus_t2 = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(Self::sx_square(t)));
+                let one_minus_t2 = Sx::Lit(1.0) - Self::sx_square(t);
                 let clamped = Sx::Max(Box::new(Sx::Lit(0.0)), Box::new(one_minus_t2));
-                Sx::Sub(
-                    Box::new(Sx::Lit(1.0)),
-                    Box::new(Sx::Sqrt(Box::new(clamped))),
-                )
+                Sx::Lit(1.0) - Sx::Sqrt(Box::new(clamped))
             }
             "back" => {
                 // easeInBack: c3*t^3 - c1*t^2
@@ -543,29 +525,15 @@ impl Checker {
                 let c3 = Sx::Lit(2.70158);
                 let t2 = Self::sx_square(t.clone());
                 let t3 = Self::sx_cube(t);
-                Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(c3), Box::new(t3))),
-                    Box::new(Sx::Mul(Box::new(c1), Box::new(t2))),
-                )
+                c3 * t3 - c1 * t2
             }
             "elastic" => {
                 // easeInElastic approximation without endpoint special-casing.
-                let pow_exp = Sx::Sub(
-                    Box::new(Sx::Mul(Box::new(Sx::Lit(10.0)), Box::new(t.clone()))),
-                    Box::new(Sx::Lit(10.0)),
-                );
+                let pow_exp = Sx::Lit(10.0) * t.clone() - Sx::Lit(10.0);
                 let pow = Self::sx_pow2(pow_exp);
-                let angle = Sx::Mul(
-                    Box::new(Sx::Lit(std::f32::consts::TAU / 3.0)),
-                    Box::new(Sx::Sub(
-                        Box::new(Sx::Mul(Box::new(Sx::Lit(10.0)), Box::new(t))),
-                        Box::new(Sx::Lit(10.75)),
-                    )),
-                );
-                Sx::Neg(Box::new(Sx::Mul(
-                    Box::new(pow),
-                    Box::new(Sx::Sin(Box::new(angle))),
-                )))
+                let angle =
+                    Sx::Lit(std::f32::consts::TAU / 3.0) * (Sx::Lit(10.0) * t - Sx::Lit(10.75));
+                -(pow * Sx::Sin(Box::new(angle)))
             }
             "linear" => t,
             _ => t,
@@ -576,79 +544,37 @@ impl Checker {
         // Piecewise bounce approximation using step() masks.
         let n1 = Sx::Lit(7.5625);
         let d1 = Sx::Lit(2.75);
-        let a = Sx::Div(Box::new(Sx::Lit(1.0)), Box::new(d1.clone()));
-        let b = Sx::Div(Box::new(Sx::Lit(2.0)), Box::new(d1.clone()));
-        let c = Sx::Div(Box::new(Sx::Lit(2.5)), Box::new(d1.clone()));
+        let a = Sx::Lit(1.0) / d1.clone();
+        let b = Sx::Lit(2.0) / d1.clone();
+        let c = Sx::Lit(2.5) / d1.clone();
 
-        let t_a = Sx::Sub(
-            Box::new(t.clone()),
-            Box::new(Sx::Div(Box::new(Sx::Lit(1.5)), Box::new(d1.clone()))),
-        );
-        let t_b = Sx::Sub(
-            Box::new(t.clone()),
-            Box::new(Sx::Div(Box::new(Sx::Lit(2.25)), Box::new(d1.clone()))),
-        );
-        let t_c = Sx::Sub(
-            Box::new(t.clone()),
-            Box::new(Sx::Div(Box::new(Sx::Lit(2.625)), Box::new(d1))),
-        );
+        let t_a = t.clone() - Sx::Lit(1.5) / d1.clone();
+        let t_b = t.clone() - Sx::Lit(2.25) / d1.clone();
+        let t_c = t.clone() - Sx::Lit(2.625) / d1;
 
-        let f1 = Sx::Mul(Box::new(n1.clone()), Box::new(Self::sx_square(t.clone())));
-        let f2 = Sx::Add(
-            Box::new(Sx::Mul(
-                Box::new(n1.clone()),
-                Box::new(Self::sx_square(t_a)),
-            )),
-            Box::new(Sx::Lit(0.75)),
-        );
-        let f3 = Sx::Add(
-            Box::new(Sx::Mul(
-                Box::new(n1.clone()),
-                Box::new(Self::sx_square(t_b)),
-            )),
-            Box::new(Sx::Lit(0.9375)),
-        );
-        let f4 = Sx::Add(
-            Box::new(Sx::Mul(Box::new(n1), Box::new(Self::sx_square(t_c)))),
-            Box::new(Sx::Lit(0.984375)),
-        );
+        let f1 = n1.clone() * Self::sx_square(t.clone());
+        let f2 = n1.clone() * Self::sx_square(t_a) + Sx::Lit(0.75);
+        let f3 = n1.clone() * Self::sx_square(t_b) + Sx::Lit(0.9375);
+        let f4 = n1 * Self::sx_square(t_c) + Sx::Lit(0.984375);
 
         let s_a = Self::sx_step(a, t.clone());
         let s_b = Self::sx_step(b, t.clone());
         let s_c = Self::sx_step(c, t);
 
-        let m1 = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(s_a.clone()));
-        let m2 = Sx::Mul(
-            Box::new(s_a),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(s_b.clone()))),
-        );
-        let m3 = Sx::Mul(
-            Box::new(s_b),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(s_c.clone()))),
-        );
+        let m1 = Sx::Lit(1.0) - s_a.clone();
+        let m2 = s_a * (Sx::Lit(1.0) - s_b.clone());
+        let m3 = s_b * (Sx::Lit(1.0) - s_c.clone());
         let m4 = s_c;
 
-        Sx::Add(
-            Box::new(Sx::Add(
-                Box::new(Sx::Mul(Box::new(m1), Box::new(f1))),
-                Box::new(Sx::Mul(Box::new(m2), Box::new(f2))),
-            )),
-            Box::new(Sx::Add(
-                Box::new(Sx::Mul(Box::new(m3), Box::new(f3))),
-                Box::new(Sx::Mul(Box::new(m4), Box::new(f4))),
-            )),
-        )
+        m1 * f1 + m2 * f2 + (m3 * f3 + m4 * f4)
     }
 
     fn sx_ease_out_transition(t: Sx, transition: &str) -> Sx {
         match transition {
             "bounce" => Self::sx_ease_out_bounce(t),
             _ => {
-                let one_minus_t = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(t));
-                Sx::Sub(
-                    Box::new(Sx::Lit(1.0)),
-                    Box::new(Self::sx_ease_in_transition(one_minus_t, transition)),
-                )
+                let one_minus_t = Sx::Lit(1.0) - t;
+                Sx::Lit(1.0) - Self::sx_ease_in_transition(one_minus_t, transition)
             }
         }
     }
@@ -657,36 +583,20 @@ impl Checker {
         match mode {
             "in" => Self::sx_ease_in_transition(t, transition),
             "in_out" => {
-                let two_t = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(t.clone()));
-                let left = Sx::Mul(
-                    Box::new(Sx::Lit(0.5)),
-                    Box::new(Self::sx_ease_in_transition(two_t.clone(), transition)),
-                );
-                let right_t = Sx::Sub(Box::new(two_t), Box::new(Sx::Lit(1.0)));
-                let right = Sx::Add(
-                    Box::new(Sx::Lit(0.5)),
-                    Box::new(Sx::Mul(
-                        Box::new(Sx::Lit(0.5)),
-                        Box::new(Self::sx_ease_out_transition(right_t, transition)),
-                    )),
-                );
+                let two_t = Sx::Lit(2.0) * t.clone();
+                let left = Sx::Lit(0.5) * Self::sx_ease_in_transition(two_t.clone(), transition);
+                let right_t = two_t - Sx::Lit(1.0);
+                let right =
+                    Sx::Lit(0.5) + Sx::Lit(0.5) * Self::sx_ease_out_transition(right_t, transition);
                 let gate = Self::sx_step(Sx::Lit(0.5), t);
                 Self::sx_select(gate, left, right)
             }
             "out_in" => {
-                let two_t = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(t.clone()));
-                let left = Sx::Mul(
-                    Box::new(Sx::Lit(0.5)),
-                    Box::new(Self::sx_ease_out_transition(two_t.clone(), transition)),
-                );
-                let right_t = Sx::Sub(Box::new(two_t), Box::new(Sx::Lit(1.0)));
-                let right = Sx::Add(
-                    Box::new(Sx::Lit(0.5)),
-                    Box::new(Sx::Mul(
-                        Box::new(Sx::Lit(0.5)),
-                        Box::new(Self::sx_ease_in_transition(right_t, transition)),
-                    )),
-                );
+                let two_t = Sx::Lit(2.0) * t.clone();
+                let left = Sx::Lit(0.5) * Self::sx_ease_out_transition(two_t.clone(), transition);
+                let right_t = two_t - Sx::Lit(1.0);
+                let right =
+                    Sx::Lit(0.5) + Sx::Lit(0.5) * Self::sx_ease_in_transition(right_t, transition);
                 let gate = Self::sx_step(Sx::Lit(0.5), t);
                 Self::sx_select(gate, left, right)
             }
@@ -898,38 +808,20 @@ impl Checker {
     }
 
     fn sx_lerp(a: Sx, b: Sx, t: Sx) -> Sx {
-        let one_minus_t = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(t.clone()));
-        Sx::Add(
-            Box::new(Sx::Mul(Box::new(a), Box::new(one_minus_t))),
-            Box::new(Sx::Mul(Box::new(b), Box::new(t))),
-        )
+        let one_minus_t = Sx::Lit(1.0) - t.clone();
+        a * one_minus_t + b * t
     }
 
     fn sx_hash2(ix: Sx, iy: Sx) -> Sx {
-        let dot = Sx::Add(
-            Box::new(Sx::Mul(Box::new(ix), Box::new(Sx::Lit(127.1)))),
-            Box::new(Sx::Mul(Box::new(iy), Box::new(Sx::Lit(311.7)))),
-        );
-        let n = Sx::Mul(
-            Box::new(Sx::Sin(Box::new(dot))),
-            Box::new(Sx::Lit(43_758.547)),
-        );
+        let dot = ix * Sx::Lit(127.1) + iy * Sx::Lit(311.7);
+        let n = Sx::Sin(Box::new(dot)) * Sx::Lit(43_758.547);
         Sx::Fract(Box::new(n))
     }
 
     fn sx_hash3(ix: Sx, iy: Sx, iz: Sx) -> Sx {
-        let dot_xy = Sx::Add(
-            Box::new(Sx::Mul(Box::new(ix), Box::new(Sx::Lit(127.1)))),
-            Box::new(Sx::Mul(Box::new(iy), Box::new(Sx::Lit(311.7)))),
-        );
-        let dot = Sx::Add(
-            Box::new(dot_xy),
-            Box::new(Sx::Mul(Box::new(iz), Box::new(Sx::Lit(74.7)))),
-        );
-        let n = Sx::Mul(
-            Box::new(Sx::Sin(Box::new(dot))),
-            Box::new(Sx::Lit(43_758.547)),
-        );
+        let dot_xy = ix * Sx::Lit(127.1) + iy * Sx::Lit(311.7);
+        let dot = dot_xy + iz * Sx::Lit(74.7);
+        let n = Sx::Sin(Box::new(dot)) * Sx::Lit(43_758.547);
         Sx::Fract(Box::new(n))
     }
 
@@ -944,19 +836,13 @@ impl Checker {
         let fy = Sx::Fract(Box::new(py));
 
         // Smooth interpolation (Hermite): u = f*f*(3 - 2*f)
-        let two_fx = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(fx.clone()));
-        let two_fy = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(fy.clone()));
-        let ux = Sx::Mul(
-            Box::new(Sx::Mul(Box::new(fx.clone()), Box::new(fx))),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(3.0)), Box::new(two_fx))),
-        );
-        let uy = Sx::Mul(
-            Box::new(Sx::Mul(Box::new(fy.clone()), Box::new(fy))),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(3.0)), Box::new(two_fy))),
-        );
+        let two_fx = Sx::Lit(2.0) * fx.clone();
+        let two_fy = Sx::Lit(2.0) * fy.clone();
+        let ux = fx.clone() * fx * (Sx::Lit(3.0) - two_fx);
+        let uy = fy.clone() * fy * (Sx::Lit(3.0) - two_fy);
 
-        let ix1 = Sx::Add(Box::new(ix.clone()), Box::new(Sx::Lit(1.0)));
-        let iy1 = Sx::Add(Box::new(iy.clone()), Box::new(Sx::Lit(1.0)));
+        let ix1 = ix.clone() + Sx::Lit(1.0);
+        let iy1 = iy.clone() + Sx::Lit(1.0);
 
         let n00 = Self::sx_hash2(ix.clone(), iy.clone());
         let n10 = Self::sx_hash2(ix1.clone(), iy);
@@ -976,25 +862,16 @@ impl Checker {
         let fy = Sx::Fract(Box::new(py));
         let fz = Sx::Fract(Box::new(pz));
 
-        let two_fx = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(fx.clone()));
-        let two_fy = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(fy.clone()));
-        let two_fz = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(fz.clone()));
-        let ux = Sx::Mul(
-            Box::new(Sx::Mul(Box::new(fx.clone()), Box::new(fx))),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(3.0)), Box::new(two_fx))),
-        );
-        let uy = Sx::Mul(
-            Box::new(Sx::Mul(Box::new(fy.clone()), Box::new(fy))),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(3.0)), Box::new(two_fy))),
-        );
-        let uz = Sx::Mul(
-            Box::new(Sx::Mul(Box::new(fz.clone()), Box::new(fz))),
-            Box::new(Sx::Sub(Box::new(Sx::Lit(3.0)), Box::new(two_fz))),
-        );
+        let two_fx = Sx::Lit(2.0) * fx.clone();
+        let two_fy = Sx::Lit(2.0) * fy.clone();
+        let two_fz = Sx::Lit(2.0) * fz.clone();
+        let ux = fx.clone() * fx * (Sx::Lit(3.0) - two_fx);
+        let uy = fy.clone() * fy * (Sx::Lit(3.0) - two_fy);
+        let uz = fz.clone() * fz * (Sx::Lit(3.0) - two_fz);
 
-        let ix1 = Sx::Add(Box::new(ix.clone()), Box::new(Sx::Lit(1.0)));
-        let iy1 = Sx::Add(Box::new(iy.clone()), Box::new(Sx::Lit(1.0)));
-        let iz1 = Sx::Add(Box::new(iz.clone()), Box::new(Sx::Lit(1.0)));
+        let ix1 = ix.clone() + Sx::Lit(1.0);
+        let iy1 = iy.clone() + Sx::Lit(1.0);
+        let iz1 = iz.clone() + Sx::Lit(1.0);
 
         let n000 = Self::sx_hash3(ix.clone(), iy.clone(), iz.clone());
         let n100 = Self::sx_hash3(ix1.clone(), iy.clone(), iz.clone());
@@ -1367,37 +1244,31 @@ impl Checker {
                     hir::UserFnStmt::Assign {
                         name: "acc".to_string(),
                         field_path: None,
-                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(Sx::Add(
-                            Box::new(Sx::Param("acc".to_string())),
-                            Box::new(Sx::Mul(
-                                Box::new(Sx::Param("amp".to_string())),
-                                Box::new(Sx::Param("n".to_string())),
-                            )),
-                        ))),
+                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(
+                            Sx::Param("acc".to_string())
+                                + Sx::Param("amp".to_string()) * Sx::Param("n".to_string()),
+                        )),
                     },
                     hir::UserFnStmt::Assign {
                         name: "fx".to_string(),
                         field_path: None,
-                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(Sx::Mul(
-                            Box::new(Sx::Param("fx".to_string())),
-                            Box::new(Sx::Param("lacunarity".to_string())),
-                        ))),
+                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(
+                            Sx::Param("fx".to_string()) * Sx::Param("lacunarity".to_string()),
+                        )),
                     },
                     hir::UserFnStmt::Assign {
                         name: "fy".to_string(),
                         field_path: None,
-                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(Sx::Mul(
-                            Box::new(Sx::Param("fy".to_string())),
-                            Box::new(Sx::Param("lacunarity".to_string())),
-                        ))),
+                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(
+                            Sx::Param("fy".to_string()) * Sx::Param("lacunarity".to_string()),
+                        )),
                     },
                     hir::UserFnStmt::Assign {
                         name: "amp".to_string(),
                         field_path: None,
-                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(Sx::Mul(
-                            Box::new(Sx::Param("amp".to_string())),
-                            Box::new(Sx::Param("gain".to_string())),
-                        ))),
+                        value: hir::UserFnExpr::Value(hir::UserFnValue::Scalar(
+                            Sx::Param("amp".to_string()) * Sx::Param("gain".to_string()),
+                        )),
                     },
                 ];
 

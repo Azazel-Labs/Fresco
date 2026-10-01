@@ -11,14 +11,8 @@ use crate::registry::{
 };
 
 fn sx_hash2(ix: Sx, iy: Sx) -> Sx {
-    let dot = Sx::Add(
-        Box::new(Sx::Mul(Box::new(ix), Box::new(Sx::Lit(127.1)))),
-        Box::new(Sx::Mul(Box::new(iy), Box::new(Sx::Lit(311.7)))),
-    );
-    let n = Sx::Mul(
-        Box::new(Sx::Sin(Box::new(dot))),
-        Box::new(Sx::Lit(43_758.547)),
-    );
+    let dot = ix * Sx::Lit(127.1) + iy * Sx::Lit(311.7);
+    let n = Sx::Sin(Box::new(dot)) * Sx::Lit(43_758.547);
     Sx::Fract(Box::new(n))
 }
 
@@ -31,23 +25,20 @@ fn sx_worley2(px: Sx, py: Sx) -> Sx {
     let mut best: Option<Sx> = None;
     for ox in -1..=1 {
         for oy in -1..=1 {
-            let cell_x = Sx::Add(Box::new(ix.clone()), Box::new(Sx::Lit(ox as f32)));
-            let cell_y = Sx::Add(Box::new(iy.clone()), Box::new(Sx::Lit(oy as f32)));
+            let cell_x = ix.clone() + Sx::Lit(ox as f32);
+            let cell_y = iy.clone() + Sx::Lit(oy as f32);
 
             let jx = sx_hash2(cell_x.clone(), cell_y.clone());
             let jy = sx_hash2(
-                Sx::Add(Box::new(cell_x.clone()), Box::new(Sx::Lit(19.19))),
-                Sx::Add(Box::new(cell_y.clone()), Box::new(Sx::Lit(73.73))),
+                cell_x.clone() + Sx::Lit(19.19),
+                cell_y.clone() + Sx::Lit(73.73),
             );
 
-            let px = Sx::Add(Box::new(Sx::Lit(ox as f32)), Box::new(jx));
-            let py = Sx::Add(Box::new(Sx::Lit(oy as f32)), Box::new(jy));
-            let dx = Sx::Sub(Box::new(px), Box::new(fx.clone()));
-            let dy = Sx::Sub(Box::new(py), Box::new(fy.clone()));
-            let dist2 = Sx::Add(
-                Box::new(Sx::Mul(Box::new(dx.clone()), Box::new(dx))),
-                Box::new(Sx::Mul(Box::new(dy.clone()), Box::new(dy))),
-            );
+            let px = Sx::Lit(ox as f32) + jx;
+            let py = Sx::Lit(oy as f32) + jy;
+            let dx = px - fx.clone();
+            let dy = py - fy.clone();
+            let dist2 = dx.clone() * dx + dy.clone() * dy;
 
             best = Some(match best {
                 Some(prev) => Sx::Min(Box::new(prev), Box::new(dist2)),
@@ -67,22 +58,10 @@ fn sx_curvature_from_normal(nx: Sx, ny: Sx, nz: Sx) -> Sx {
     let ddy_ny = Sx::Ddy(Box::new(ny));
     let ddy_nz = Sx::Ddy(Box::new(nz));
 
-    let ddx_sq = Sx::Add(
-        Box::new(Sx::Mul(Box::new(ddx_nx.clone()), Box::new(ddx_nx))),
-        Box::new(Sx::Add(
-            Box::new(Sx::Mul(Box::new(ddx_ny.clone()), Box::new(ddx_ny))),
-            Box::new(Sx::Mul(Box::new(ddx_nz.clone()), Box::new(ddx_nz))),
-        )),
-    );
-    let ddy_sq = Sx::Add(
-        Box::new(Sx::Mul(Box::new(ddy_nx.clone()), Box::new(ddy_nx))),
-        Box::new(Sx::Add(
-            Box::new(Sx::Mul(Box::new(ddy_ny.clone()), Box::new(ddy_ny))),
-            Box::new(Sx::Mul(Box::new(ddy_nz.clone()), Box::new(ddy_nz))),
-        )),
-    );
+    let ddx_sq = ddx_nx.clone() * ddx_nx + (ddx_ny.clone() * ddx_ny + ddx_nz.clone() * ddx_nz);
+    let ddy_sq = ddy_nx.clone() * ddy_nx + (ddy_ny.clone() * ddy_ny + ddy_nz.clone() * ddy_nz);
 
-    Sx::Sqrt(Box::new(Sx::Add(Box::new(ddx_sq), Box::new(ddy_sq))))
+    Sx::Sqrt(Box::new(ddx_sq + ddy_sq))
 }
 
 builtin! {
@@ -98,14 +77,11 @@ builtin! {
     check = |ctx, x, range| {
         let (lo, hi) = ctx.require_range_pair(range, "`wrap(x, range: ...)`")?;
 
-        let width = Sx::Sub(Box::new(hi), Box::new(lo.clone()));
-        let shifted = Sx::Sub(Box::new(x), Box::new(lo.clone()));
-        let u = Sx::Div(Box::new(shifted), Box::new(width.clone()));
+        let width = hi - lo.clone();
+        let shifted = x - lo.clone();
+        let u = shifted / width.clone();
         let w = Sx::Fract(Box::new(u));
-        let out = Sx::Add(
-            Box::new(lo),
-            Box::new(Sx::Mul(Box::new(width), Box::new(w))),
-        );
+        let out = lo + width * w;
         Value::Scalar(out)
     }
 }
@@ -324,13 +300,10 @@ pub fn distribute_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<
             return Some(Value::Error);
         };
 
-        let pitch = Sx::Add(Box::new(width_sx), Box::new(gap_sx));
-        let span = Sx::Mul(Box::new(count_sx.clone()), Box::new(pitch));
-        let start = Sx::Sub(
-            Box::new(anchor_sx),
-            Box::new(Sx::Mul(Box::new(Sx::Lit(0.5)), Box::new(span.clone()))),
-        );
-        let end = Sx::Add(Box::new(start.clone()), Box::new(span));
+        let pitch = width_sx + gap_sx;
+        let span = count_sx.clone() * pitch;
+        let start = anchor_sx - Sx::Lit(0.5) * span.clone();
+        let end = start.clone() + span;
         (start, end)
     } else {
         let Some((start_sx, _)) = Checker::as_numeric_scalar(&start_value) else {
@@ -437,11 +410,8 @@ pub fn rand_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Value>
     let (lo, hi) = ctx.require_range_pair(range, "`rand`")?;
 
     if let Some(unit) = ctx.scatter_rand_unit(bag.call_span()) {
-        let width = Sx::Sub(Box::new(hi), Box::new(lo.clone()));
-        let out = Sx::Add(
-            Box::new(lo),
-            Box::new(Sx::Mul(Box::new(width), Box::new(unit))),
-        );
+        let width = hi - lo.clone();
+        let out = lo + width * unit;
         ctx.hir.notes.push(format!(
             "signal: rand lowered as deterministic per-instance scatter noise at {}..{}",
             bag.call_span().start,
@@ -500,18 +470,12 @@ pub fn hash_check_impl(ctx: &mut Checker, bag: &mut ArgBag<'_>) -> Option<Value>
     let sx = match value {
         Value::Scalar(v) => sx_hash2(v, salt),
         Value::Vec2((x, y)) => {
-            let salted_y = Sx::Add(
-                Box::new(y),
-                Box::new(Sx::Mul(Box::new(salt), Box::new(Sx::Lit(17.0)))),
-            );
+            let salted_y = y + salt * Sx::Lit(17.0);
             sx_hash2(x, salted_y)
         }
         Value::RepeatCell(cell) => {
             let (x, y) = cell.id;
-            let salted_y = Sx::Add(
-                Box::new(y),
-                Box::new(Sx::Mul(Box::new(salt), Box::new(Sx::Lit(17.0)))),
-            );
+            let salted_y = y + salt * Sx::Lit(17.0);
             sx_hash2(x, salted_y)
         }
         other => {

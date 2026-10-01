@@ -528,7 +528,7 @@ impl Checker {
     }
 
     fn fold_neg_if_literal(sx: Sx) -> Sx {
-        let expr = Sx::Neg(Box::new(sx.clone()));
+        let expr = -sx.clone();
         if Self::is_literal_like_sx(&sx) {
             Self::fold_static_sx(expr)
         } else {
@@ -641,10 +641,10 @@ impl Checker {
         };
 
         let expr = match op {
-            BinOp::Add => Sx::Add(Box::new(a.clone()), Box::new(b.clone())),
-            BinOp::Sub => Sx::Sub(Box::new(a.clone()), Box::new(b.clone())),
-            BinOp::Mul => Sx::Mul(Box::new(a.clone()), Box::new(b.clone())),
-            BinOp::Div => Sx::Div(Box::new(a.clone()), Box::new(b.clone())),
+            BinOp::Add => a.clone() + b.clone(),
+            BinOp::Sub => a.clone() - b.clone(),
+            BinOp::Mul => a.clone() * b.clone(),
+            BinOp::Div => a.clone() / b.clone(),
             _ => unreachable!("non-arithmetic op used in fold_bin_if_literals"),
         };
         if Self::is_literal_like_sx(&a) && Self::is_literal_like_sx(&b) {
@@ -660,10 +660,10 @@ impl Checker {
 
     fn color_bin(op: BinOp, a: [Sx; 4], b: [Sx; 4]) -> Option<[Sx; 4]> {
         let mk = |la: Sx, lb: Sx| match op {
-            BinOp::Add => Some(Sx::Add(Box::new(la), Box::new(lb))),
-            BinOp::Sub => Some(Sx::Sub(Box::new(la), Box::new(lb))),
-            BinOp::Mul => Some(Sx::Mul(Box::new(la), Box::new(lb))),
-            BinOp::Div => Some(Sx::Div(Box::new(la), Box::new(lb))),
+            BinOp::Add => Some(la + lb),
+            BinOp::Sub => Some(la - lb),
+            BinOp::Mul => Some(la * lb),
+            BinOp::Div => Some(la / lb),
             _ => None,
         };
 
@@ -786,7 +786,7 @@ impl Checker {
     }
 
     fn sx_mod_floor(x: Sx, m: Sx) -> Sx {
-        let q = Sx::Floor(Box::new(Sx::Div(Box::new(x.clone()), Box::new(m.clone()))));
+        let q = Sx::Floor(Box::new(x.clone() / m.clone()));
         let q_times_m = Self::fold_bin_if_literals(BinOp::Mul, q, m);
         Self::fold_bin_if_literals(BinOp::Sub, x, q_times_m)
     }
@@ -932,13 +932,9 @@ impl Checker {
                         );
                         return None;
                     };
-                    let v = Sx::Fract(Box::new(Sx::Mul(
-                        Box::new(Sx::Sin(Box::new(Sx::Add(
-                            Box::new(unit),
-                            Box::new(Sx::Lit(17.173)),
-                        )))),
-                        Box::new(Sx::Lit(43_758.547)),
-                    )));
+                    let v = Sx::Fract(Box::new(
+                        Sx::Sin(Box::new(unit + Sx::Lit(17.173))) * Sx::Lit(43_758.547),
+                    ));
                     Some(Value::Scalar(v))
                 }
                 "jitter" => {
@@ -952,21 +948,11 @@ impl Checker {
                         );
                         return None;
                     };
-                    let other = Sx::Fract(Box::new(Sx::Mul(
-                        Box::new(Sx::Sin(Box::new(Sx::Add(
-                            Box::new(unit.clone()),
-                            Box::new(Sx::Lit(31.331)),
-                        )))),
-                        Box::new(Sx::Lit(91_821.734)),
-                    )));
-                    let jx = Sx::Sub(
-                        Box::new(Sx::Mul(Box::new(unit), Box::new(Sx::Lit(2.0)))),
-                        Box::new(Sx::Lit(1.0)),
-                    );
-                    let jy = Sx::Sub(
-                        Box::new(Sx::Mul(Box::new(other), Box::new(Sx::Lit(2.0)))),
-                        Box::new(Sx::Lit(1.0)),
-                    );
+                    let other = Sx::Fract(Box::new(
+                        Sx::Sin(Box::new(unit.clone() + Sx::Lit(31.331))) * Sx::Lit(91_821.734),
+                    ));
+                    let jx = unit * Sx::Lit(2.0) - Sx::Lit(1.0);
+                    let jy = other * Sx::Lit(2.0) - Sx::Lit(1.0);
                     Some(Value::Vec2((jx, jy)))
                 }
                 _ => {
@@ -1037,22 +1023,10 @@ impl Checker {
                 start,
                 end,
             } => {
-                let slot_size = Sx::Div(
-                    Box::new(Sx::Sub(Box::new(end), Box::new(start.clone()))),
-                    Box::new(count.clone()),
-                );
-                let slot_left = Sx::Add(
-                    Box::new(start),
-                    Box::new(Sx::Mul(
-                        Box::new(index.clone()),
-                        Box::new(slot_size.clone()),
-                    )),
-                );
-                let slot_right = Sx::Add(Box::new(slot_left.clone()), Box::new(slot_size.clone()));
-                let slot_center = Sx::Add(
-                    Box::new(slot_left.clone()),
-                    Box::new(Sx::Mul(Box::new(slot_size.clone()), Box::new(Sx::Lit(0.5)))),
-                );
+                let slot_size = (end - start.clone()) / count.clone();
+                let slot_left = start + index.clone() * slot_size.clone();
+                let slot_right = slot_left.clone() + slot_size.clone();
+                let slot_center = slot_left.clone() + slot_size.clone() * Sx::Lit(0.5);
 
                 match field {
                     "index" => Some(Value::Scalar(index)),
@@ -4138,20 +4112,20 @@ mod tests {
     #[test]
     fn factor_symbolic_pair_factors_shared_positive_symbol_through_max() {
         let length = Sx::Length(SxVec::V2(Box::new((Sx::CoordX, Sx::CoordY))));
-        let lhs = Sx::Mul(Box::new(Sx::Lit(1.5)), Box::new(length.clone()));
-        let rhs = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(length.clone()));
+        let lhs = Sx::Lit(1.5) * length.clone();
+        let rhs = Sx::Lit(2.0) * length.clone();
 
         let factored = Checker::factor_symbolic_pair(SymbolicFactorOp::Max, lhs, rhs)
             .expect("expected shared-factor max rewrite");
 
-        assert_eq!(factored, Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(length)));
+        assert_eq!(factored, Sx::Lit(2.0) * length);
     }
 
     #[test]
     fn factor_symbolic_pair_collapses_shared_nonnegative_symbol_through_sub() {
         let shape = Sx::Abs(Box::new(Sx::CoordX));
-        let lhs = Sx::Mul(Box::new(Sx::Lit(1.5)), Box::new(shape.clone()));
-        let rhs = Sx::Mul(Box::new(Sx::Lit(0.5)), Box::new(shape.clone()));
+        let lhs = Sx::Lit(1.5) * shape.clone();
+        let rhs = Sx::Lit(0.5) * shape.clone();
 
         let factored = Checker::factor_symbolic_pair(SymbolicFactorOp::Sub, lhs, rhs)
             .expect("expected shared-factor subtraction rewrite");
@@ -4165,8 +4139,8 @@ mod tests {
             Box::new(Sx::Length(SxVec::V2(Box::new((Sx::CoordX, Sx::CoordY))))),
             Box::new(Sx::Lit(1.0)),
         );
-        let lhs = Sx::Mul(Box::new(Sx::Lit(3.0)), Box::new(symbol.clone()));
-        let rhs = Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(symbol));
+        let lhs = Sx::Lit(3.0) * symbol.clone();
+        let rhs = Sx::Lit(2.0) * symbol;
 
         let factored = Checker::factor_symbolic_pair(SymbolicFactorOp::Div, lhs, rhs)
             .expect("expected shared-factor division rewrite");

@@ -28,21 +28,15 @@ fn unfiltered_checker(x: Sx, y: Sx) -> Sx {
     let step_y = Sx::Step(Box::new(Sx::Lit(0.5)), Box::new(fract_y));
 
     // s(x) = 1 - 2*step_x
-    let s_x = Sx::Sub(
-        Box::new(Sx::Lit(1.0)),
-        Box::new(Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(step_x))),
-    );
-    let s_y = Sx::Sub(
-        Box::new(Sx::Lit(1.0)),
-        Box::new(Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(step_y))),
-    );
+    let s_x = Sx::Lit(1.0) - Sx::Lit(2.0) * step_x;
+    let s_y = Sx::Lit(1.0) - Sx::Lit(2.0) * step_y;
 
     // s(x) * s(y)
-    let product = Sx::Mul(Box::new(s_x), Box::new(s_y));
+    let product = s_x * s_y;
 
     // checker = 0.5 * (1 - product)
-    let one_minus_prod = Sx::Sub(Box::new(Sx::Lit(1.0)), Box::new(product));
-    Sx::Mul(Box::new(Sx::Lit(0.5)), Box::new(one_minus_prod))
+    let one_minus_prod = Sx::Lit(1.0) - product;
+    Sx::Lit(0.5) * one_minus_prod
 }
 
 /// Helper: compute a simple unfiltered stripe pattern along x-axis.
@@ -54,25 +48,16 @@ fn unfiltered_stripe(x: Sx) -> Sx {
 
     // s(x) = 1 - 2*step_x (ranges from -1 to +1)
     // Map to 0..1: (s(x) + 1) / 2
-    let s_x = Sx::Sub(
-        Box::new(Sx::Lit(1.0)),
-        Box::new(Sx::Mul(Box::new(Sx::Lit(2.0)), Box::new(step_x))),
-    );
+    let s_x = Sx::Lit(1.0) - Sx::Lit(2.0) * step_x;
 
     // Map to [0, 1]
-    Sx::Mul(
-        Box::new(Sx::Lit(0.5)),
-        Box::new(Sx::Add(Box::new(s_x), Box::new(Sx::Lit(1.0)))),
-    )
+    Sx::Lit(0.5) * (s_x + Sx::Lit(1.0))
 }
 
 /// Screen pixel size in UV-space (independent of local `in space` remaps).
 fn screen_px_uv(ctx: &mut Checker) -> Sx {
     let (_res_x, res_y) = ctx.runtime_resolution();
-    Sx::Div(
-        Box::new(Sx::Lit(1.0)),
-        Box::new(Sx::Max(Box::new(res_y), Box::new(Sx::Lit(1.0e-6)))),
-    )
+    Sx::Lit(1.0) / Sx::Max(Box::new(res_y), Box::new(Sx::Lit(1.0e-6)))
 }
 
 builtin! {
@@ -102,11 +87,11 @@ builtin! {
         let coord_y = Sx::CoordY;
 
         // Transform coordinate: (coord - center) / scale
-        let rel_x = Sx::Sub(Box::new(coord_x), Box::new(center_x));
-        let rel_y = Sx::Sub(Box::new(coord_y), Box::new(center_y));
+        let rel_x = coord_x - center_x;
+        let rel_y = coord_y - center_y;
 
-        let scaled_x = Sx::Div(Box::new(rel_x), Box::new(scale_x.clone()));
-        let scaled_y = Sx::Div(Box::new(rel_y), Box::new(scale_y.clone()));
+        let scaled_x = rel_x / scale_x.clone();
+        let scaled_y = rel_y / scale_y.clone();
 
         // Check filtering state and footprint availability
         let filtering_state = ctx.get_filtering_state();
@@ -121,13 +106,13 @@ builtin! {
             let (j11, j12, j21, j22) = ctx.get_canvas_jacobian();
                 let (span_x, span_y) = deriv::footprint_spans(&j11, &j12, &j21, &j22);
                 let px_uv = screen_px_uv(ctx);
-                let pixel_span_x = Sx::Mul(Box::new(span_x), Box::new(px_uv.clone()));
-                let pixel_span_y = Sx::Mul(Box::new(span_y), Box::new(px_uv));
+                let pixel_span_x = span_x * px_uv.clone();
+                let pixel_span_y = span_y * px_uv;
 
                 // Convert UV-step spans into local-units per output pixel, then normalize
                 // by the checker period to get the filter width in checker-space cells.
-                let width_x = Sx::Div(Box::new(pixel_span_x), Box::new(scale_x));
-                let width_y = Sx::Div(Box::new(pixel_span_y), Box::new(scale_y));
+                let width_x = pixel_span_x / scale_x;
+                let width_y = pixel_span_y / scale_y;
 
                 ctx.hir.notes.push(
                     "pattern: checker (prefiltered analytic, sep-box, ε ≤ 0.02)".to_string()
@@ -191,8 +176,8 @@ builtin! {
 
         let center = if variant == "x" { center_x } else { center_y };
 
-        let rel = Sx::Sub(Box::new(axis_coord), Box::new(center));
-        let scaled = Sx::Div(Box::new(rel), Box::new(scale.clone()));
+        let rel = axis_coord - center;
+        let scaled = rel / scale.clone();
 
         // Check filtering state and footprint availability
         let filtering_state = ctx.get_filtering_state();
@@ -209,11 +194,11 @@ builtin! {
 
                 // Select the appropriate span based on axis direction
                 let span = if variant == "x" { span_x } else { span_y };
-                let pixel_span = Sx::Mul(Box::new(span), Box::new(screen_px_uv(ctx)));
+                let pixel_span = span * screen_px_uv(ctx);
 
                 // Convert UV-step span into local-units per output pixel, then normalize
                 // by the stripe period to get the filter width in stripe-space cells.
-                let width = Sx::Div(Box::new(pixel_span), Box::new(scale));
+                let width = pixel_span / scale;
 
                 ctx.hir.notes.push(format!(
                     "pattern: stripe(along: {variant}) (prefiltered analytic, sep-box, ε ≤ 0.02)"
