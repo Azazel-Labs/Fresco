@@ -34,6 +34,38 @@ pub struct Diag {
 }
 
 impl Diag {
+    /// Render a parser error as a diagnostic, naming the innermost parse context.
+    pub(crate) fn from_parse_error(e: crate::parser::PError<'_>) -> Self {
+        if let chumsky::error::RichReason::Custom(msg) = e.reason() {
+            let mut d = Self::error(e.span().clone(), msg.to_string());
+            if let Some((label, _)) = e.contexts().last() {
+                d = d.with_label(format!("while parsing {label}"));
+            }
+            return d;
+        }
+
+        let found = e
+            .found()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "end of input".to_string());
+        let mut expected: Vec<String> = e.expected().map(ToString::to_string).collect();
+        expected.sort();
+        expected.dedup();
+
+        let mut d = Self::error(e.span().clone(), format!("unexpected {found}"));
+        if let Some((label, _)) = e.contexts().last() {
+            d = d.with_label(format!("while parsing {label}"));
+        } else {
+            d = d.with_label("unexpected token");
+        }
+        if !expected.is_empty() {
+            d = d.with_help(format!("expected {}", expected.join(", ")));
+        }
+        d
+    }
+}
+
+impl Diag {
     fn new(severity: Severity, span: Span, message: impl Into<String>) -> Self {
         Diag {
             severity,

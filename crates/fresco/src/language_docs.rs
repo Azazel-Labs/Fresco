@@ -1080,35 +1080,6 @@ fn builtin_category_from_signatures(signatures: &[DocBuiltinSignature]) -> &'sta
 }
 
 fn parse_prelude_program(src: &str) -> Result<crate::ast::Program, Vec<crate::diag::Diag>> {
-    fn perr_to_diag(e: crate::parser::PError<'_>) -> crate::diag::Diag {
-        if let chumsky::error::RichReason::Custom(msg) = e.reason() {
-            let mut d = crate::diag::Diag::error(e.span().clone(), msg.to_string());
-            if let Some((label, _)) = e.contexts().last() {
-                d = d.with_label(format!("while parsing {label}"));
-            }
-            return d;
-        }
-
-        let found = e
-            .found()
-            .map(ToString::to_string)
-            .unwrap_or_else(|| "end of input".to_string());
-        let mut expected: Vec<String> = e.expected().map(ToString::to_string).collect();
-        expected.sort();
-        expected.dedup();
-
-        let mut d = crate::diag::Diag::error(e.span().clone(), format!("unexpected {found}"));
-        if let Some((label, _)) = e.contexts().last() {
-            d = d.with_label(format!("while parsing {label}"));
-        } else {
-            d = d.with_label("unexpected token");
-        }
-        if !expected.is_empty() {
-            d = d.with_help(format!("expected {}", expected.join(", ")));
-        }
-        d
-    }
-
     let mut tokens = Vec::new();
     let mut lex_diags = Vec::new();
     for (tok, span) in crate::lexer::Token::lexer(src).spanned() {
@@ -1130,7 +1101,10 @@ fn parse_prelude_program(src: &str) -> Result<crate::ast::Program, Vec<crate::di
         .into_output_errors();
 
     if !parse_errs.is_empty() {
-        return Err(parse_errs.into_iter().map(perr_to_diag).collect());
+        return Err(parse_errs
+            .into_iter()
+            .map(crate::diag::Diag::from_parse_error)
+            .collect());
     }
 
     Ok(program.unwrap_or_default())

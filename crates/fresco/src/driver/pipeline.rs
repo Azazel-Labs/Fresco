@@ -797,7 +797,7 @@ pub(super) fn parse_syntax(
         .into_output_errors();
 
     if !parse_errs.is_empty() {
-        return Err(parse_errs.into_iter().map(perr_to_diag).collect());
+        return Err(parse_errs.into_iter().map(Diag::from_parse_error).collect());
     }
 
     let mut program = program.unwrap_or_default();
@@ -2847,33 +2847,4 @@ fn lower_and_validate(input: LowerInputs) -> Result<CompiledProgram, Vec<Diag>> 
         param_bindings: result.param_bindings,
         global_uniform_bindings: result.global_uniform_bindings,
     })
-}
-
-fn perr_to_diag(e: parser::PError<'_>) -> Diag {
-    if let chumsky::error::RichReason::Custom(msg) = e.reason() {
-        let mut d = Diag::error(e.span().clone(), msg.to_string());
-        if let Some((label, _)) = e.contexts().last() {
-            d = d.with_label(format!("while parsing {label}"));
-        }
-        return d;
-    }
-
-    let found = e
-        .found()
-        .map(ToString::to_string)
-        .unwrap_or_else(|| "end of input".to_string());
-    let mut expected: Vec<String> = e.expected().map(ToString::to_string).collect();
-    expected.sort();
-    expected.dedup();
-
-    let mut d = Diag::error(e.span().clone(), format!("unexpected {found}"));
-    if let Some((label, _)) = e.contexts().last() {
-        d = d.with_label(format!("while parsing {label}"));
-    } else {
-        d = d.with_label("unexpected token");
-    }
-    if !expected.is_empty() {
-        d = d.with_help(format!("expected {}", expected.join(", ")));
-    }
-    d
 }
