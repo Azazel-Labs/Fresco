@@ -1,3 +1,4 @@
+use super::coercions::AnchorRef;
 use super::*;
 use std::hash::{Hash, Hasher};
 use tracing::info;
@@ -286,99 +287,12 @@ impl Checker {
         Some(PathValue::from_points(0, vec![(0.0, 0.0), (1.0, 0.0)]).expect("static fallback path"))
     }
 
-    pub(super) fn is_anchor_variant_name(name: &str) -> bool {
-        matches!(
-            name,
-            "center"
-                | "top_center"
-                | "bottom_center"
-                | "left_center"
-                | "right_center"
-                | "top_left"
-                | "top_right"
-                | "bottom_left"
-                | "bottom_right"
-        )
-    }
-
-    fn anchor_variant_value(name: &str) -> Option<Value> {
-        anchor_variant_coords(name).map(|(x, y)| Value::Vec2((Sx::Lit(x), Sx::Lit(y))))
-    }
-
     fn resolve_anchor_value_name(&mut self, name: &str, span: &Span) -> Option<Value> {
-        if let Some((enum_name, variant_name)) = name.split_once('.') {
-            if enum_name != "Anchor" {
-                return None;
-            }
-            if variant_name.contains('.') {
-                self.diags.push(
-                    Diag::error(span.clone(), format!("invalid enum variant path `{name}`"))
-                        .with_help("use `Anchor.<variant>`, for example `Anchor.center`"),
-                );
-                return Some(Value::Error);
-            }
-
-            let Some(anchor_def) = self.enum_defs.get("Anchor") else {
-                self.diags.push(
-                    Diag::error(span.clone(), "enum `Anchor` is not available")
-                        .with_help("ensure stdlib enums are loaded before using anchor literals"),
-                );
-                return Some(Value::Error);
-            };
-
-            if !anchor_def.variants.contains_key(variant_name) {
-                self.diags.push(
-                    Diag::error(
-                        span.clone(),
-                        format!("unknown anchor variant `{variant_name}`"),
-                    )
-                    .with_help("supported anchor variants: center, top_center, bottom_center, left_center, right_center, top_left, top_right, bottom_left, bottom_right"),
-                );
-                return Some(Value::Error);
-            }
-
-            return Some(Self::anchor_variant_value(variant_name).unwrap_or(Value::Error));
+        match self.resolve_anchor_coords(name, span) {
+            Ok(AnchorRef::NotAnchor) => None,
+            Ok(AnchorRef::Coords(x, y)) => Some(Value::Vec2((Sx::Lit(x), Sx::Lit(y)))),
+            Ok(AnchorRef::NonPositional(_)) | Err(()) => Some(Value::Error),
         }
-
-        if !Self::is_anchor_variant_name(name) {
-            return None;
-        }
-
-        let owners: Vec<&str> = self
-            .enum_defs
-            .iter()
-            .filter(|(enum_name, _)| crate::registry::enum_allows_unqualified_values(enum_name))
-            .filter_map(|(enum_name, enum_def)| {
-                enum_def
-                    .variants
-                    .contains_key(name)
-                    .then_some(enum_name.as_str())
-            })
-            .collect();
-        if owners.is_empty() {
-            return None;
-        }
-        if owners.len() > 1 {
-            self.diags.push(
-                Diag::error(span.clone(), format!("ambiguous enum variant `{name}`")).with_help(
-                    format!(
-                        "qualify the variant: {}",
-                        owners
-                            .iter()
-                            .map(|owner| format!("`{owner}.{name}`"))
-                            .collect::<Vec<_>>()
-                            .join(" or ")
-                    ),
-                ),
-            );
-            return Some(Value::Error);
-        }
-
-        if owners[0] != "Anchor" {
-            return None;
-        }
-
-        Some(Self::anchor_variant_value(name).unwrap_or(Value::Error))
     }
 
     fn enum_variant_scalar_value(enum_def: &EnumDef, variant_name: &str) -> Value {

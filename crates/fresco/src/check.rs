@@ -1334,9 +1334,8 @@ pub(super) fn is_stdlib_source(path: &str) -> bool {
 }
 
 /// Returns the canonical UV coordinates for a named anchor variant, or `None`
-/// if the name is not a known anchor. Both `anchor_variant_value` (in `expr`)
-/// and `anchor_variant_vec2` (in `coercions`) derive their values from this
-/// single source of truth.
+/// if the name is not a known anchor. `Checker::resolve_anchor_coords` derives
+/// anchor values from this single source of truth.
 pub(super) fn anchor_variant_coords(name: &str) -> Option<(f32, f32)> {
     match name {
         "center" => Some((0.5, 0.5)),

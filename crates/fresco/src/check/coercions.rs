@@ -1,34 +1,40 @@
 use super::*;
 use web_time::Instant;
 
+/// What an identifier names when read as an anchor reference.
+pub(super) enum AnchorRef<'a> {
+    /// Not an anchor variant; the caller resolves the name some other way.
+    NotAnchor,
+    /// A positional anchor with its canonical UV coordinates.
+    Coords(f32, f32),
+    /// A declared `Anchor` variant that has no positional coordinates.
+    NonPositional(&'a str),
+}
+
 impl Checker {
-    fn anchor_variant_vec2(name: &str) -> Option<V2> {
-        anchor_variant_coords(name).map(|(x, y)| (Sx::Lit(x), Sx::Lit(y)))
-    }
-
-    fn resolve_anchor_literal_vec2(&mut self, e: &SExpr) -> Result<Option<V2>, ()> {
-        let Expr::Var(name) = &e.node else {
-            return Ok(None);
-        };
-
+    /// Resolve `Anchor.<variant>` or an unqualified anchor variant name.
+    /// Malformed, unknown, and ambiguous anchor references report a diagnostic
+    /// and return `Err(())`.
+    pub(super) fn resolve_anchor_coords<'a>(
+        &mut self,
+        name: &'a str,
+        span: &Span,
+    ) -> Result<AnchorRef<'a>, ()> {
         if let Some((enum_name, variant_name)) = name.split_once('.') {
             if enum_name != "Anchor" {
-                return Ok(None);
+                return Ok(AnchorRef::NotAnchor);
             }
             if variant_name.contains('.') {
                 self.diags.push(
-                    Diag::error(
-                        e.span.clone(),
-                        format!("invalid enum variant path `{name}`"),
-                    )
-                    .with_help("use `Anchor.<variant>`, for example `Anchor.center`"),
+                    Diag::error(span.clone(), format!("invalid enum variant path `{name}`"))
+                        .with_help("use `Anchor.<variant>`, for example `Anchor.center`"),
                 );
                 return Err(());
             }
 
             let Some(anchor_def) = self.enum_defs.get("Anchor") else {
                 self.diags.push(
-                    Diag::error(e.span.clone(), "enum `Anchor` is not available")
+                    Diag::error(span.clone(), "enum `Anchor` is not available")
                         .with_help("ensure stdlib enums are loaded before using anchor literals"),
                 );
                 return Err(());
@@ -37,7 +43,7 @@ impl Checker {
             if !anchor_def.variants.contains_key(variant_name) {
                 self.diags.push(
                     Diag::error(
-                        e.span.clone(),
+                        span.clone(),
                         format!("unknown anchor variant `{variant_name}`"),
                     )
                     .with_help("supported anchor variants: center, top_center, bottom_center, left_center, right_center, top_left, top_right, bottom_left, bottom_right"),
@@ -45,22 +51,15 @@ impl Checker {
                 return Err(());
             }
 
-            let Some(v) = Self::anchor_variant_vec2(variant_name) else {
-                self.diags.push(
-                    Diag::error(
-                        e.span.clone(),
-                        format!("anchor variant `{variant_name}` cannot be used as a coordinate"),
-                    )
-                    .with_help("use one of the built-in positional anchor variants"),
-                );
-                return Err(());
-            };
-            return Ok(Some(v));
+            return Ok(anchor_variant_coords(variant_name)
+                .map_or(AnchorRef::NonPositional(variant_name), |(x, y)| {
+                    AnchorRef::Coords(x, y)
+                }));
         }
 
-        if !Self::is_anchor_variant_name(name) {
-            return Ok(None);
-        }
+        let Some((x, y)) = anchor_variant_coords(name) else {
+            return Ok(AnchorRef::NotAnchor);
+        };
 
         let owners: Vec<&str> = self
             .enum_defs
@@ -75,12 +74,12 @@ impl Checker {
             .collect();
 
         if owners.is_empty() {
-            return Ok(None);
+            return Ok(AnchorRef::NotAnchor);
         }
 
         if owners.len() > 1 {
             self.diags.push(
-                Diag::error(e.span.clone(), format!("ambiguous enum variant `{name}`")).with_help(
+                Diag::error(span.clone(), format!("ambiguous enum variant `{name}`")).with_help(
                     format!(
                         "qualify the variant: {}",
                         owners
@@ -95,20 +94,30 @@ impl Checker {
         }
 
         if owners[0] != "Anchor" {
-            return Ok(None);
+            return Ok(AnchorRef::NotAnchor);
         }
 
-        let Some(v) = Self::anchor_variant_vec2(name) else {
-            self.diags.push(
-                Diag::error(
-                    e.span.clone(),
-                    format!("anchor variant `{name}` cannot be used as a coordinate"),
-                )
-                .with_help("use one of the built-in positional anchor variants"),
-            );
-            return Err(());
+        Ok(AnchorRef::Coords(x, y))
+    }
+
+    fn resolve_anchor_literal_vec2(&mut self, e: &SExpr) -> Result<Option<V2>, ()> {
+        let Expr::Var(name) = &e.node else {
+            return Ok(None);
         };
-        Ok(Some(v))
+        match self.resolve_anchor_coords(name, &e.span)? {
+            AnchorRef::NotAnchor => Ok(None),
+            AnchorRef::Coords(x, y) => Ok(Some((Sx::Lit(x), Sx::Lit(y)))),
+            AnchorRef::NonPositional(variant_name) => {
+                self.diags.push(
+                    Diag::error(
+                        e.span.clone(),
+                        format!("anchor variant `{variant_name}` cannot be used as a coordinate"),
+                    )
+                    .with_help("use one of the built-in positional anchor variants"),
+                );
+                Err(())
+            }
+        }
     }
 
     pub(super) fn as_color_expr(&mut self, e: &SExpr) -> Option<[Sx; 4]> {
