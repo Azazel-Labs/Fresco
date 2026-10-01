@@ -242,9 +242,11 @@ impl Checker {
                             let Some(v2) = self.as_vec2(item) else {
                                 return;
                             };
-                            let Some((x, y)) =
-                                self.require_const_param_vec2(&v2, "element", item.span.clone())
-                            else {
+                            let Some([x, y]) = self.require_const_param_lanes(
+                                [&v2.0, &v2.1],
+                                "element",
+                                item.span.clone(),
+                            ) else {
                                 return;
                             };
                             values.push(hir::ArrayElemValue::Vec2((x, y)));
@@ -255,9 +257,11 @@ impl Checker {
                             let Some(v3) = self.as_vec3(item) else {
                                 return;
                             };
-                            let Some((x, y, z)) =
-                                self.require_const_param_vec3(&v3, "element", item.span.clone())
-                            else {
+                            let Some([x, y, z]) = self.require_const_param_lanes(
+                                [&v3.0, &v3.1, &v3.2],
+                                "element",
+                                item.span.clone(),
+                            ) else {
                                 return;
                             };
                             values.push(hir::ArrayElemValue::Vec3((x, y, z)));
@@ -268,9 +272,11 @@ impl Checker {
                             let Some(v4) = self.as_vec4(item) else {
                                 return;
                             };
-                            let Some((x, y, z, w)) =
-                                self.require_const_param_vec4(&v4, "element", item.span.clone())
-                            else {
+                            let Some([x, y, z, w]) = self.require_const_param_lanes(
+                                [&v4.0, &v4.1, &v4.2, &v4.3],
+                                "element",
+                                item.span.clone(),
+                            ) else {
                                 return;
                             };
                             values.push(hir::ArrayElemValue::Vec4((x, y, z, w)));
@@ -467,9 +473,11 @@ impl Checker {
                         let Some(v2) = self.as_vec2(item) else {
                             return;
                         };
-                        let Some((x, y)) =
-                            self.require_const_param_vec2(&v2, "element", item.span.clone())
-                        else {
+                        let Some([x, y]) = self.require_const_param_lanes(
+                            [&v2.0, &v2.1],
+                            "element",
+                            item.span.clone(),
+                        ) else {
                             return;
                         };
 
@@ -486,9 +494,11 @@ impl Checker {
                         let Some(v3) = self.as_vec3(item) else {
                             return;
                         };
-                        let Some((x, y, z)) =
-                            self.require_const_param_vec3(&v3, "element", item.span.clone())
-                        else {
+                        let Some([x, y, z]) = self.require_const_param_lanes(
+                            [&v3.0, &v3.1, &v3.2],
+                            "element",
+                            item.span.clone(),
+                        ) else {
                             return;
                         };
 
@@ -506,9 +516,11 @@ impl Checker {
                         let Some(v4) = self.as_vec4(item) else {
                             return;
                         };
-                        let Some((x, y, z, w)) =
-                            self.require_const_param_vec4(&v4, "element", item.span.clone())
-                        else {
+                        let Some([x, y, z, w]) = self.require_const_param_lanes(
+                            [&v4.0, &v4.1, &v4.2, &v4.3],
+                            "element",
+                            item.span.clone(),
+                        ) else {
                             return;
                         };
 
@@ -533,7 +545,7 @@ impl Checker {
                             [mat.1.0.clone(), mat.1.1.clone()],
                         ];
                         let Some(values_mat) =
-                            self.require_const_param_mat2(&mat_array, "element", item.span.clone())
+                            self.require_const_param_mat(&mat_array, "element", item.span.clone())
                         else {
                             return;
                         };
@@ -564,7 +576,7 @@ impl Checker {
                             [mat.2.0.clone(), mat.2.1.clone(), mat.2.2.clone()],
                         ];
                         let Some(values_mat) =
-                            self.require_const_param_mat3(&mat_array, "element", item.span.clone())
+                            self.require_const_param_mat(&mat_array, "element", item.span.clone())
                         else {
                             return;
                         };
@@ -623,7 +635,7 @@ impl Checker {
                             ],
                         ];
                         let Some(values_mat) =
-                            self.require_const_param_mat4(&mat_array, "element", item.span.clone())
+                            self.require_const_param_mat(&mat_array, "element", item.span.clone())
                         else {
                             return;
                         };
@@ -1260,89 +1272,37 @@ impl Checker {
         }
     }
 
-    pub(super) fn require_const_param_vec2(
+    /// Require each vector lane to be a numeric literal, naming lanes
+    /// `x`/`y`/`z`/`w` in diagnostics.
+    pub(super) fn require_const_param_lanes<const N: usize>(
         &mut self,
-        v2: &V2,
+        lanes: [&Sx; N],
         label: &str,
         span: Span,
-    ) -> Option<(f32, f32)> {
-        let x = self.require_const_param_scalar(&v2.0, &format!("{label} x"), span.clone())?;
-        let y = self.require_const_param_scalar(&v2.1, &format!("{label} y"), span)?;
-        Some((x, y))
-    }
-
-    pub(super) fn require_const_param_vec3(
-        &mut self,
-        v3: &(Sx, Sx, Sx),
-        label: &str,
-        span: Span,
-    ) -> Option<(f32, f32, f32)> {
-        let x = self.require_const_param_scalar(&v3.0, &format!("{label} x"), span.clone())?;
-        let y = self.require_const_param_scalar(&v3.1, &format!("{label} y"), span.clone())?;
-        let z = self.require_const_param_scalar(&v3.2, &format!("{label} z"), span)?;
-        Some((x, y, z))
-    }
-
-    pub(super) fn require_const_param_vec4(
-        &mut self,
-        v4: &(Sx, Sx, Sx, Sx),
-        label: &str,
-        span: Span,
-    ) -> Option<(f32, f32, f32, f32)> {
-        let x = self.require_const_param_scalar(&v4.0, &format!("{label} x"), span.clone())?;
-        let y = self.require_const_param_scalar(&v4.1, &format!("{label} y"), span.clone())?;
-        let z = self.require_const_param_scalar(&v4.2, &format!("{label} z"), span.clone())?;
-        let w = self.require_const_param_scalar(&v4.3, &format!("{label} w"), span)?;
-        Some((x, y, z, w))
-    }
-
-    pub(super) fn require_const_param_mat2(
-        &mut self,
-        mat: &[[Sx; 2]; 2],
-        label: &str,
-        span: Span,
-    ) -> Option<[[f32; 2]; 2]> {
-        let mut result = [[0.0; 2]; 2];
-        for i in 0..2 {
-            for j in 0..2 {
-                result[i][j] = self.require_const_param_scalar(
-                    &mat[i][j],
-                    &format!("{label} [{i}][{j}]"),
-                    span.clone(),
-                )?;
-            }
+    ) -> Option<[f32; N]> {
+        const LANE_NAMES: [&str; 4] = ["x", "y", "z", "w"];
+        let mut result = [0.0; N];
+        for (i, (slot, lane)) in result.iter_mut().zip(lanes).enumerate() {
+            *slot = self.require_const_param_scalar(
+                lane,
+                &format!("{label} {}", LANE_NAMES[i]),
+                span.clone(),
+            )?;
         }
         Some(result)
     }
 
-    pub(super) fn require_const_param_mat3(
+    /// Require each matrix entry to be a numeric literal, naming entries
+    /// `[row][column]` in diagnostics.
+    pub(super) fn require_const_param_mat<const N: usize>(
         &mut self,
-        mat: &[[Sx; 3]; 3],
+        mat: &[[Sx; N]; N],
         label: &str,
         span: Span,
-    ) -> Option<[[f32; 3]; 3]> {
-        let mut result = [[0.0; 3]; 3];
-        for i in 0..3 {
-            for j in 0..3 {
-                result[i][j] = self.require_const_param_scalar(
-                    &mat[i][j],
-                    &format!("{label} [{i}][{j}]"),
-                    span.clone(),
-                )?;
-            }
-        }
-        Some(result)
-    }
-
-    pub(super) fn require_const_param_mat4(
-        &mut self,
-        mat: &[[Sx; 4]; 4],
-        label: &str,
-        span: Span,
-    ) -> Option<[[f32; 4]; 4]> {
-        let mut result = [[0.0; 4]; 4];
-        for i in 0..4 {
-            for j in 0..4 {
+    ) -> Option<[[f32; N]; N]> {
+        let mut result = [[0.0; N]; N];
+        for i in 0..N {
+            for j in 0..N {
                 result[i][j] = self.require_const_param_scalar(
                     &mat[i][j],
                     &format!("{label} [{i}][{j}]"),
