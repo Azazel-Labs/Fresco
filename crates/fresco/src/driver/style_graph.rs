@@ -1,4 +1,5 @@
 //! Validate engine graph contracts before lowering their explicit integration points.
+use crate::ast::{find_attr, has_attr};
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestRecipeResource, ManifestRecipeStep};
 use std::collections::{BTreeMap, BTreeSet};
@@ -175,10 +176,7 @@ pub(super) fn bindings<'a>(
         return vec![];
     };
     let mut result: Vec<_> = pass.bindings.iter().collect();
-    let declared = pass
-        .attrs
-        .iter()
-        .find(|a| a.name == "factory")
+    let declared = find_attr(&pass.attrs, "factory")
         .and_then(|a| a.args.first())
         .map(String::as_str);
     let selected = if step.is_draw_scoped() {
@@ -263,7 +261,7 @@ pub(super) fn bound_resource(
                 .attrs
                 .iter()
                 .any(|a| a.name == "draw_data" && a.args.as_slice() == ["instance_id"])
-                || binding.attrs.iter().any(|a| a.name == "source")
+                || has_attr(&binding.attrs, "source")
                 || binding.value_signature.as_deref().map(compact).as_deref()
                     != Some("uniform<u32>")
                 || compact(expected) != "draw_instance_id"
@@ -293,7 +291,7 @@ pub(super) fn bound_resource(
                 .find(|h| h.name == *entry)
                 .ok_or_else(|| format!("unknown capability entry `{endpoint}`"))?;
             let stage = if vertex { "vertex" } else { "fragment" };
-            if !hook.attrs.iter().any(|a| a.name == stage) {
+            if !has_attr(&hook.attrs, stage) {
                 return Err(format!("`{endpoint}` is not a {stage} output"));
             }
             let record = hook
@@ -596,7 +594,7 @@ fn provider(program: &Program, provider: &StyleProviderDecl) -> Result<CheckedPr
     let pipeline = program
         .pipelines
         .iter()
-        .find(|p| p.name == provider.renderer && p.attrs.iter().any(|a| a.name == "renderer"))
+        .find(|p| p.name == provider.renderer && has_attr(&p.attrs, "renderer"))
         .ok_or_else(|| {
             format!(
                 "provider requires renderer pipeline `{}`",
@@ -1158,7 +1156,7 @@ pub(super) fn requirements(program: &Program) -> Result<(), Vec<Diag>> {
             let renderer = program
                 .pipelines
                 .iter()
-                .find(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"))
+                .find(|p| has_attr(&p.attrs, "selected_renderer"))
                 .ok_or_else(|| {
                     vec![
                         Diag::error(

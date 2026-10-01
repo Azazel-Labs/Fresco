@@ -1,5 +1,6 @@
 //! General GPU stage programs declared by engine passes.
 use super::*;
+use crate::ast::has_attr;
 use fresco_artifact::{
     ManifestGpuBinding, ManifestGpuProgram, ManifestRasterEntry, ManifestStageOutput,
 };
@@ -21,7 +22,7 @@ pub(in crate::driver) fn build(
     }
     let selected = pipelines
         .iter()
-        .find(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"));
+        .find(|p| has_attr(&p.attrs, "selected_renderer"));
     passes
         .iter()
         .filter(|pass| {
@@ -35,7 +36,7 @@ pub(in crate::driver) fn build(
                     .filter(|p| super::super::techniques::is_technique(p))
                     .any(|p| p.pass_refs.iter().any(|r| r.name == pass.name))
         })
-        .filter(|pass| pass.attrs.iter().any(|a| a.name == "shader"))
+        .filter(|pass| has_attr(&pass.attrs, "shader"))
         .flat_map(|pass| {
             if let Some(expected) = &pass.material_name {
                 materials
@@ -153,8 +154,7 @@ pub(in crate::driver) fn emit(
         for attr in &binding.attrs {
             match attr.name.as_str() {
                 "group" | "binding" | "geometry_resource" => {}
-                "source" | "draw_data" | "sampler"
-                    if pass.attrs.iter().any(|a| a.name == "factory") => {}
+                "source" | "draw_data" | "sampler" if has_attr(&pass.attrs, "factory") => {}
                 "access" if attr.args.as_slice() == ["read_write"] => access = "read_write",
                 "access" if attr.args.as_slice() == ["write"] => access = "write",
                 _ => {
@@ -279,7 +279,7 @@ pub(in crate::driver) fn emit(
         hooks: pass
             .hooks
             .iter()
-            .filter(|h| h.attrs.iter().any(|a| a.name == "pure"))
+            .filter(|h| has_attr(&h.attrs, "pure"))
             .cloned()
             .collect(),
         ..pass.clone()
@@ -294,7 +294,7 @@ pub(in crate::driver) fn emit(
         {
             continue;
         }
-        if hook.attrs.iter().any(|a| a.name == "pure") {
+        if has_attr(&hook.attrs, "pure") {
             if hook.attrs.len() != 1 || !hook.attrs[0].args.is_empty() {
                 return Err("@pure must be the only attribute on a typed helper".into());
             }
@@ -349,7 +349,7 @@ pub(in crate::driver) fn emit(
                 record.fields.iter().map(|f| format!("{temporary}.{}", f.name)).collect::<Vec<_>>().join(", ")));
             continue;
         }
-        if hook.attrs.iter().any(|a| a.name == "evaluate") {
+        if has_attr(&hook.attrs, "evaluate") {
             let material =
                 material.ok_or("evaluator requires a material-specialized shader pass")?;
             if hook.attrs.len() != 1
@@ -417,11 +417,11 @@ pub(in crate::driver) fn emit(
                 }
             }
         }
-        if hook.attrs.iter().any(|a| a.name == "workgroup_size") && stage != Some("compute") {
+        if has_attr(&hook.attrs, "workgroup_size") && stage != Some("compute") {
             return Err("workgroup size requires a compute entry".into());
         }
         if stage == Some("compute")
-            && (!hook.attrs.iter().any(|a| a.name == "workgroup_size") || hook.return_ty.is_some())
+            && (!has_attr(&hook.attrs, "workgroup_size") || hook.return_ty.is_some())
         {
             return Err("compute entry requires a workgroup size and no return value".into());
         }
@@ -557,11 +557,7 @@ pub(in crate::driver) fn emit(
     let varying_types: BTreeSet<_> = pass
         .hooks
         .iter()
-        .filter(|hook| {
-            hook.attrs
-                .iter()
-                .any(|attribute| attribute.name == "vertex")
-        })
+        .filter(|hook| has_attr(&hook.attrs, "vertex"))
         .filter_map(|hook| hook.return_ty.as_ref().map(|ty| ty.node.as_str()))
         .collect();
     let mut done = BTreeSet::new();
@@ -598,7 +594,7 @@ pub(in crate::driver) fn emit(
             }
             let mut attrs = String::new();
             for (name, args) in &field.attrs {
-                if record.attrs.iter().any(|a| a.name == "table")
+                if has_attr(&record.attrs, "table")
                     && matches!(
                         name.as_str(),
                         "table_index"

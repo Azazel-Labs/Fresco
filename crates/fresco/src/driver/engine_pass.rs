@@ -1,5 +1,6 @@
 //! Specialization and WGSL emission for an engine-authored fullscreen pass.
 
+use crate::ast::find_attr;
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{BinOp, Expr, PassDecl, PipelineDecl, SExpr, Stmt, UnOp};
@@ -107,10 +108,7 @@ pub(super) fn for_canvas(
     }
 
     for permutation in &pass.permutations {
-        let mode = permutation
-            .attrs
-            .iter()
-            .find(|attr| attr.name == "known")
+        let mode = find_attr(&permutation.attrs, "known")
             .and_then(|attr| attr.args.first())
             .map(|mode| mode.trim().to_ascii_lowercase());
         if mode.as_deref() != Some("compile") {

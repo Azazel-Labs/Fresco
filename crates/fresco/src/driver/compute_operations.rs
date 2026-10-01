@@ -1,4 +1,5 @@
 //! Definition-side contracts for owned compute operations.
+use crate::ast::{find_attr, has_attr};
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{
     ManifestComputeBindingSource as BindingSource, ManifestComputeDimension as Dimension,
@@ -82,7 +83,7 @@ pub(super) fn host_type(
             && let Some(input) = operation.inputs.iter().find(|i| i.name == root)
         {
             if let Some(resource) = program.resource_types.iter().find(|r| r.name == input.ty) {
-                let roles = resource.attrs.iter().find(|a| a.name == "geometry");
+                let roles = find_attr(&resource.attrs, "geometry");
                 if roles.is_some_and(|a| {
                     a.args.get(2).is_some_and(|n| n == field)
                         || a.args.get(3).is_some_and(|n| n == field)
@@ -282,11 +283,7 @@ pub(super) fn shader_definition_projected(
                 input.name, input.ty
             ));
         } else if let Some(resource) = program.resource_types.iter().find(|r| r.name == input.ty) {
-            let roles = resource
-                .attrs
-                .iter()
-                .find(|a| a.name == "geometry")
-                .expect("validated geometry roles");
+            let roles = find_attr(&resource.attrs, "geometry").expect("validated geometry roles");
             for field in &resource.fields {
                 let name = format!("__fresco_{}_{}", input.name, field.name);
                 let geometry_source = || -> Result<BindingSource, Vec<Diag>> {
@@ -515,7 +512,7 @@ pub(super) fn shader_definition_projected(
         }
         hook.body = body;
         let mut capture = prelude.clone();
-        if hook.attrs.iter().any(|a| a.name == "compute") {
+        if has_attr(&hook.attrs, "compute") {
             let parameter = &mut hook.params[0];
             parameter.attrs.push(attribute(
                 "builtin",
@@ -674,7 +671,7 @@ pub(super) fn validate(program: &Program, pass: &PassDecl) -> Result<(), Vec<Dia
     let entries: Vec<_> = pass
         .hooks
         .iter()
-        .filter(|h| h.attrs.iter().any(|a| a.name == "compute"))
+        .filter(|h| has_attr(&h.attrs, "compute"))
         .collect();
     let [entry] = entries.as_slice() else {
         return Err(fail(

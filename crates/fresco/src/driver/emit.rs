@@ -1,3 +1,4 @@
+use crate::ast::{find_attr, has_attr};
 use std::collections::{BTreeSet, HashMap};
 use std::str::FromStr;
 
@@ -192,29 +193,20 @@ fn manifest_vertex_factories(
                 .bindings
                 .iter()
                 .map(|binding| {
-                    let group = binding
-                        .attrs
-                        .iter()
-                        .find(|attribute| attribute.name == "group")
+                    let group = find_attr(&binding.attrs, "group")
                         .and_then(|attribute| attribute.args.first())
                         .map(String::as_str);
                     let group_index = binding.group_index;
                     let binding_index = binding.binding_index;
                     ManifestVertexFactoryBinding {
-                        sampler: binding.attrs.iter().find(|a| a.name == "sampler").map(|a| {
+                        sampler: find_attr(&binding.attrs, "sampler").map(|a| {
                             fresco_artifact::types::SamplerPreset::parse(&a.args[0])
                                 .expect("validated sampler preset")
                         }),
-                        draw_data: binding
-                            .attrs
-                            .iter()
-                            .any(|a| a.name == "draw_data")
+                        draw_data: has_attr(&binding.attrs, "draw_data")
                             .then_some(fresco_artifact::ManifestDrawData::InstanceId),
                         geometry: None,
-                        source: binding
-                            .attrs
-                            .iter()
-                            .find(|a| a.name == "source")
+                        source: find_attr(&binding.attrs, "source")
                             .and_then(|a| a.args.first())
                             .cloned(),
                         name: binding.name.clone(),
@@ -237,14 +229,6 @@ fn manifest_vertex_factories(
         .collect()
 }
 
-fn has_pass_attr(pass_decl: &PassDecl, attr_name: &str) -> bool {
-    pass_decl.attrs.iter().any(|attr| attr.name == attr_name)
-}
-
-fn has_permutation_attr(permutation: &crate::ast::PassPermutationDecl, attr_name: &str) -> bool {
-    permutation.attrs.iter().any(|attr| attr.name == attr_name)
-}
-
 fn has_permutation_editor_config(permutation: &crate::ast::PassPermutationDecl) -> bool {
     permutation.attrs.iter().any(|attr| {
         if attr.name == "config_editor" {
@@ -260,7 +244,7 @@ fn has_permutation_editor_config(permutation: &crate::ast::PassPermutationDecl) 
 }
 
 fn pass_included_for_profile(pass_decl: &PassDecl, build_profile: BuildProfile) -> bool {
-    if !has_pass_attr(pass_decl, "editor_only") {
+    if !has_attr(&pass_decl.attrs, "editor_only") {
         return true;
     }
     build_profile.includes_editor_only()
@@ -269,7 +253,7 @@ fn pass_included_for_profile(pass_decl: &PassDecl, build_profile: BuildProfile) 
 fn known_mode_from_permutation_attrs(
     permutation: &crate::ast::PassPermutationDecl,
 ) -> &'static str {
-    if let Some(known_attr) = permutation.attrs.iter().find(|attr| attr.name == "known")
+    if let Some(known_attr) = find_attr(&permutation.attrs, "known")
         && let Some(mode) = known_attr.args.first()
     {
         return match mode.trim().to_ascii_lowercase().as_str() {
@@ -279,11 +263,11 @@ fn known_mode_from_permutation_attrs(
             _ => "unknown",
         };
     }
-    if has_permutation_attr(permutation, "known_compile") {
+    if has_attr(&permutation.attrs, "known_compile") {
         "compile"
-    } else if has_permutation_attr(permutation, "known_pipeline") {
+    } else if has_attr(&permutation.attrs, "known_pipeline") {
         "pipeline"
-    } else if has_permutation_attr(permutation, "known_draw") {
+    } else if has_attr(&permutation.attrs, "known_draw") {
         "draw"
     } else {
         "unknown"
@@ -1112,32 +1096,24 @@ fn render_manifest(input: ManifestInputs<'_>) -> Result<String, EmitError> {
                             .bindings
                             .iter()
                             .map(|b| ManifestVertexFactoryBinding {
-                                sampler: b.attrs.iter().find(|a| a.name == "sampler").map(|a| {
+                                sampler: find_attr(&b.attrs, "sampler").map(|a| {
                                     fresco_artifact::types::SamplerPreset::parse(&a.args[0])
                                         .expect("validated sampler preset")
                                 }),
-                                draw_data: b
-                                    .attrs
-                                    .iter()
-                                    .any(|a| a.name == "draw_data")
+                                draw_data: has_attr(&b.attrs, "draw_data")
                                     .then_some(fresco_artifact::ManifestDrawData::InstanceId),
-                                geometry: b
-                                    .attrs
-                                    .iter()
-                                    .find(|a| a.name == "geometry_resource")
-                                    .map(|a| fresco_artifact::ManifestGeometryBinding {
+                                geometry: find_attr(&b.attrs, "geometry_resource").map(|a| {
+                                    fresco_artifact::ManifestGeometryBinding {
                                         producer: a.args[0].clone(),
                                         role: a.args[1].clone(),
-                                    }),
+                                    }
+                                }),
                                 name: b.name.clone(),
                                 group: b.group_index.map(|g| g.to_string()),
                                 group_index: b.group_index,
                                 binding: b.binding_index,
                                 signature: b.value_signature.clone(),
-                                source: b
-                                    .attrs
-                                    .iter()
-                                    .find(|a| a.name == "source")
+                                source: find_attr(&b.attrs, "source")
                                     .and_then(|a| a.args.first())
                                     .cloned(),
                             })

@@ -1469,6 +1469,18 @@ pub struct PipelineAttribute {
     pub span: Span,
 }
 
+/// Returns `true` when `attrs` contains an attribute named `name`.
+#[must_use]
+pub fn has_attr(attrs: &[PipelineAttribute], name: &str) -> bool {
+    attrs.iter().any(|attr| attr.name == name)
+}
+
+/// The first attribute in `attrs` named `name`, if any.
+#[must_use]
+pub fn find_attr<'a>(attrs: &'a [PipelineAttribute], name: &str) -> Option<&'a PipelineAttribute> {
+    attrs.iter().find(|attr| attr.name == name)
+}
+
 /// A staged binding-like declaration in a pass body.
 #[allow(
     dead_code,

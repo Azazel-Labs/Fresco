@@ -1,11 +1,12 @@
 //! Engine-owned mesh preparation and resource aggregate contracts.
+use crate::ast::{find_attr, has_attr};
 use crate::{ast::*, diag::Diag};
 use std::collections::BTreeSet;
 
 pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
     let mut values = Vec::new();
     for declaration in std::mem::take(&mut program.structs) {
-        if declaration.attrs.iter().any(|a| a.name == "resource") {
+        if has_attr(&declaration.attrs, "resource") {
             program.resource_types.push(declaration);
         } else {
             values.push(declaration);
@@ -130,7 +131,7 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
         if pass
             .bindings
             .iter()
-            .any(|b| b.attrs.iter().any(|a| a.name == "geometry_resource"))
+            .any(|b| has_attr(&b.attrs, "geometry_resource"))
         {
             return Err(vec![Diag::error(
                 pass.span.clone(),
@@ -140,7 +141,7 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
         let preparations: Vec<_> = pass
             .hooks
             .iter()
-            .filter(|h| h.attrs.iter().any(|a| a.name == "prepare"))
+            .filter(|h| has_attr(&h.attrs, "prepare"))
             .collect();
         if preparations.len() > 1 {
             return Err(vec![Diag::error(
@@ -149,11 +150,7 @@ pub(super) fn collect(program: &mut Program) -> Result<(), Vec<Diag>> {
             )]);
         }
         if let Some(hook) = preparations.first() {
-            let resource = hook
-                .attrs
-                .iter()
-                .find(|a| a.name == "prepare")
-                .expect("preparation attribute");
+            let resource = find_attr(&hook.attrs, "prepare").expect("preparation attribute");
             let [name] = resource.args.as_slice() else {
                 return Err(vec![Diag::error(
                     resource.span.clone(),
@@ -227,11 +224,7 @@ pub(super) fn producer<'a>(
         .iter()
         .find(|r| r.name == resource)
         .ok_or("unknown geometry resource type")?;
-    let roles = resource
-        .attrs
-        .iter()
-        .find(|a| a.name == "geometry")
-        .expect("checked resource roles");
+    let roles = find_attr(&resource.attrs, "geometry").expect("checked resource roles");
     let vertices = resource
         .fields
         .iter()
@@ -258,10 +251,7 @@ pub(super) fn producer<'a>(
     if !program.vertex_interfaces.iter().any(|i| i.name == *input) {
         return Err("preparation input must be a declared vertex interface".into());
     }
-    let declared = pass
-        .attrs
-        .iter()
-        .find(|a| a.name == "factory")
+    let declared = find_attr(&pass.attrs, "factory")
         .and_then(|a| a.args.first())
         .ok_or("preparation pass must declare its vertex factory")?;
     if factory.is_some_and(|f| f != declared) {
@@ -296,11 +286,7 @@ pub(super) fn member<'a>(
 }
 
 pub(super) fn roles(resource: &StructDecl) -> [&StructFieldDecl; 5] {
-    let roles = resource
-        .attrs
-        .iter()
-        .find(|a| a.name == "geometry")
-        .expect("validated geometry resource");
+    let roles = find_attr(&resource.attrs, "geometry").expect("validated geometry resource");
     std::array::from_fn(|i| {
         resource
             .fields
@@ -372,7 +358,7 @@ pub(super) fn select_resource(
         let renderer = program
             .pipelines
             .iter()
-            .find(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"))
+            .find(|p| has_attr(&p.attrs, "selected_renderer"))
             .ok_or("prepared geometry requires a selected renderer")?;
         let provider = program
             .style_providers
@@ -512,7 +498,7 @@ pub(super) fn bind_draw(program: &Program, pass: &mut PassDecl) -> Result<String
             }
         }
         hook.body = rewritten;
-        if hook.attrs.iter().any(|a| a.name == "vertex") {
+        if has_attr(&hook.attrs, "vertex") {
             for parameter in &mut hook.params {
                 if parameter.attrs.is_empty() {
                     parameter.attrs.push(PipelineAttribute {

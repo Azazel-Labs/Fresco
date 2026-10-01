@@ -2,6 +2,7 @@
 
 use super::gpu_function::*;
 use crate::ast::{BinOp, Expr, SExpr, Stmt};
+use crate::ast::{find_attr, has_attr};
 mod preparation_shader;
 mod program;
 pub(super) use program::{
@@ -104,7 +105,7 @@ pub(super) fn for_surface(
 ) -> Result<Vec<MeshStage>, String> {
     let selected = pipelines
         .iter()
-        .find(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"));
+        .find(|p| has_attr(&p.attrs, "selected_renderer"));
     let eligible: Vec<_> = passes
         .iter()
         .filter(|pass| {
@@ -165,7 +166,7 @@ pub(super) fn for_surface(
             if pass.preparation.is_some() && !demand.contains(&pass.name) {
                 pass.preparation = None;
                 pass.bindings
-                    .retain(|b| !b.attrs.iter().any(|a| a.name == "geometry_resource"));
+                    .retain(|b| !has_attr(&b.attrs, "geometry_resource"));
             }
             pass
         })
@@ -182,10 +183,7 @@ pub(super) fn for_surface(
         usages.iter().map(|name| Some(name.as_str())).collect()
     };
     let mut stages = Vec::new();
-    for pass in passes
-        .iter()
-        .filter(|p| p.attrs.iter().any(|a| a.name == "factory"))
-    {
+    for pass in passes.iter().filter(|p| has_attr(&p.attrs, "factory")) {
         let mut pass = pass.clone();
         let shading_inputs = super::implementations::specialize_draw_dispatch(
             &mut pass,
@@ -243,12 +241,7 @@ fn for_factory(
     let candidates = passes
         .iter()
         .filter_map(|pass| {
-            let factory_name = pass
-                .attrs
-                .iter()
-                .find(|attr| attr.name == "factory")?
-                .args
-                .first()?;
+            let factory_name = find_attr(&pass.attrs, "factory")?.args.first()?;
             Some((pass, factory_name.as_str()))
         })
         .collect::<Vec<_>>();
@@ -329,7 +322,7 @@ fn for_factory(
     let vertex = pass
         .hooks
         .iter()
-        .find(|hook| hook.attrs.iter().any(|a| a.name == "vertex"))
+        .find(|hook| has_attr(&hook.attrs, "vertex"))
         .ok_or_else(|| {
             format!(
                 "executable mesh pass `{}` requires a vertex hook",

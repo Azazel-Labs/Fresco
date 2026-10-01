@@ -1,4 +1,5 @@
 //! Instantiate authored draw operations from a statically constructed style graph.
+use crate::ast::{find_attr, has_attr};
 use crate::{ast::*, diag::Diag};
 use fresco_artifact::{ManifestImplementationSelection, ManifestStyleInvocation};
 use std::collections::{BTreeMap, BTreeSet};
@@ -1213,10 +1214,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     "draw operation requires an explicit vertex factory",
                 ));
             }
-            let factory_name = pass
-                .attrs
-                .iter()
-                .find(|a| a.name == "factory")
+            let factory_name = find_attr(&pass.attrs, "factory")
                 .and_then(|a| a.args.first())
                 .expect("checked factory attribute");
             let factory = program
@@ -1230,7 +1228,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
                     "operation factory requires a transform hook",
                 ));
             }
-        } else if pass.attrs.iter().any(|a| a.name == "factory") {
+        } else if has_attr(&pass.attrs, "factory") {
             return Err(fail(
                 &pass.span,
                 "prepared draws obtain their factory from the geometry producer",
@@ -1240,7 +1238,7 @@ fn validate(program: &Program, definitions: &[PassDecl]) -> Result<(), Vec<Diag>
             if pass
                 .hooks
                 .iter()
-                .filter(|h| h.attrs.iter().any(|a| a.name == kind))
+                .filter(|h| has_attr(&h.attrs, kind))
                 .count()
                 != 1
             {
@@ -1351,7 +1349,7 @@ fn instantiate(
     let renderer = program
         .pipelines
         .iter_mut()
-        .find(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"))
+        .find(|p| has_attr(&p.attrs, "selected_renderer"))
         .ok_or_else(|| fail(&call.span, "draw invocation requires a selected renderer"))?;
     if !renderer
         .attrs
@@ -1439,14 +1437,14 @@ fn instantiate(
     let vertex = pass
         .hooks
         .iter()
-        .find(|h| h.attrs.iter().any(|a| a.name == "vertex"))
+        .find(|h| has_attr(&h.attrs, "vertex"))
         .expect("vertex")
         .name
         .clone();
     let fragment = pass
         .hooks
         .iter()
-        .find(|h| h.attrs.iter().any(|a| a.name == "fragment"))
+        .find(|h| has_attr(&h.attrs, "fragment"))
         .expect("fragment")
         .name
         .clone();
@@ -1749,11 +1747,7 @@ fn instantiate(
                 let prepared = super::prepared_geometry::select_resource(
                     context, style, parameter, &call.args,
                 )?;
-                let roles = prepared
-                    .resource
-                    .attrs
-                    .iter()
-                    .find(|a| a.name == "geometry")
+                let roles = find_attr(&prepared.resource.attrs, "geometry")
                     .expect("validated geometry roles");
                 geometry.insert(
                     parameter.name.clone(),
@@ -1859,10 +1853,7 @@ pub(super) fn ensure_binding(
     name: &str,
     ty: &str,
 ) -> Result<(), Vec<Diag>> {
-    let factory = pass
-        .attrs
-        .iter()
-        .find(|a| a.name == "factory")
+    let factory = find_attr(&pass.attrs, "factory")
         .and_then(|a| a.args.first())
         .and_then(|n| program.vertex_factories.iter().find(|f| f.name == *n))
         .ok_or_else(|| fail(&pass.span, "unknown operation vertex factory"))?;

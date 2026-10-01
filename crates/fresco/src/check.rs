@@ -6,6 +6,7 @@
 //! positional arguments; and every mismatch is reported with a span and,
 //! where possible, a fix-it hint.
 
+use crate::ast::{find_attr, has_attr};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::f64::consts::PI;
 use std::time::Duration;
@@ -144,10 +145,6 @@ fn validate_pipeline_attr_target(
             "attributes are parsed generically; checker allow-lists are staged and will expand with pipeline lowering",
         ),
     );
-}
-
-fn has_attr(pass_attrs: &[PipelineAttribute], attr_name: &str) -> bool {
-    pass_attrs.iter().any(|attr| attr.name == attr_name)
 }
 
 fn attr_has_editor_config(attr: &PipelineAttribute) -> bool {
@@ -387,7 +384,7 @@ fn collect_pipeline_axis_decls(
         };
 
         for permutation in &pass_decl.permutations {
-            if !permutation.attrs.iter().any(|attr| attr.name == "known") {
+            if !has_attr(&permutation.attrs, "known") {
                 continue;
             }
 
@@ -1115,7 +1112,7 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
         }
 
         for permutation in &pass_decl.permutations {
-            let known_attr = permutation.attrs.iter().find(|attr| attr.name == "known");
+            let known_attr = find_attr(&permutation.attrs, "known");
             let Some(known_attr) = known_attr else {
                 diags.push(
                     pass_error(
@@ -1244,11 +1241,12 @@ pub fn validate_pipeline_skeleton_decls(program: &Program) -> Result<(), Vec<Dia
             );
         }
 
+        let is_technique = has_attr(&pipeline_decl.attrs, "technique");
         for attr in &pipeline_decl.attrs {
             if matches!(
                 attr.name.as_str(),
                 "pool" | "asset" | "provider" | "from" | "output" | "dimensions"
-            ) && !pipeline_decl.attrs.iter().any(|a| a.name == "technique")
+            ) && !is_technique
             {
                 diags.push(Diag::error(
                     attr.span.clone(),

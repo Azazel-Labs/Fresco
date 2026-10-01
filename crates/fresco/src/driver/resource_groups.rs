@@ -1,25 +1,23 @@
 //! Resolve authored group symbols independently of engine vocabulary.
+use crate::ast::has_attr;
 use crate::{ast::Program, diag::Diag};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     for pass in &program.passes {
-        if !pass.attrs.iter().any(|a| a.name == "factory")
-            && pass
-                .bindings
-                .iter()
-                .any(|b| b.attrs.iter().any(|a| a.name == "sampler"))
+        if !has_attr(&pass.attrs, "factory")
+            && pass.bindings.iter().any(|b| has_attr(&b.attrs, "sampler"))
         {
             return Err(vec![Diag::error(
                 pass.span.clone(),
                 "sampler presets require a factory execution scope",
             )]);
         }
-        if !pass.attrs.iter().any(|a| a.name == "factory")
+        if !has_attr(&pass.attrs, "factory")
             && pass
                 .bindings
                 .iter()
-                .any(|b| b.attrs.iter().any(|a| a.name == "draw_data"))
+                .any(|b| has_attr(&b.attrs, "draw_data"))
         {
             return Err(vec![Diag::error(
                 pass.span.clone(),

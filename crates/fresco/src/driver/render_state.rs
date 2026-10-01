@@ -1,4 +1,5 @@
 //! Resolve authored GPU state using the existing bounded constant evaluator.
+use crate::ast::find_attr;
 use crate::{
     ast::{Expr, Program, Spanned, Stmt, SurfaceSettings},
     diag::Diag,
@@ -126,7 +127,7 @@ pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 continue;
             }
             for (index, step) in pipeline.pass_refs.iter().enumerate() {
-                let implementation = step.attrs.iter().find(|a| a.name == "implementation_when");
+                let implementation = find_attr(&step.attrs, "implementation_when");
                 let selected = if let Some(attr) = implementation {
                     let [contract, symbol] = attr.args.as_slice() else {
                         return Err(vec![Diag::error(

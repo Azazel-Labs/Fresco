@@ -1,5 +1,6 @@
 //! Selected compute calls become independent, material-owned GPU programs.
 use super::*;
+use crate::ast::has_attr;
 use fresco_artifact::{
     ComputeScalarType, ManifestComputeArgument as Argument, ManifestComputeInvocation,
     ManifestComputeOutput,
@@ -175,7 +176,7 @@ pub(super) fn instantiate(
             let renderer = context
                 .pipelines
                 .iter()
-                .find(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"))
+                .find(|p| has_attr(&p.attrs, "selected_renderer"))
                 .ok_or_else(|| {
                     fail(
                         &call.span,

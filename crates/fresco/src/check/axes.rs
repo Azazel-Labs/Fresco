@@ -1,6 +1,7 @@
 //! Resolve engine-declared axis domains before checking pass contracts.
 use super::*;
 use crate::ast::{AxisDecl, AxisDomain, PipelineAttribute};
+use crate::ast::{find_attr, has_attr};
 
 pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     let mut diags = Vec::new();
@@ -39,7 +40,7 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     for pass in &mut program.passes {
         for permutation in &mut pass.permutations {
             if let Some(axis) = axes.get(permutation.name.as_str()) {
-                if let Some(attr) = permutation.attrs.iter().find(|a| a.name == "known") {
+                if let Some(attr) = find_attr(&permutation.attrs, "known") {
                     if attr.args.first() != Some(&axis.known_mode) {
                         diags.push(Diag::error(
                             attr.span.clone(),
@@ -79,9 +80,7 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                         diags.push(Diag::error(value.span.clone(), format!("axis `{}` selects `{}`, but that value is not declared for the axis", axis.name, value.node)));
                     }
                 }
-            } else if !program.axes.is_empty()
-                && !permutation.attrs.iter().any(|a| a.name == "known")
-            {
+            } else if !program.axes.is_empty() && !has_attr(&permutation.attrs, "known") {
                 diags.push(Diag::error(
                     permutation.name_span.clone(),
                     format!(
@@ -99,10 +98,7 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
             .map(|p| AxisDecl {
                 name: p.name.clone(),
                 name_span: p.name_span.clone(),
-                known_mode: p
-                    .attrs
-                    .iter()
-                    .find(|a| a.name == "known")
+                known_mode: find_attr(&p.attrs, "known")
                     .and_then(|a| a.args.first())
                     .cloned()
                     .unwrap_or_default(),

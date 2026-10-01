@@ -1,5 +1,6 @@
 //! Compose compiler-generated operation invocations at checked provider boundaries.
 //! These private graph records are not an alternative authoring syntax.
+use crate::ast::{find_attr, has_attr};
 use crate::{
     ast::{PipelineAttribute, Program, Spanned},
     diag::Diag,
@@ -51,21 +52,14 @@ fn attribute(name: &str, args: Vec<String>) -> PipelineAttribute {
     }
 }
 fn node(reference: &crate::ast::PipelinePassRef) -> String {
-    reference
-        .attrs
-        .iter()
-        .find(|a| a.name == "node")
+    find_attr(&reference.attrs, "node")
         .and_then(|a| a.args.first())
         .unwrap_or(&reference.name)
         .clone()
 }
 
 fn queue(reference: &crate::ast::PipelinePassRef) -> Option<&String> {
-    reference
-        .attrs
-        .iter()
-        .find(|attr| attr.name == "transparent_queue")
-        .and_then(|attr| attr.args.first())
+    find_attr(&reference.attrs, "transparent_queue").and_then(|attr| attr.args.first())
 }
 
 pub(super) fn prepare(program: &mut Program) -> Result<(), Vec<Diag>> {
@@ -106,7 +100,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
     let mut contributions: Vec<_> = program
         .pipelines
         .iter()
-        .filter(|p| p.attrs.iter().any(|a| a.name == "__style_operation"))
+        .filter(|p| has_attr(&p.attrs, "__style_operation"))
         .cloned()
         .collect();
     // The engine's stable draw policy uses checked invocation identity; generated
@@ -204,7 +198,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
         for pipeline in program
             .pipelines
             .iter_mut()
-            .filter(|p| p.attrs.iter().any(|a| a.name == "selected_renderer"))
+            .filter(|p| has_attr(&p.attrs, "selected_renderer"))
         {
             let ports: Vec<_> = pipeline
                 .attrs
@@ -433,7 +427,7 @@ fn compose(program: &mut Program) -> Result<(), String> {
     }
     program
         .pipelines
-        .retain(|p| !p.attrs.iter().any(|a| a.name == "__style_operation"));
+        .retain(|p| !has_attr(&p.attrs, "__style_operation"));
     for pipeline in &mut program.pipelines {
         pipeline.attrs.retain(|a| {
             !matches!(

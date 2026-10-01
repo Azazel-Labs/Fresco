@@ -1,4 +1,5 @@
 //! Engine-authored renderer catalog and compile configuration selection.
+use crate::ast::has_attr;
 use crate::{
     ast::{Expr, PipelineAttribute, PipelineDecl, Program},
     diag::Diag,
@@ -43,8 +44,8 @@ pub(super) fn catalog(pipelines: &[PipelineDecl]) -> Result<Vec<ManifestRenderer
             id: attr.args[0].clone(),
             label: attr.args[1].clone(),
             pipeline: pipeline.name.clone(),
-            selected: pipeline.attrs.iter().any(|a| a.name == "selected_renderer"),
-            default: pipeline.attrs.iter().any(|a| a.name == "default"),
+            selected: has_attr(&pipeline.attrs, "selected_renderer"),
+            default: has_attr(&pipeline.attrs, "default"),
             passes: pipeline.passes.iter().map(|p| p.node.clone()).collect(),
         });
     }

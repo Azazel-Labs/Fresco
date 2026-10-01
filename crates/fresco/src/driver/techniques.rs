@@ -1,5 +1,6 @@
 //! Reusable executable pipelines independent of renderer and material selection.
 use crate::ast::PipelineDecl;
+use crate::ast::{find_attr, has_attr};
 use fresco_artifact::{
     ManifestDispatchExtent, ManifestDrawCount, ManifestGpuProgram, ManifestImageExtent,
     ManifestResourceSource, ManifestResourceType, ManifestTechnique, ManifestTechniqueOperation,
@@ -8,7 +9,7 @@ use fresco_artifact::{
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn is_technique(pipeline: &PipelineDecl) -> bool {
-    pipeline.attrs.iter().any(|a| a.name == "technique")
+    has_attr(&pipeline.attrs, "technique")
 }
 
 pub(super) fn reflect(
@@ -54,7 +55,7 @@ fn build(
     if marker.len() != 1 || !marker[0].args.is_empty() {
         return Err("requires one argument-free @technique".into());
     }
-    if pipeline.attrs.iter().any(|a| a.name == "renderer") {
+    if has_attr(&pipeline.attrs, "renderer") {
         return Err("techniques are independent of material and renderer selection".into());
     }
     let mut recipe = pipeline.clone();
@@ -151,10 +152,7 @@ fn build(
     let mut instances = BTreeMap::new();
     let mut enabled = BTreeMap::new();
     for reference in &mut recipe.pass_refs {
-        let name = reference
-            .attrs
-            .iter()
-            .find(|a| a.name == "node")
+        let name = find_attr(&reference.attrs, "node")
             .and_then(|a| a.args.first())
             .unwrap_or(&reference.name)
             .clone();

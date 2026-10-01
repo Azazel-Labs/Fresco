@@ -1,5 +1,6 @@
 //! Named, stateless interface implementations and explicitly bound GPU dispatch.
 //! All contract and method names are authored vocabulary.
+use crate::ast::find_attr;
 use crate::ast::*;
 use crate::diag::Diag;
 use logos::Logos;
@@ -468,10 +469,7 @@ pub(super) fn specialize_draw_dispatch(
                 plan.contract, input.name
             );
             if declared_captures.insert(name.clone()) {
-                let factory = pass
-                    .attrs
-                    .iter()
-                    .find(|a| a.name == "factory")
+                let factory = find_attr(&pass.attrs, "factory")
                     .and_then(|a| a.args.first())
                     .and_then(|name| factories.iter().find(|f| &f.name == name))
                     .ok_or_else(|| {

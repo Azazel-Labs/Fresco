@@ -1,5 +1,6 @@
 //! Typed, explicitly bound raster functions. Engine code owns evaluation order.
 use super::*;
+use crate::ast::{find_attr, has_attr};
 use fresco_artifact::{ManifestRasterEntry, ManifestStageOutput};
 
 fn canonical(name: &str) -> String {
@@ -889,7 +890,7 @@ pub(super) fn emit(
                 ));
             }
         }
-        if hook.attrs.iter().any(|a| a.name == "evaluate")
+        if has_attr(&hook.attrs, "evaluate")
             && hook
                 .attrs
                 .iter()
@@ -902,7 +903,7 @@ pub(super) fn emit(
         .hooks
         .iter()
         .enumerate()
-        .filter(|(_, h)| h.attrs.iter().any(|a| a.name == "vertex"))
+        .filter(|(_, h)| has_attr(&h.attrs, "vertex"))
         .map(|(i, _)| i)
         .collect();
     let Some(vertex_index) = vertex_indices.first() else {
@@ -925,7 +926,7 @@ pub(super) fn emit(
         .hooks
         .iter()
         .enumerate()
-        .filter(|(_, h)| h.attrs.iter().any(|a| a.name == "prepare"))
+        .filter(|(_, h)| has_attr(&h.attrs, "prepare"))
         .collect();
     if preparations.len() > 1 {
         return Err("mesh pass accepts one preparation function".into());
@@ -1420,10 +1421,7 @@ pub(in crate::driver) fn service_closure(
     if exports.is_empty() && (iterator_roots.is_empty() || pass.operation.is_some()) {
         return Ok(linked);
     }
-    let factory = pass
-        .attrs
-        .iter()
-        .find(|a| a.name == "factory")
+    let factory = find_attr(&pass.attrs, "factory")
         .and_then(|a| a.args.first())
         .map(|name| {
             program
@@ -1667,7 +1665,7 @@ pub(in crate::driver) fn validate_operation(
     let vertex = pass
         .hooks
         .iter()
-        .find(|h| h.attrs.iter().any(|a| a.name == "vertex"))
+        .find(|h| has_attr(&h.attrs, "vertex"))
         .ok_or("missing vertex shader")?;
     let input = vertex
         .params
