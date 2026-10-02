@@ -56,8 +56,8 @@ fn normalize_or_zero(v: vec4) -> vec4 {
     return normalize_or(v, vec4(0.0))
 }
 // Required frame globals bound once by the host as a single uniform block.
-// `time()`, `delta_time()`, and `resolution()` below — and the
-// `signal`/`delta`/`resolution` entry parameter types — link to these fields.
+// `time()`, `delta_time()`, and `resolution()` below, and the Canvas context's
+// `frame` field, resolve the engine's time and resolution roles from these fields.
 struct FrameGlobals {
     @semantic(time) time: f32
     @semantic(delta_time) delta_time: f32

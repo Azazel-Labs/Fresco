@@ -572,12 +572,14 @@ Keep instance parameters separate from pass/view configuration, including editor
 values. See [host integration](LANGUAGE.md#host-integration-obligations), [engine examples](examples/engine),
 and the [current engine contract](LANGUAGE.md#language-engine-and-host).
 
-- [ ] Finish the [Canvas context migration](docs/canvas-context-design.md).
-  Registered entries now use explicit typed contexts and engine-selected methods;
-  custom raster names and named method blocks share that binding path. Migrate
-  remaining legacy unregistered canvas contracts before removing their argument
-  synthesis adapter. Keep the shipped `Canvas`/`present_canvas`/`canvas_pipeline`
-  contract and automatic engine discovery working throughout the migration.
+- [x] Finish the [Canvas context migration](LANGUAGE.md#canvas-contracts-and-context).
+  Entry kinds are engine-provided only: `canvas` is no longer a lexer keyword or
+  parser special case, the standalone positional entry ABI and its argument
+  synthesis adapter are removed, and an unregistered `canvas` is rejected as
+  ``unregistered entry declaration `canvas` ``. Registered entries use explicit
+  typed contexts and engine-selected methods; the shipped
+  `Canvas`/`present_canvas`/`canvas_pipeline` contract and automatic engine
+  discovery are unchanged.
 - [ ] Finish [engine-registered authoring contracts](LANGUAGE.md#interfaces-and-registered-entries).
   Custom raster declaration names, named typed method blocks, explicit registered
   canvas context forwarding, engine-owned compile-time configuration, and ordered

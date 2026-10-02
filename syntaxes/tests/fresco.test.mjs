@@ -73,6 +73,24 @@ test("separates ranges, pipes, declarations, types, colors, and host names", () 
   }
 });
 
+test("entry kinds are engine vocabulary, not grammar keywords", () => {
+  const [shorthand, block, nested, local] = tokenize(`canvas glow(ctx: CanvasContext) -> color { return #fff }
+picture demo {
+  if ready { return #fff }
+  let canvas = 1.0`);
+  for (const line of [shorthand, block]) {
+    assert.ok(line.every(token => !token.scopes.includes("keyword.control.fresco") || token.text === "return"),
+      JSON.stringify(line));
+  }
+  hasScope(shorthand, "glow", "entity.name.function.fresco");
+  hasScope(block, "demo", "entity.name.function.fresco");
+  hasScope(nested, "if", "keyword.control.fresco");
+  hasScope(local, "let", "keyword.control.fresco");
+  assert.ok(local.every(token => token.text.trim() !== "canvas" || !token.scopes.includes("keyword.control.fresco")));
+  hasScope(tokenize("struct Frame {")[0], "struct", "storage.type.fresco");
+  hasScope(tokenize("template Overlay {")[0], "template", "keyword.control.fresco");
+});
+
 test("comments and multiline strings shield their contents and restore code scopes", () => {
   const lines = tokenize('/* canvas #fff\nfn ignored() */\nlet text = """\n// raw \\q #fff\n"""\nlet value = "ok\\n bad\\q" // comment\nreturn #fff');
   assert.ok(lines[0].every(token => token.scopes.includes("comment.block.fresco")));

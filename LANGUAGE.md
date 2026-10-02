@@ -101,7 +101,7 @@ contracts, styles, scenes, and renderers.
 | --- | --- |
 | `const`, `param`, `struct`, `enum`, `fn` | Values, configurable inputs, records, choices, shader computation |
 | `interface`, `conform` | Typed methods and implementations/specialization |
-| `canvas`, `surface`, registered authored entries | Content entries associated with engine contracts |
+| `surface`, engine-registered entry kinds (such as the bundled `canvas`) | Content entries associated with engine contracts |
 | `material_properties`, `schema_program`, `schema_expression`, `schema_evaluator` | Channels and schema-associated construction/evaluation |
 | `vertex_interface`, `vertex_format`, `vertex_factory` | Vertex semantics, source layout, mesh preparation |
 | `texture_type`, resource declarations, binding groups | Texture interpretation and GPU layout |
@@ -240,6 +240,15 @@ every `a .. b` occurrence supports reversed or runtime-crossing endpoints.
 using the language's general entry mechanism. Integration authors can change or
 extend the interface, context, and executing passes in their engine source;
 authored content must satisfy the resulting contract.
+
+`canvas` is not a language keyword, and the compiler owns no Canvas ABI. Without
+a reachable `@entry(canvas, ...)` registration, `canvas name ...` is rejected as
+``unregistered entry declaration `canvas` ``. The former standalone entry form
+with positional `: coord`, `: signal`, `: delta`, and `: resolution` parameters
+was removed: a registered Canvas must implement its `draw` method with exactly
+one parameter of the engine's context type, and entry bindings such as `time`
+are not implicitly visible inside helper functions. Outside an entry, `canvas`
+is an ordinary identifier.
 
 The typed Canvas entry is implemented. The engine declares a context, annotates
 semantic fields, registers a method, constructs a value, and calls content with
@@ -1547,7 +1556,7 @@ resources, and applicable graph execution. Shader and metadata are a matched pai
 Current executable schema **13** is defined in `crates/fresco-artifact`.
 Schema 13 renamed the root `canvases` list to `raster_entries` (record type
 `ManifestRasterEntry`); each record describes one raster entry, the resolved
-color-result root entry of any registered or standalone entry kind.
+color-result root entry of an engine-registered entry kind.
 Versions 2–6 in older guides describe earlier milestones, not versions to hardcode.
 
 Hosts supply compatible resources, upload inputs, create described pipelines,

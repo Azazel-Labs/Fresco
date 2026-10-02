@@ -135,7 +135,7 @@
     "declarations": {
       "patterns": [
         {
-          "match": "\\b(fn|canvas|surface|effect|texture_type)(\\s+)([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "match": "\\b(fn|surface|effect|texture_type)(\\s+)([A-Za-z_][A-Za-z0-9_]*)\\b",
           "captures": {
             "1": {
               "name": "storage.type.fresco"
@@ -155,6 +155,15 @@
               "name": "entity.name.type.fresco"
             }
           }
+        },
+        {
+          "comment": "Engine-registered entry declarations: the kind is engine vocabulary, so only the entry name is scoped.",
+          "match": "^(?!(?:as|at|blend|break|canvas_space|case|compose|conform|const|default|disable|each|effect|else|enum|every|extern|field|fn|for|if|import|in|interface|internal|known|layer|let|lifetime|match|optional|param|pass|pipeline|require|required|respawn|return|rewrite|scatter|seed|select|space|strategy|struct|style|surface|tags|template|texture_type|through|uniform|unroll|var|vertex|when|within)\\b)([A-Za-z_][A-Za-z0-9_]*)(\\s+)([A-Za-z_][A-Za-z0-9_]*)(?=\\s*[({])",
+          "captures": {
+            "3": {
+              "name": "entity.name.function.fresco"
+            }
+          }
         }
       ]
     },
@@ -164,7 +173,7 @@
     },
     "keywords": {
       "name": "keyword.control.fresco",
-      "match": "\\b(?:as|at|blend|break|canvas|canvas_space|case|compose|conform|const|default|disable|each|effect|else|enum|every|extern|field|fn|for|if|import|in|interface|internal|known|layer|let|lifetime|match|optional|param|pass|pipeline|require|required|respawn|return|rewrite|scatter|seed|select|space|strategy|struct|style|surface|tags|template|texture_type|through|uniform|unroll|var|vertex|when|within)\\b"
+      "match": "\\b(?:as|at|blend|break|canvas_space|case|compose|conform|const|default|disable|each|effect|else|enum|every|extern|field|fn|for|if|import|in|interface|internal|known|layer|let|lifetime|match|optional|param|pass|pipeline|require|required|respawn|return|rewrite|scatter|seed|select|space|strategy|struct|style|surface|tags|template|texture_type|through|uniform|unroll|var|vertex|when|within)\\b"
     },
     "types": {
       "name": "support.type.fresco",

@@ -65,7 +65,7 @@ their task lists as current completion status.
 | [Designing Fresco with Kotlin](kotlin-fresco-design.md) | Exploration of Kotlin DSL authoring, compiler targets, and extension ideas for standalone Fresco |
 | [Surface engine-policy audit](surface-engine-policy-audit.md) | Hardcoded material semantics, ownership corrections, and migration acceptance criteria |
 | [Engine follow-up](../TODO.md#engine-contracts-and-renderer-execution) | Executable engine-authored passes, shading, vertex contracts, permutations |
-| [Canvas context design](canvas-context-design.md) | Accepted typed Canvas contract, scoped semantic inputs, and required migration away from draw adapters |
+| [Canvas contracts and context](../LANGUAGE.md#canvas-contracts-and-context) | Implemented engine-registered Canvas contract and scoped semantic inputs; the standalone entry ABI and draw adapters are removed |
 | [Lowering scalability tasks](../TODO.md#lowering-scalability) | Measured code-size budgets, scatter expansion, and temporal evaluation |
 | [Path follow-up tasks](../TODO.md#path-geometry-and-arc-length) | Runtime geometry, arc-length accuracy, boundary semantics, and explain receipts |
 | [Const-template follow-up](../TODO.md#const-templates-and-bounded-unrolling) | Compile-time value parameters and bounded specialization |

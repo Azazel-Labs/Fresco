@@ -277,8 +277,9 @@ function syncVirtualFileRefs(): void {
   activeFile = virtualFilesController.getActiveFile();
 }
 
+// Entry kinds such as `canvas` are engine vocabulary: they are highlighted
+// from the active engine's `@entry` registrations, not listed here.
 const DEFAULT_FRESCO_KEYWORDS = [
-  "canvas",
   "let",
   "compose",
   "space",

@@ -149,8 +149,9 @@ export function createEditorHighlightingController(deps: EditorHighlightingDeps)
       return true;
     }
 
-    // Treat function/canvas signatures as declaration type contexts.
-    if (/\b(?:canvas|fn)\b[^\n{}]*\([^\n)]*:\s*$/.test(prefix)) {
+    // Treat function and entry signatures (`fn name(` or an engine-registered
+    // `kind name(` at the start of a line) as declaration type contexts.
+    if (/(?:\bfn\b[^\n{}]*|^\s*(?!return\b)[A-Za-z_][A-Za-z0-9_]*\s+[A-Za-z_][A-Za-z0-9_]*\s*)\([^\n)]*:\s*$/.test(prefix)) {
       return true;
     }
 

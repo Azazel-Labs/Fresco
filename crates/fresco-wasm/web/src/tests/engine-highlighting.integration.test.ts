@@ -16,3 +16,16 @@ it("derives keyword spans from the current engine and retains identifier uses", 
   files["engine/engine.fr"] = files["engine/engine.fr"].replace("swarm", "flock");
   expect(fresco_lex_tokens_with_files(source,"main.fr", files).filter(t => t.kind === "engine_keyword")).toHaveLength(0);
 });
+it("highlights canvas only through an engine registration", () => {
+  const source = "canvas glow { draw { return rgba(1.0, 1.0, 1.0, 1.0) } }";
+  const files = {"engine/engine.fr": "struct CanvasContext { @semantic(coord) uv: vec2 }\n@entry(canvas, draw) interface Canvas { fn draw(@context ctx: CanvasContext) -> color }"};
+  const highlighted = (bundle: Record<string, string>) => {
+    const tokens = fresco_lex_tokens_with_files(source, "main.fr", bundle);
+    const controller = createEditorHighlightingController({getLexTokens: () => tokens,
+      getLanguageConfig: () => ({keywords: ["return"], typeKeywords: [], builtins: [], spaceTransforms: [], enumMembers: []})});
+    return controller.syntaxHighlighter(null, source)
+      .filter(s => s.className === "cm-fresco-keyword").map(s => source.slice(s.from, s.to));
+  };
+  expect(highlighted(files)).toEqual(["canvas", "draw", "return"]);
+  expect(highlighted({})).toEqual(["return"]);
+});
