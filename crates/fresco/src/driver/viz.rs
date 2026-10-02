@@ -459,9 +459,6 @@ fn format_space_preview_detail(labels: &[String]) -> String {
     }) {
         markers.push("depth-stack".to_string());
     }
-    if labels.iter().any(|label| label == "warp") {
-        markers.push("warp-grid".to_string());
-    }
     format!(
         "legend: left=before, right=after, warm=distortion, seam=split; probe={}",
         markers.join(", ")
