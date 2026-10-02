@@ -10,7 +10,7 @@
 //   prints `sky.sun_transmittance: cached 512^2 r16f, refreshed on delta > 0.1s`;
 //   mountains occlude clouds via host depth with no Fresco scene ownership.
 
-surface terrain_shadowed(sp: surf, time: signal) -> material {
+surface terrain_shadowed(sp: surf) -> material {
     compose {
         // ...the 20-terrain-splat stack...
         base(albedo: image(grass_tex, at: sp.uv * 24), roughness: 0.9)

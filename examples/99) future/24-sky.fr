@@ -10,7 +10,8 @@
 //   `band-restricted marching` and `rewrite: beer_lambert fired`; rung 11 adds
 //   `budget 32 + temporal blend 0.9 ~= quality of 96`.
 
-volume sky(ray: ray3, time: signal) -> radiance {
+volume sky(ray: ray3) -> radiance {
+    let time = context(time)
     param coverage:   f32 = 0.5  in 0 .. 1
     param storminess: f32 = 0.2  in 0 .. 1
     param wind:       vec2 = (12.0, 3.0)          // m/s, planar

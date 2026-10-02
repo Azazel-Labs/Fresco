@@ -13,7 +13,8 @@
 //   relief_shadow: 8 steps; worst case 28 height evals/pixel`; silhouette edges
 //   documented as the known POM limitation.
 
-surface relief_wall(sp: surf, time: signal) -> material {
+surface relief_wall(sp: surf) -> material {
+    let time = context(time)
     param relief: f32 = 0.05 in 0 .. 0.12
 
     let height = field brick_profile(sp.uv * (6, 3)) + fbm(sp.uv * 30) * 0.15

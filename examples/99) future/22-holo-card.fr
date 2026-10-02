@@ -11,7 +11,7 @@
 // done when: filmstrip over `tilt` reproduces the wiggle-the-card-under-the-light
 //   motion; glitter pings are stable (no shimmer crawl) under small tilt deltas.
 
-surface holo_card(sp: surf, time: signal) -> material(unlit) {
+surface holo_card(sp: surf) -> material(unlit) {
     param tilt: vec2 = (0, 0)
     let view = view_or_tilt(sp, tilt)
 

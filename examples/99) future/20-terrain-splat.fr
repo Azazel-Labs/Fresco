@@ -8,7 +8,7 @@
 // done when: snow stays off steep slopes; rock fades in on cliffs; changing the
 //   host world scale rescales the height thresholds correctly (unit test for `m`).
 
-surface terrain(sp: surf, time: signal) -> material {
+surface terrain(sp: surf) -> material {
     let h = sp.position.y
     let slope = 1 - dot(sp.normal, up)
 

@@ -12,7 +12,7 @@
 //   self-occlusion at grazing angles with no branch in source; --explain prints
 //   `march: sphere-trace (pure shape3), budget 64, epsilon 0.5px`.
 
-surface card_front(sp: surf, time: signal) -> material(unlit) {
+surface card_front(sp: surf) -> material(unlit) {
     let pulse = wave(period: 1.6s, shape: sine, range: 0.35 .. 0.85)
     compose {
         base(albedo: #f8fafc)
@@ -22,7 +22,7 @@ surface card_front(sp: surf, time: signal) -> material(unlit) {
     }
 }
 
-surface card_back(sp: surf, time: signal) -> material(unlit) {
+surface card_back(sp: surf) -> material(unlit) {
     compose {
         base(albedo: #0f766e)
         each (i) in 0 .. 3 {
@@ -32,7 +32,8 @@ surface card_back(sp: surf, time: signal) -> material(unlit) {
     }
 }
 
-volume flip_card(ray: ray3, time: signal) -> radiance {
+volume flip_card(ray: ray3) -> radiance {
+    let time = context(time)
     let flip = time * 96deg
     space cam = camera(at: (0m, 0m, -1.6m), look: origin3, fov: 58deg)
     let key = directional(azimuth: -30deg, elevation: 40deg, color: #fff)

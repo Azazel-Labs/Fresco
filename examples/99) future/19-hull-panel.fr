@@ -10,7 +10,7 @@
 //   the running light animates via the signal; silhouette-unchanged limitation
 //   stated in emitted docs.
 
-surface hull(sp: surf, time: signal) -> material {
+surface hull(sp: surf) -> material {
     let panels = in space repeat(every: (0.21, 0.13), cell: cell) {
         box(at: cell.center, size: (0.19, 0.11)) |> round(0.008)
         |> inset_bevel(depth: 0.4, width: 0.012)
