@@ -173,7 +173,8 @@ impl ModuleLoader for MemModuleLoader {
             format!("cannot resolve import path `{import_path}` from `{current_canonical}`")
         })?;
         let src = self.files.get(&canonical).cloned().ok_or_else(|| {
-            let available: Vec<&str> = self.files.keys().map(String::as_str).collect();
+            let mut available: Vec<&str> = self.files.keys().map(String::as_str).collect();
+            available.sort_unstable();
             format!(
                 "module `{canonical}` not found in virtual file system \
                  (available: {})",

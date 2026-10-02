@@ -221,7 +221,7 @@ struct SurfaceVertexInputs<'a> {
     material: &'a MaterialHir,
     t: &'a TypeHandles,
     policy: LoweringPolicy,
-    param_globals: &'a HashMap<String, SurfaceParamGlobal>,
+    param_globals: &'a BTreeMap<String, SurfaceParamGlobal>,
     user_helper_fns: HashMap<String, Handle<naga::Function>>,
     global_uniform_globals: &'a HashMap<String, Handle<naga::GlobalVariable>>,
 }
@@ -349,7 +349,7 @@ fn lower_surface_response_fn(
     policy: LoweringPolicy,
     tex_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
     sampler_global: Option<Handle<naga::GlobalVariable>>,
-    param_globals: &HashMap<String, SurfaceParamGlobal>,
+    param_globals: &BTreeMap<String, SurfaceParamGlobal>,
     user_helper_fns: HashMap<String, Handle<naga::Function>>,
     global_uniform_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
     material_types: HashMap<String, Handle<naga::Type>>,
@@ -699,7 +699,7 @@ enum SurfaceParamGlobal {
 /// `b`, `a` component) and return the loaded pointer expressions.
 fn bind_surface_param_globals(
     function: &mut FunctionBuilder,
-    param_globals: &HashMap<String, SurfaceParamGlobal>,
+    param_globals: &BTreeMap<String, SurfaceParamGlobal>,
     param_scalars: &mut HashMap<String, Handle<Ex>>,
 ) -> HashSet<Handle<Ex>> {
     let mut ptrs = HashSet::new();
@@ -729,8 +729,8 @@ fn create_surface_param_globals(
     material: &MaterialHir,
     existing_param_bindings: &mut HashMap<String, u32>,
     next_param_binding: &mut u32,
-) -> HashMap<String, SurfaceParamGlobal> {
-    let mut out = HashMap::new();
+) -> BTreeMap<String, SurfaceParamGlobal> {
+    let mut out = BTreeMap::new();
     for param in &material.params {
         let key = format!("{}:{}", material.name, param.name);
         let binding = *existing_param_bindings.entry(key).or_insert_with(|| {

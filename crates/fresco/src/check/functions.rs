@@ -2710,7 +2710,8 @@ impl Checker {
         // callees reachable from the actual entry point.
         let saved_helpers = self.hir.user_helpers.clone();
         let saved_pending_helpers = self.pending_user_helpers.clone();
-        let work = self
+        let saved_note_count = self.hir.notes.len();
+        let mut work = self
             .fn_defs
             .iter()
             .flat_map(|(name, defs)| {
@@ -2720,6 +2721,10 @@ impl Checker {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+        // Validate in a stable order so diagnostics, let numbering, and the
+        // watchdog cutoff do not depend on hash iteration; the stable sort keeps
+        // overloads in declaration order.
+        work.sort_by(|(a, _), (b, _)| a.cmp(b));
 
         for (name, def) in work {
             // Once the expression watchdog trips once, `timeout_exceeded()`
@@ -2736,6 +2741,7 @@ impl Checker {
 
         self.hir.user_helpers = saved_helpers;
         self.pending_user_helpers = saved_pending_helpers;
+        self.hir.notes.truncate(saved_note_count);
 
         // Give whatever comes after this eager pass (the real raster entry/surface
         // body evaluation) a fresh timeout budget instead of inheriting a
@@ -4790,7 +4796,7 @@ pub fn check_with_workbook(
         conformance_set,
         interface_names,
         fn_eval_cache: HashMap::new(),
-        pending_user_helpers: HashMap::new(),
+        pending_user_helpers: BTreeMap::new(),
         emit_user_helper_calls: true,
         fn_call_stack: Vec::new(),
         fn_source_stack: Vec::new(),

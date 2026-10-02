@@ -2743,7 +2743,7 @@ pub struct Checker {
     /// Names of all registered interfaces (for dyn-dispatch rejection).
     interface_names: HashSet<String>,
     fn_eval_cache: HashMap<String, Value>,
-    pending_user_helpers: HashMap<String, (String, FnDef)>,
+    pending_user_helpers: BTreeMap<String, (String, FnDef)>,
     emit_user_helper_calls: bool,
     fn_call_stack: Vec<(String, String, Span)>,
     fn_source_stack: Vec<String>,
