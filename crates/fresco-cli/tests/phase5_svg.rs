@@ -7,7 +7,7 @@ use common::{normalize, run_fresco, unique_temp_path};
 
 #[test]
 fn svg_path_compiles_for_line_contour() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let icon = svg_path("M 0.10 0.10 L 0.90 0.10 L 0.90 0.90 L 0.10 0.90 Z")
 
   compose {
@@ -31,7 +31,7 @@ fn svg_path_compiles_for_line_contour() {
 
 #[test]
 fn svg_compiles_for_supported_subset() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let logo = svg("<svg viewBox='0 0 100 100'><path d='M10 10 L90 10 L90 90 L10 90 Z'/></svg>")
 
   compose {
@@ -55,7 +55,7 @@ fn svg_compiles_for_supported_subset() {
 
 #[test]
 fn svg_compiles_for_triple_quoted_multiline_source() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let logo = svg("""
 <svg viewBox='0 0 100 100'>
   <path d='M10 10 L90 10 L90 90 L10 90 Z'/>
@@ -83,7 +83,7 @@ fn svg_compiles_for_triple_quoted_multiline_source() {
 
 #[test]
 fn svg_path_rejects_unsupported_curve_command() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = svg_path("M 0.10 0.10 C 0.20 0.80, 0.80 0.20, 0.90 0.90 Z")
 
   compose {
@@ -113,7 +113,7 @@ fn svg_path_rejects_unsupported_curve_command() {
 
 #[test]
 fn svg_rejects_unsupported_element() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = svg("<svg viewBox='0 0 100 100'><rect x='10' y='10' width='80' height='80'/></svg>")
 
   compose {

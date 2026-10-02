@@ -6,7 +6,7 @@ use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn manifest_includes_pass_plan_schedule() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -36,7 +36,7 @@ fn manifest_includes_pass_plan_schedule() {
 
 #[test]
 fn manifest_emit_stdout_is_valid_json_object() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
   }
@@ -69,7 +69,7 @@ fn manifest_emit_stdout_is_valid_json_object() {
 /// intermediate targets in the manifest.
 #[test]
 fn manifest_single_pass_has_fused_strategy_and_no_targets() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ff0000)
   }
@@ -108,7 +108,7 @@ fn manifest_single_pass_has_fused_strategy_and_no_targets() {
 #[test]
 fn blur_on_arbitrary_layer_compiles_and_manifest_shows_kernel_strategy() {
     // blur over a grey(scalar) layer — not analytically rewritable.
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     grey(time * 0.5) |> blur(radius: 2px)
   }
@@ -140,7 +140,7 @@ fn blur_on_arbitrary_layer_compiles_and_manifest_shows_kernel_strategy() {
 /// occurs and the manifest shows only a fused strategy.
 #[test]
 fn blur_on_fill_rewrites_analytically_manifest_stays_single_pass() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.25) |> fill(#ffffff) |> blur(radius: 3px)
   }
@@ -170,7 +170,7 @@ fn blur_on_fill_rewrites_analytically_manifest_stays_single_pass() {
 /// `→ swapchain` / `→ rt{n}` routing note per pass.
 #[test]
 fn explain_shows_kernel_strategy_annotation() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
   }
@@ -206,7 +206,7 @@ effect chromatic_split(spread: f32) local(spread) {
   layer rgba(r: left.r, g: self.g, b: right.b, a: self.a)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     box(at: (0.5, 0.5), size: (0.6, 0.6))
       |> fill(mix(#1a1a2e, #ff6b6b, checker(scale: 0.08uv, at: (0.5, 0.5))))
@@ -240,7 +240,7 @@ fn manifest_multi_pass_program_has_intermediate_targets() {
     // blur over a grey(scalar) layer — not analytically rewritable — produces a
     // Local layer, triggering a multi-pass schedule with at least one
     // intermediate target.
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     grey(time * 0.5) |> blur(radius: 2px)
     circle(at: center, radius: 0.2) |> fill(#112233)
@@ -282,7 +282,7 @@ fn manifest_multi_pass_program_has_intermediate_targets() {
 
 #[test]
 fn manifest_includes_path_buffers_for_threshold_paths() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)

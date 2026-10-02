@@ -15,7 +15,7 @@ function makeState() {
 
 function makeDeps(overrides = {}) {
   const sourceEditor = {
-    getValue: () => "canvas t(uv: coord, time: signal) -> color { compose { circle(at: center, radius: 0.2) |> fill(#fff) } }",
+    getValue: () => "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); compose { circle(at: center, radius: 0.2) |> fill(#fff) } }",
     getModel: () => ({ id: "model" }),
     setDiagnostics: vi.fn(),
   };
@@ -102,7 +102,7 @@ describe("compile orchestrator manifest output", () => {
     const deps = makeDeps();
     const orchestrator = createCompileOrchestrator(deps);
 
-    await orchestrator.compileAndRender({ source: "canvas t(uv: coord, time: signal) -> color { compose { circle(at: center, radius: 0.2) |> fill(#fff) } }" });
+    await orchestrator.compileAndRender({ source: "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); compose { circle(at: center, radius: 0.2) |> fill(#fff) } }" });
 
     expect(deps.manifestEl.textContent).toBe(JSON.stringify({ passes: [{ id: "canvas" }] }, null, 2));
   });

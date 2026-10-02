@@ -112,7 +112,7 @@ fn helper_lowering_emits_vector_signature_helper_calls() {
   return p.x + b.y;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let pos = vec3(uv.x, uv.y, sin(time));
   compose {
     circle(at: center, radius: 0.1 + 0.01 * sd_mock(pos, vec3(1.0, 2.0, 3.0))) |> fill(#ffffff)
@@ -143,7 +143,7 @@ fn helper_lowering_emits_matrix_signature_helper_calls() {
   return r.x + r.y + r.z;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let m = mat3(
     vec3(1.0, 0.0, 0.0),
     vec3(0.0, 1.0, 0.0),
@@ -178,7 +178,7 @@ fn helper_lowering_preserves_vec3_dot_normalize_pattern() {
     let input = r#"fn lambert(n: vec3, l: vec3) -> f32 {
   return dot(normalize(n), normalize(l));
 }
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let n = vec3(uv.x - 0.5, uv.y - 0.5, 1.0);
   let l = vec3(0.5, 0.25, 1.0);
   let d = lambert(n, l);
@@ -223,7 +223,7 @@ fn helper_lowering_preserves_vec2_dot_self_shape() {
   return dot(v, v);
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let d = len2_sq(vec2(uv.x - 0.5, uv.y - 0.5));
   compose {
     circle(at: center, radius: 0.03 + 0.01 * d) |> fill(#ffffff)
@@ -252,7 +252,7 @@ fn outer(x: f32) -> f32 {
   return x + 1.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.1 + 0.02 * outer(inner(sin(time)))) |> fill(#ffffff)
   }
@@ -293,7 +293,7 @@ fn helper_lowering_preserves_vec3_max_scalar_shape() {
   return length(max(q, 0.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = vec3(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2);
   let d = box_fold(p, vec3(0.2, 0.2, 0.2));
   compose {
@@ -317,7 +317,7 @@ fn helper_lowering_preserves_vec2_max_scalar_shape() {
   return length(max(q, 0.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let d = fold2(vec2(uv.x - 0.5, uv.y - 0.5));
   compose {
     circle(at: center, radius: 0.03 + 0.02 * d) |> fill(#ffffff)
@@ -340,7 +340,7 @@ fn helper_lowering_preserves_vec4_max_scalar_shape() {
   return length(max(q, 0.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let d = fold4(vec4(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2, 1.0));
   compose {
     circle(at: center, radius: 0.03 + 0.02 * d) |> fill(#ffffff)
@@ -363,7 +363,7 @@ fn helper_lowering_preserves_vec3_min_scalar_shape() {
   return length(min(q, 0.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = vec3(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2);
   let d = box_fold_min(p, vec3(0.2, 0.2, 0.2));
   compose {
@@ -387,7 +387,7 @@ fn helper_lowering_preserves_vec2_min_scalar_shape() {
   return length(min(q, 0.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let d = fold2_min(vec2(uv.x - 0.5, uv.y - 0.5));
   compose {
     circle(at: center, radius: 0.03 + 0.02 * abs(d)) |> fill(#ffffff)
@@ -410,7 +410,7 @@ fn helper_lowering_preserves_vec4_min_scalar_shape() {
   return length(min(q, 0.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let d = fold4_min(vec4(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2, 1.0));
   compose {
     circle(at: center, radius: 0.03 + 0.02 * abs(d)) |> fill(#ffffff)
@@ -432,7 +432,7 @@ fn helper_lowering_preserves_vec3_clamp_shape() {
   return clamp(v, vec3(0.0), vec3(1.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let rgb = clamp_rgb(vec3(uv.x, uv.y, sin(time) * 0.5 + 0.5));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * rgb.x) |> fill(#ffffff)
@@ -454,7 +454,7 @@ fn helper_lowering_preserves_vec2_clamp_shape() {
   return clamp(v, vec2(0.0), vec2(1.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let rg = clamp_rg(vec2(uv.x, uv.y));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * rg.x) |> fill(#ffffff)
@@ -476,7 +476,7 @@ fn helper_lowering_preserves_vec4_clamp_shape() {
   return clamp(v, vec4(0.0), vec4(1.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let rgba = clamp_rgba(vec4(uv.x, uv.y, sin(time) * 0.5 + 0.5, 1.0));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * rgba.x) |> fill(#ffffff)
@@ -498,7 +498,7 @@ fn helper_lowering_preserves_normalize_chain_shape() {
   return normalize(normalize(v));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let n = normalize_twice(vec3(uv.x - 0.5, uv.y - 0.5, 1.0));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * n.x) |> fill(#ffffff)
@@ -525,7 +525,7 @@ fn helper_lowering_preserves_vec2_normalize_chain_shape() {
   return normalize(normalize(v));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let n = normalize_twice2(vec2(uv.x - 0.5, uv.y - 0.5));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * n.x) |> fill(#ffffff)
@@ -548,7 +548,7 @@ fn helper_lowering_preserves_vec4_normalize_chain_shape() {
   return normalize(normalize(v));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let n = normalize_twice4(vec4(uv.x - 0.5, uv.y - 0.5, 1.0, 1.0));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * n.x) |> fill(#ffffff)
@@ -591,7 +591,7 @@ fn helper_statement_ir_lowers_if_for_break_and_assignments() {
   return res;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let ro = vec3(0.0, 0.3, -2.0);
   let rd = normalize(vec3(uv.x - 0.5, uv.y - 0.5, 1.0));
   let hit = march(ro, rd);
@@ -621,7 +621,7 @@ fn map(pos: vec3) -> vec2 {
   return res;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = vec3(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2);
   let h = map(p);
   compose {
@@ -671,7 +671,7 @@ fn raycast(ro: vec3, rd: vec3) -> vec2 {
   return hit;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let ro = vec3(0.0, 0.6, -2.0);
   let rd = normalize(vec3(uv.x - 0.5, uv.y - 0.5, 1.0));
   let h = raycast(ro, rd);
@@ -693,7 +693,7 @@ fn helper_stmt_ir_reports_unsupported_statement_with_helper_context() {
   return x;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = bad_helper(uv.x);
   compose {
     circle(at: center, radius: 0.03 + 0.01 * v) |> fill(#ffffff)
@@ -718,7 +718,7 @@ fn helper_stmt_ir_reports_assignment_arity_mismatch_with_helper_context() {
   return q.x;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = bad_assign((uv.x, uv.y));
   compose {
     circle(at: center, radius: 0.03 + 0.01 * v) |> fill(#ffffff)
@@ -741,7 +741,7 @@ fn helper_stmt_ir_reports_break_outside_loop_with_code() {
   return x;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = bad_break(uv.x);
   compose {
     circle(at: center, radius: 0.03 + 0.01 * v) |> fill(#ffffff)
@@ -767,7 +767,7 @@ fn helper_for_loop_break_cap_uses_live_continuing_index() {
     return acc;
   }
 
-  canvas t(uv: coord, time: signal) -> color {
+  canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let v = sum_steps();
     compose {
     circle(at: center, radius: 0.02 + 0.005 * v) |> fill(#ffffff)
@@ -814,7 +814,7 @@ fn helper_for_loop_break_cap_uses_live_continuing_index() {
 
 #[test]
 fn helper_lowering_omits_along_accumulator_for_dist_only_paths() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)
@@ -842,7 +842,7 @@ fn helper_lowering_omits_along_accumulator_for_dist_only_paths() {
 
 #[test]
 fn helper_lowering_skips_path_tables_when_only_length_is_used() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)
@@ -869,7 +869,7 @@ fn helper_lowering_skips_path_tables_when_only_length_is_used() {
 
 #[test]
 fn helper_lowering_uses_shared_arc_sample_helper_for_point_and_tangent_at() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)
@@ -905,7 +905,7 @@ fn helper_lowering_uses_shared_arc_sample_helper_for_point_and_tangent_at() {
 
 #[test]
 fn helper_lowering_explain_has_no_placeholder_path_eval_note() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)

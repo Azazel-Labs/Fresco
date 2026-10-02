@@ -22,7 +22,7 @@ impl Fixture {
         std::fs::create_dir_all(path.join("selected")).unwrap();
         std::fs::write(
             path.join("project/main.fr"),
-            "canvas probe(uv: coord) -> color { rgba(uv.x, uv.y, 0.0, 1.0) }",
+            "canvas probe(ctx: CanvasContext) -> color { let uv = context(coord); rgba(uv.x, uv.y, 0.0, 1.0) }",
         )
         .unwrap();
         std::fs::write(
@@ -56,7 +56,7 @@ impl Drop for Fixture {
 #[test]
 fn embedded_engine_and_filesystem_imports_keep_separate_resolution_domains() {
     let fixture = Fixture::new();
-    let source = "import \"helper.fr\"\ncanvas probe(uv: coord) -> color { rgba(engine_value(), project_value(), 0.0, 1.0) }";
+    let source = "import \"helper.fr\"\ncanvas probe(ctx: CanvasContext) -> color { let uv = context(coord); rgba(engine_value(), project_value(), 0.0, 1.0) }";
     std::fs::write(
         fixture.0.join("project/helper.fr"),
         "fn project_value() -> f32 { return 0.75 }",

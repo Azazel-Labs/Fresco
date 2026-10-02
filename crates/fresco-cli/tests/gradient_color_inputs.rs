@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 fn compile(body: &str) -> fresco::driver::CompileBundleOutput {
     let source = format!(
-        "canvas t(uv: coord, time: signal) -> color {{
+        "canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time);
             let g = gradient(along: x, stops: [stop(at: 0.0, color: #f008), stop(at: 1.0, color: #08fc)])
             let disk = circle(at: (0.5, 0.5), radius: 0.3)
             {body}
@@ -36,7 +36,7 @@ fn sampled_gradients_preserve_nested_scopes_and_shape_anchors() {
     ] {
         compile(body);
     }
-    let errors = compile_source("canvas t(uv: coord) -> color { let g = gradient(along: x, anchor: shape, stops: [stop(at: 0.0, color: #000), stop(at: 1.0, color: #fff)]); fill(lighten(g, by: 0.2)) }")
+    let errors = compile_source("canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let g = gradient(along: x, anchor: shape, stops: [stop(at: 0.0, color: #000), stop(at: 1.0, color: #fff)]); fill(lighten(g, by: 0.2)) }")
         .expect_err("a fullscreen color has no shape anchor");
     assert!(
         errors

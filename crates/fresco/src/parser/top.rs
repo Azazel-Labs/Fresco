@@ -3595,7 +3595,7 @@ mod tests {
     fn raster_entry_and_surface_share_the_same_entry_template_shape() {
         let program = parse_program(
             r#"
-            canvas preview(uv: coord) -> color {
+            canvas preview(ctx: CanvasContext) -> color {
                 let x = 1.0;
             }
 

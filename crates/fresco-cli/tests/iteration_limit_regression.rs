@@ -10,7 +10,7 @@ fn run_range(start: i32, end: i32) -> std::process::Output {
         "fn choose(x: f32) -> color {{\n\
          for i in {start} .. {end} {{ let unused = i }}\n\
          return #ff0000\n}}\n\
-         canvas t(uv: coord) -> color {{ compose {{ choose(uv.x) }} }}"
+         canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); compose {{ choose(uv.x) }} }}"
     );
     let path = common::unique_temp_path("iteration_limit");
     fs::write(&path, source).unwrap();

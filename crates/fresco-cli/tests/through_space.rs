@@ -9,7 +9,7 @@ use common::{normalize, run_fresco, unique_temp_path};
 
 #[test]
 fn through_space_translate_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = circle(at: center, radius: 0.2) |> fill(#4ade80)
     scene through space translate(by: (0.05, 0))
 }
@@ -28,7 +28,7 @@ fn through_space_translate_compiles() {
 
 #[test]
 fn through_space_warp_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let bg = fill(#0a1220)
     let fg = circle(at: center, radius: 0.3) |> fill(#38bdf8)
     let offset = (sin(coord.x * 8.0 + time) * 0.02, cos(coord.y * 8.0 + time) * 0.02)
@@ -49,7 +49,7 @@ fn through_space_warp_compiles() {
 
 #[test]
 fn through_space_rotate_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = box(at: center, size: (0.6, 0.4)) |> fill(#7c3aed)
     scene through space rotate(angle: time * 0.5)
 }
@@ -70,7 +70,7 @@ fn through_space_rotate_compiles() {
 
 #[test]
 fn through_space_chained_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = circle(at: center, radius: 0.25) |> fill(#f59e0b)
     scene through space translate(by: (0.05, 0)) . rotate(angle: 0.3)
 }
@@ -91,7 +91,7 @@ fn through_space_chained_compiles() {
 
 #[test]
 fn through_named_space_ref_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space lens = scale(factor: 2.0, around: center)
     let scene = circle(at: center, radius: 0.15) |> fill(#22d3ee)
     scene through space lens
@@ -113,7 +113,7 @@ fn through_named_space_ref_compiles() {
 
 #[test]
 fn through_space_followed_by_pipe_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = circle(at: center, radius: 0.2) |> fill(#c084fc)
     scene through space translate(by: (0.1, 0)) |> opacity(0.6)
 }
@@ -134,7 +134,7 @@ fn through_space_followed_by_pipe_compiles() {
 
 #[test]
 fn through_space_in_compose_stack_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = circle(at: center, radius: 0.25) |> fill(#38bdf8)
     let offset = (sin(coord.x * 6.0) * 0.025, cos(coord.y * 6.0) * 0.025)
     compose {
@@ -160,7 +160,7 @@ fn through_space_in_compose_stack_compiles() {
 
 #[test]
 fn through_space_emits_valid_wgsl() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = circle(at: center, radius: 0.2) |> fill(#4ade80)
     let offset = (sin(coord.x * 8.0 + time) * 0.02, cos(coord.y * 8.0 + time) * 0.02)
     scene through space warp(by: offset)
@@ -190,7 +190,7 @@ fn through_space_emits_valid_wgsl() {
 
 #[test]
 fn through_space_non_layer_operand_is_an_error() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let sample_value = 0.5
     sample_value through space translate(by: (0.1, 0))
 }
@@ -216,7 +216,7 @@ fn through_space_non_layer_operand_is_an_error() {
 
 #[test]
 fn through_unknown_space_is_an_error() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let scene = circle(at: center, radius: 0.2) |> fill(#4ade80)
     scene through space no_such_space_fn(amount: 0.3)
 }

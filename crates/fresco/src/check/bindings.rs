@@ -350,7 +350,7 @@ mod tests {
     fn styles_do_not_shadow_value_mutability() {
         for keyword in ["let", "var"] {
             let source = format!(
-                "canvas test(uv: coord) -> color {{ {keyword} x = 1.0; style x = fill(#fff); x += 1.0; compose {{ fill(#fff) }} }}"
+                "canvas test(ctx: CanvasContext) -> color {{ let uv = context(coord); {keyword} x = 1.0; style x = fill(#fff); x += 1.0; compose {{ fill(#fff) }} }}"
             );
             assert_eq!(validate(&parse(&source)).is_ok(), keyword == "var");
         }

@@ -712,9 +712,9 @@ pub fn render_language_docs_markdown(model: &LanguageDocsModel) -> String {
     out.push_str("  g: roughness\n");
     out.push_str("  b: metallic\n");
     out.push_str("}\n\n");
-    out.push_str("canvas example(uv: coord) -> color {\n");
+    out.push_str("canvas example(ctx: CanvasContext) -> color {\n");
     out.push_str("  param orm: texture<ORM> = \"orm.png\"\n");
-    out.push_str("  let sampled = orm.at(uv * 2.0)\n");
+    out.push_str("  let sampled = orm.at(context(coord) * 2.0)\n");
     out.push_str("  let rough = sampled.roughness\n");
     out.push_str("  compose {\n");
     out.push_str("    sampled\n");

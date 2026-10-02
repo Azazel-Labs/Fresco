@@ -5,7 +5,7 @@ import initWasm, { compile_fresco_bundle } from "../../pkg/fresco_wasm.js";
 
 import enginePolicy from "../../../../../tests/render-policy/engine/engine.fr?raw";
 
-const WARNING_SOURCE = `canvas t(uv: coord, time: signal) -> color {
+const WARNING_SOURCE = `canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: (0.45, 0.5), radius: 0.16)
     let b = box(at: (0.55, 0.5), size: (0.26, 0.18)) |> round(radius: 0.05)
     let joined = (a | b) |> smooth(radius: 0.04)
@@ -18,14 +18,14 @@ const WARNING_SOURCE = `canvas t(uv: coord, time: signal) -> color {
 }
 `;
 
-const CLEAN_SOURCE = `canvas t(uv: coord, time: signal) -> color {
+const CLEAN_SOURCE = `canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         circle(at: center, radius: 0.2) |> fill(#ffffff)
     }
 }
 `;
 
-const COMPARISON_IF_SOURCE = `canvas t(uv: coord, time: signal) -> color {
+const COMPARISON_IF_SOURCE = `canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: center, radius: 0.3)
     let cond = cos(time) >= 0.0
     compose {
@@ -38,7 +38,7 @@ const COMPARISON_IF_SOURCE = `canvas t(uv: coord, time: signal) -> color {
 }
 `;
 
-const ELSE_IF_SOURCE = `canvas t(uv: coord, time: signal) -> color {
+const ELSE_IF_SOURCE = `canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: center, radius: 0.3)
     let c1 = cos(time) > 0.5
     let c2 = cos(time) >= 0.0

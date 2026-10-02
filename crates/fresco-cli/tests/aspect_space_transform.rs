@@ -7,7 +7,7 @@ use common::{normalize, run_fresco, run_source, unique_temp_path};
 
 #[test]
 fn arbitrary_grouped_brace_blocks_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space stage = centered(aspect: preserve)
 
   {
@@ -43,7 +43,7 @@ fn arbitrary_grouped_brace_blocks_compile() {
 
 #[test]
 fn grouped_brace_block_bindings_do_not_leak() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   {
     let inner = circle(at: (0.5, 0.5), radius: 0.12)
     inner |> fill(#ffffff)
@@ -71,7 +71,7 @@ fn grouped_brace_block_bindings_do_not_leak() {
 
 #[test]
 fn viewport_units_vw_vh_vmax_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let c = circle(at: center, radius: 4vmax)
   compose {
     fill(#0b1220)
@@ -94,7 +94,7 @@ fn viewport_units_vw_vh_vmax_compile() {
 
 #[test]
 fn in_space_empty_block_is_allowed() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#0b1220)
     in space centered(aspect: preserve) {
@@ -115,7 +115,7 @@ fn in_space_empty_block_is_allowed() {
 
 #[test]
 fn in_space_statement_blend_modes_are_preserved() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#0b1220)
     in space centered(aspect: preserve) {
@@ -147,7 +147,7 @@ fn in_space_statement_blend_modes_are_preserved() {
 
 #[test]
 fn scatter_add_blend_does_not_force_opaque_alpha() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 1 within screen seed 7 strategy compact {
     circle(at: instance.pos, radius: 1px) |> fill(#ffffff)
   }
@@ -177,7 +177,7 @@ fn scatter_add_blend_does_not_force_opaque_alpha() {
 
 #[test]
 fn nested_in_space_block_preserves_multiple_layers() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space stage = centered(aspect: preserve)
   let spin = wave(period: 4s, shape: saw, range: 0deg .. 360deg)
 
@@ -212,7 +212,7 @@ fn nested_in_space_block_preserves_multiple_layers() {
 
 #[test]
 fn aspect_space_transform_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space framed = aspect(ratio: 16/9)
 
   compose {
@@ -239,7 +239,7 @@ fn aspect_space_transform_compiles() {
 
 #[test]
 fn aspect_space_transform_rejects_non_positive_ratio() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space aspect(ratio: 0) {
       box(at: center, size: (0.7, 0.45)) |> fill(#ffffff)
@@ -266,7 +266,7 @@ fn aspect_space_transform_rejects_non_positive_ratio() {
 
 #[test]
 fn repeat_y_space_transform_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space repeat_y(every: 0.1) {
       box(at: (0.5, 0.5), size: (0.6, 0.02)) |> fill(#ffffff)
@@ -287,7 +287,7 @@ fn repeat_y_space_transform_compiles() {
 
 #[test]
 fn repeat_space_named_cell_binding_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#101827)
     in space repeat(every: (0.12, 0.12), cell: tile) {
@@ -317,7 +317,7 @@ fn repeat_space_named_cell_binding_compiles() {
 
 #[test]
 fn repeat_space_id_cell_binding_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#101827)
     in space repeat(every: (0.12, 0.12), id: cell) {
@@ -348,7 +348,7 @@ fn repeat_space_id_cell_binding_compiles() {
 
 #[test]
 fn repeat_space_as_cell_binding_compiles_with_warning() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#101827)
     in space repeat(every: (0.12, 0.12), as: tile) {
@@ -379,7 +379,7 @@ fn repeat_space_as_cell_binding_compiles_with_warning() {
 
 #[test]
 fn repeat_space_rejects_duplicate_binding_aliases() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#101827)
     in space repeat(every: (0.12, 0.12), cell: cell, id: tile) {
@@ -408,7 +408,7 @@ fn repeat_space_rejects_duplicate_binding_aliases() {
 
 #[test]
 fn repeat_space_named_cell_binding_nests_cleanly() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#0f172a)
     in space repeat(every: (0.25, 0.25), cell: tile) {
@@ -436,7 +436,7 @@ fn repeat_space_named_cell_binding_nests_cleanly() {
 
 #[test]
 fn repeat_space_hash_cell_matches_hash_cell_id() {
-    let direct = r#"canvas t(uv: coord, time: signal) -> color {
+    let direct = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#101827)
     in space repeat(every: (0.12, 0.12), cell: tile) {
@@ -447,7 +447,7 @@ fn repeat_space_hash_cell_matches_hash_cell_id() {
   }
 }
 "#;
-    let via_id = r#"canvas t(uv: coord, time: signal) -> color {
+    let via_id = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#101827)
     in space repeat(every: (0.12, 0.12), cell: tile) {
@@ -485,7 +485,7 @@ fn repeat_space_hash_cell_matches_hash_cell_id() {
 
 #[test]
 fn repeat_y_space_transform_rejects_non_positive_period() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space repeat_y(every: 0) {
       box(at: center, size: (0.6, 0.02)) |> fill(#ffffff)
@@ -512,7 +512,7 @@ fn repeat_y_space_transform_rejects_non_positive_period() {
 
 #[test]
 fn repeat_radial_space_transform_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space repeat_radial(count: 9, around: center, from: -90deg, to: 90deg) {
       capsule(from: (0.5, 0.5), to: (0.5, 0.1), radius: 0.004) |> fill(#ffffff)
@@ -533,7 +533,7 @@ fn repeat_radial_space_transform_compiles() {
 
 #[test]
 fn repeat_radial_space_transform_rejects_invalid_count() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space repeat_radial(count: 1, around: center, from: -90deg, to: 90deg) {
       circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -560,7 +560,7 @@ fn repeat_radial_space_transform_rejects_invalid_count() {
 
 #[test]
 fn repeat_radial_space_transform_accepts_explicit_angle_list() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let center = (0.5, 0.5)
   compose {
     in space repeat_radial(around: center, angles: [-90deg, -45deg, 0deg, 45deg, 90deg]) {
@@ -582,7 +582,7 @@ fn repeat_radial_space_transform_accepts_explicit_angle_list() {
 
 #[test]
 fn repeat_radial_space_transform_accepts_non_uniform_angle_list() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let center = (0.5, 0.5)
   compose {
     in space repeat_radial(around: center, angles: [-90deg, -20deg, 0deg, 90deg]) {
@@ -604,7 +604,7 @@ fn repeat_radial_space_transform_accepts_non_uniform_angle_list() {
 
 #[test]
 fn repeat_radial_space_transform_rejects_non_ascending_angle_list() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let center = (0.5, 0.5)
   compose {
     in space repeat_radial(around: center, angles: [90deg, 10deg, -20deg, -90deg]) {
@@ -634,7 +634,7 @@ fn repeat_radial_space_transform_rejects_non_ascending_angle_list() {
 
 #[test]
 fn perspective_space_transform_compiles_flat_v1() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space perspective(fov: 45deg, near: 0.01, far: 100.0, origin: center) {
       box(at: center, size: (0.5, 0.3)) |> fill(#ffffff)
@@ -655,7 +655,7 @@ fn perspective_space_transform_compiles_flat_v1() {
 
 #[test]
 fn perspective_space_transform_rejects_invalid_planes() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space perspective(fov: 45deg, near: 1.0, far: 0.5, origin: center) {
       box(at: center, size: (0.5, 0.3)) |> fill(#ffffff)
@@ -682,7 +682,7 @@ fn perspective_space_transform_rejects_invalid_planes() {
 
 #[test]
 fn perspective_space_supports_translate3_and_rotate_y() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space perspective(fov: 45deg, near: 0.01, far: 100.0, origin: center).translate3(x: 0.0, y: 0.0, z: 0.2).rotate_y(angle: 20deg, around: center) {
       box(at: center, size: (0.5, 0.3)) |> fill(#ffffff)
@@ -703,7 +703,7 @@ fn perspective_space_supports_translate3_and_rotate_y() {
 
 #[test]
 fn in_space_transform_chain_allows_newline_before_dot() {
-    let input = r##"canvas t(uv: coord, time: signal) -> color {
+    let input = r##"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space perspective(fov: 55deg, near: 0.02, far: 12.0, origin: center)
       .rotate_x(angle: -8deg, around: center)
@@ -727,7 +727,7 @@ fn in_space_transform_chain_allows_newline_before_dot() {
 
 #[test]
 fn perspective_space_supports_rotate_x_and_rotate_z() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space perspective(fov: 60deg, near: 0.02, far: 50.0, origin: center).rotate_x(angle: 15deg, around: center).rotate_z(angle: -5deg, around: center) {
       box(at: center, size: (0.5, 0.3)) |> fill(#ffffff)
@@ -748,7 +748,7 @@ fn perspective_space_supports_rotate_x_and_rotate_z() {
 
 #[test]
 fn orientation_space_transform_compiles_for_y_down() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space screen = orientation(y: down)
 
   compose {
@@ -773,7 +773,7 @@ fn orientation_space_transform_compiles_for_y_down() {
 
 #[test]
 fn orientation_space_transform_rejects_unknown_axis_direction() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space orientation(y: sideways) {
       circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -800,7 +800,7 @@ fn orientation_space_transform_rejects_unknown_axis_direction() {
 
 #[test]
 fn orientation_space_sets_default_orientation_with_explicit_wrapper() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space orientation(y: down) {
       circle(at: (0.5, 0.8), radius: 0.12) |> fill(#ffd27a)
@@ -821,7 +821,7 @@ fn orientation_space_sets_default_orientation_with_explicit_wrapper() {
 
 #[test]
 fn canvas_space_is_rejected() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   canvas_space = orientation(y: up)
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -852,7 +852,7 @@ fn orientation_accepts_enum_qualified_variant() {
   down,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space orientation(y: VerticalAxis.down) {
       circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -881,7 +881,7 @@ enum Flow {
   down,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space orientation(y: down) {
       circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -908,7 +908,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn anchor_literal_compiles_in_coord_like_builtin_param() {
-    let input = r#"canvas t(pos: coord, t: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let pos = context(coord); let t = context(time);
   compose {
     box(at: center, size: (0.7, 0.45)) |> fill(#ffffff)
   }
@@ -927,7 +927,7 @@ fn anchor_literal_compiles_in_coord_like_builtin_param() {
 
 #[test]
 fn qualified_anchor_literal_compiles_in_coord_like_builtin_param() {
-    let input = r#"canvas t(pos: coord, t: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let pos = context(coord); let t = context(time);
   compose {
     circle(at: Anchor.top_center, radius: 0.1) |> fill(#ffffff)
   }

@@ -294,7 +294,7 @@ mod tests {
         let source = root.join("examples/a.fr");
         fs::write(
             &source,
-            "canvas a(uv: coord) -> color { compose { fill(#fff) } }\n",
+            "canvas a(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(#fff) } }\n",
         )
         .unwrap();
         let readme = root.join("README.md");
@@ -307,7 +307,7 @@ mod tests {
         let synced = fs::read_to_string(&readme).unwrap();
         fs::write(
             &source,
-            "canvas a(uv: coord) -> color { compose { nonexistent() } }\n",
+            "canvas a(ctx: CanvasContext) -> color { let uv = context(coord); compose { nonexistent() } }\n",
         )
         .unwrap();
         assert!(run(&root, false).is_err());
@@ -316,7 +316,7 @@ mod tests {
         fs::write(&source, "fn ink() -> color { return #fff }\n").unwrap();
         fs::write(
             root.join("examples/main.fr"),
-            "import \"a.fr\"\ncanvas main(uv: coord) -> color { compose { fill(ink()) } }\n",
+            "import \"a.fr\"\ncanvas main(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(ink()) } }\n",
         )
         .unwrap();
         fs::write(root.join("docs/readme/samples.json"),

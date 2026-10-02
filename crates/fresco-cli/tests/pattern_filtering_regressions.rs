@@ -5,7 +5,7 @@ use common::{normalize, run_source};
 
 #[test]
 fn filtered_patterns_in_transformed_space_do_not_use_local_px_derivatives() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space warped = rotate(45deg) . scale(0.5)
 
   compose {

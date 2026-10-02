@@ -1812,7 +1812,7 @@ mod tests {
 
     #[test]
     fn blend_call_arg_context_suggests_blend_modes() {
-        let marked = "canvas t(uv: coord, time: signal) -> color {\n  let b = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> blend(ad<cursor>)\n}\n";
+        let marked = "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let b = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> blend(ad<cursor>)\n}\n";
         let cursor = marked.find("<cursor>").expect("cursor marker required");
         let source = marked.replace("<cursor>", "");
         let items = completion_items_for_cursor(&source, cursor);
@@ -1836,7 +1836,7 @@ mod tests {
 
     #[test]
     fn pipe_context_filters_to_shape_layer_relevant_operations() {
-        let marked = "canvas t(uv: coord, time: signal) -> color {\n  let b = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> <cursor>\n}\n";
+        let marked = "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let b = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> <cursor>\n}\n";
         let cursor = marked.find("<cursor>").expect("cursor marker required");
         let source = marked.replace("<cursor>", "");
         let line_prefix = current_line_prefix(&source, cursor);
@@ -1902,7 +1902,7 @@ mod tests {
     #[test]
     fn centered_aspect_value_context_does_not_suggest_untyped_scope_symbols() {
         let (source, cursor) = source_and_cursor(
-            "canvas t(uv: coord, time: signal) -> color {\n  let pulse = wave(period: 1.6s, shape: sine, range: 0.35 .. 0.85)\n  space stage = centered(aspect: |)\n}\n",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let pulse = wave(period: 1.6s, shape: sine, range: 0.35 .. 0.85)\n  space stage = centered(aspect: |)\n}\n",
         );
         let items = completion_items_for_cursor(&source, cursor);
         let labels = completion_labels(&items);
@@ -2060,7 +2060,7 @@ mod tests {
     #[test]
     fn wave_shape_value_context_suggests_wave_shape_variants() {
         let (source, cursor) = source_and_cursor(
-            "canvas t(uv: coord, time: signal) -> color {\n  let p = wave(period: 0.11s, shape: |, range: 0.58 .. 1.0)\n}\n",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let p = wave(period: 0.11s, shape: |, range: 0.58 .. 1.0)\n}\n",
         );
         let items = completion_items_for_cursor(&source, cursor);
         let labels = completion_labels(&items);
@@ -2073,7 +2073,7 @@ mod tests {
     #[test]
     fn wave_shape_value_context_respects_partial_prefix() {
         let (source, cursor) = source_and_cursor(
-            "canvas t(uv: coord, time: signal) -> color {\n  let p = wave(period: 0.11s, shape: tri|, range: 0.58 .. 1.0)\n}\n",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let p = wave(period: 0.11s, shape: tri|, range: 0.58 .. 1.0)\n}\n",
         );
         let items = completion_items_for_cursor(&source, cursor);
         let labels = completion_labels(&items);
@@ -2094,7 +2094,7 @@ mod tests {
     #[test]
     fn gradient_kind_value_context_suggests_variants() {
         let (source, cursor) = source_and_cursor(
-            "canvas t(uv: coord, time: signal) -> color {\n  let g = gradient(kind: |)\n}\n",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let g = gradient(kind: |)\n}\n",
         );
         let items = completion_items_for_cursor(&source, cursor);
         let labels = completion_labels(&items);
@@ -2105,7 +2105,7 @@ mod tests {
     #[test]
     fn gradient_kind_value_context_respects_partial_prefix() {
         let (source, cursor) = source_and_cursor(
-            "canvas t(uv: coord, time: signal) -> color {\n  let g = gradient(kind: ra|)\n}\n",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let g = gradient(kind: ra|)\n}\n",
         );
         let items = completion_items_for_cursor(&source, cursor);
         let labels = completion_labels(&items);
@@ -2116,7 +2116,7 @@ mod tests {
     #[test]
     fn gradient_kind_value_context_does_not_suggest_untyped_scope_symbols() {
         let (source, cursor) = source_and_cursor(
-            "canvas t(uv: coord, time: signal) -> color {\n  let radial_hint = 1\n  let g = gradient(kind: |)\n}\n",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);\n  let radial_hint = 1\n  let g = gradient(kind: |)\n}\n",
         );
         let items = completion_items_for_cursor(&source, cursor);
         let labels = completion_labels(&items);
@@ -2242,7 +2242,7 @@ mod tests {
             );
 
             let (value_source, value_cursor) = source_and_cursor(&format!(
-                "canvas t(uv: coord, time: signal) -> color {{\n  let _x = {}({}: |)\n}}\n",
+                "canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time);\n  let _x = {}({}: |)\n}}\n",
                 builtin.name, discriminator.name
             ));
             let value_items = completion_items_for_cursor_e2e(&value_source, value_cursor);

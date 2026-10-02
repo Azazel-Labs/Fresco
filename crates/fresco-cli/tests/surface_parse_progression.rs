@@ -222,7 +222,7 @@ surface uv2_sig(sp: surf) -> material {
 fn canvas_plus_surface_both_compile() {
     let (success, output) = compile(
         r#"
-canvas preview(uv: coord, time: signal) -> color {
+canvas preview(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(#ff8800)
     }
@@ -348,7 +348,7 @@ surface mat(sp: surf) -> material {
 fn canvas_plus_surface_manifest_has_both() {
     let (success, manifest) = compile_manifest(
         r#"
-canvas preview(uv: coord, time: signal) -> color {
+canvas preview(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose { fill(#aaaaaa) }
 }
 surface my_mat(sp: surf) -> material {

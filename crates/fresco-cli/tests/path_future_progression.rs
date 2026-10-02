@@ -29,7 +29,7 @@ fn assert_compile_fails_contains(suffix: &str, input: &str, needle: &str) {
 
 #[test]
 fn path_future_method_and_channel_placeholders_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)
@@ -56,7 +56,7 @@ fn path_future_method_and_channel_placeholders_compile() {
 
 #[test]
 fn fill_path_width_reports_migration_error() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     line (0.90, 0.30)
@@ -77,7 +77,7 @@ fn fill_path_width_reports_migration_error() {
 
 #[test]
 fn path_receiver_fill_closed_path_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg("M 0.20 0.20 L 0.80 0.20 L 0.80 0.80 L 0.20 0.80 Z")
 
   compose {
@@ -91,7 +91,7 @@ fn path_receiver_fill_closed_path_compiles() {
 
 #[test]
 fn path_receiver_fill_supports_shape_anchor_gradient() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg("M 0.12 0.62 C 0.30 0.18, 0.56 0.20, 0.74 0.52 C 0.82 0.66, 0.90 0.60, 0.92 0.48 Z")
 
   compose {
@@ -112,7 +112,7 @@ fn path_receiver_fill_supports_shape_anchor_gradient() {
 
 #[test]
 fn path_receiver_fill_open_path_reports_closed_contour_error() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     line (0.90, 0.30)
@@ -134,7 +134,7 @@ fn path_receiver_fill_open_path_reports_closed_contour_error() {
 
 #[test]
 fn path_explain_reports_const_module_embedded_storage_for_small_paths() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     line (0.90, 0.30)
@@ -156,7 +156,7 @@ fn path_explain_reports_const_module_embedded_storage_for_small_paths() {
 
 #[test]
 fn path_explain_reports_threshold_buffer_reason_for_large_paths() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)
@@ -178,7 +178,7 @@ fn path_explain_reports_threshold_buffer_reason_for_large_paths() {
 
 #[test]
 fn path_svg_cubic_outline_compiles_as_real_path_value() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg("M 0.12 0.62 C 0.30 0.18, 0.56 0.20, 0.74 0.52 C 0.82 0.66, 0.90 0.60, 0.92 0.48 Z")
 
   let head_s = fract(time * 0.2) * curve.length
@@ -198,7 +198,7 @@ fn path_svg_cubic_outline_compiles_as_real_path_value() {
 
 #[test]
 fn path_svg_explain_reports_svg_path_lowering_note() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg("M 0.12 0.62 C 0.30 0.18, 0.56 0.20, 0.74 0.52 C 0.82 0.66, 0.90 0.60, 0.92 0.48 Z")
 
   compose {
@@ -216,7 +216,7 @@ fn path_svg_explain_reports_svg_path_lowering_note() {
 
 #[test]
 fn path_svg_samples_knob_can_keep_curve_const_embedded() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 55 142 C 145 34, 275 50, 358 112 C 425 161, 512 152, 562 110 C 588 88, 616 94, 618 114 C 620 132, 600 138, 592 126 C 588 119, 594 111, 601 114 C 596 113, 593 118, 596 123 C 601 131, 615 127, 613 115 C 611 99, 588 95, 568 116 C 520 162, 424 174, 350 122 C 278 70, 152 48, 55 158 Z",
     samples: 6,
@@ -237,7 +237,7 @@ fn path_svg_samples_knob_can_keep_curve_const_embedded() {
 
 #[test]
 fn path_svg_tolerance_mode_reports_adaptive_sampling_note() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 55 142 C 145 34, 275 50, 358 112 C 425 161, 512 152, 562 110 C 588 88, 616 94, 618 114 C 620 132, 600 138, 592 126 C 588 119, 594 111, 601 114 C 596 113, 593 118, 596 123 C 601 131, 615 127, 613 115 C 611 99, 588 95, 568 116 C 520 162, 424 174, 350 122 C 278 70, 152 48, 55 158 Z",
     tolerance: 6.0,
@@ -258,7 +258,7 @@ fn path_svg_tolerance_mode_reports_adaptive_sampling_note() {
 
 #[test]
 fn path_svg_preserve_cubics_mode_reports_retention_note() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 0.12 0.62 C 0.30 0.18, 0.56 0.20, 0.74 0.52 C 0.82 0.66, 0.90 0.60, 0.92 0.48 Z",
     preserve_cubics: 1,
@@ -280,7 +280,7 @@ fn path_svg_preserve_cubics_mode_reports_retention_note() {
 
 #[test]
 fn path_svg_preserve_cubics_reports_deterministic_single_segment_count() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 0.08 0.52 C 0.30 0.10, 0.70 0.90, 0.92 0.48",
     preserve_cubics: 1,
@@ -301,7 +301,7 @@ fn path_svg_preserve_cubics_reports_deterministic_single_segment_count() {
 
 #[test]
 fn path_svg_preserve_cubics_reports_deterministic_two_segment_count() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 0.12 0.52 C 0.26 0.15, 0.44 0.82, 0.58 0.46 C 0.70 0.18, 0.82 0.78, 0.92 0.48",
     preserve_cubics: 1,
@@ -322,7 +322,7 @@ fn path_svg_preserve_cubics_reports_deterministic_two_segment_count() {
 
 #[test]
 fn path_svg_preserve_cubics_inflection_curve_compiles_with_nearest_channels() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 0.08 0.52 C 0.30 0.10, 0.70 0.90, 0.92 0.48",
     preserve_cubics: 1,
@@ -352,7 +352,7 @@ fn path_svg_preserve_cubics_inflection_curve_compiles_with_nearest_channels() {
 
 #[test]
 fn path_svg_preserve_cubics_near_degenerate_handles_compile_and_report_retention() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 0.12 0.50 C 0.1205 0.5003, 0.8795 0.4997, 0.88 0.50 C 0.8803 0.5002, 0.9197 0.5398, 0.92 0.54",
     preserve_cubics: 1,
@@ -380,7 +380,7 @@ fn path_svg_preserve_cubics_near_degenerate_handles_compile_and_report_retention
 
 #[test]
 fn path_svg_preserve_cubics_endpoint_lock_and_overlapping_handles_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "M 0.14 0.54 C 0.14 0.54, 0.92 0.46, 0.92 0.46 C 0.92 0.46, 0.60 0.80, 0.30 0.22",
     preserve_cubics: 1,
@@ -416,7 +416,7 @@ fn path_svg_preserve_cubics_endpoint_lock_and_overlapping_handles_compile() {
 
 #[test]
 fn path_svg_accepts_raw_path_tag_and_auto_normalizes() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "<path fill=\"var(--p)\" stroke=\"none\" d=\"M 55 142&#10;C 145 34, 275 50, 358 112&#10;C 425 161, 512 152, 562 110&#10;C 588 88, 616 94, 618 114&#10;C 620 132, 600 138, 592 126&#10;C 588 119, 594 111, 601 114&#10;C 596 113, 593 118, 596 123&#10;C 601 131, 615 127, 613 115&#10;C 611 99, 588 95, 568 116&#10;C 520 162, 424 174, 350 122&#10;C 278 70, 152 48, 55 158&#10;Z\" style=\"fill:rgb(11,11,11);stroke:none\"/>",
     preserve_cubics: 1,
@@ -442,7 +442,7 @@ fn path_svg_accepts_raw_path_tag_and_auto_normalizes() {
 
 #[test]
 fn path_svg_accepts_full_svg_with_viewbox_and_normalizes_from_viewbox() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let curve = path_svg(
     "<svg width=\"100%\" viewBox=\"0 0 680 210\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M 55 142 C 145 34, 275 50, 358 112 C 425 161, 512 152, 562 110 C 588 88, 616 94, 618 114 C 620 132, 600 138, 592 126 C 588 119, 594 111, 601 114 C 596 113, 593 118, 596 123 C 601 131, 615 127, 613 115 C 611 99, 588 95, 568 116 C 520 162, 424 174, 350 122 C 278 70, 152 48, 55 158 Z\"/></svg>",
     preserve_cubics: 1,
@@ -464,7 +464,7 @@ fn path_svg_accepts_full_svg_with_viewbox_and_normalizes_from_viewbox() {
 
 #[test]
 fn path_explain_reports_channel_demand_and_shared_search_note() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let curve = path {
     move (0.10, 0.30)
     cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)

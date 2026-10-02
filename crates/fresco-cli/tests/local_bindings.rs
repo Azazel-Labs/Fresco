@@ -12,7 +12,7 @@ fn accumulate(x: f32) -> f32 {
     for i in 0..3 { result += 0.05; }
     return result;
 }
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     var point: vec2 = uv;
     point.x += accumulate(0.1);
     let shade: f32 = point.x;
@@ -35,8 +35,9 @@ fn immutable_assignment_diagnostics_survive_the_full_pipeline() {
         "let x = 0.1; if false { x = 0.2; }",
         "let x = 0.1; { var x = 0.2; x += 0.1; } x = 0.3;",
     ] {
-        let source =
-            format!("canvas test(uv: coord) -> color {{ {body} compose {{ fill(#fff) }} }}");
+        let source = format!(
+            "canvas test(ctx: CanvasContext) -> color {{ let uv = context(coord); {body} compose {{ fill(#fff) }} }}"
+        );
         let path = unique_temp_path("immutable_local");
         fs::write(&path, source).unwrap();
         let output = run_fresco(&path);

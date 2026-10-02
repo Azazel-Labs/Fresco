@@ -50,7 +50,7 @@ test("covers compiler keywords and every numeric suffix", async () => {
 });
 
 test("separates ranges, pipes, declarations, types, colors, and host names", () => {
-  const lines = tokenize(`canvas badge(uv: coord, time: signal) -> color {
+  const lines = tokenize(`canvas badge(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let steps = [for i in 0..7 => i]
     shape |> fill(#abc) |> fill(#abcd) |> fill(#aabbcc) |> fill(#aabbccdd)
     @builtin #pragma $resolution

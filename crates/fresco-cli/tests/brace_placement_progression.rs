@@ -21,7 +21,7 @@ fn assert_compiles_with_style(suffix: &str, input: &str) {
 
 #[test]
 fn compose_allows_newline_before_open_brace() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose
   {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
@@ -34,7 +34,7 @@ fn compose_allows_newline_before_open_brace() {
 
 #[test]
 fn compose_if_allows_newline_before_open_brace() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     if time > 0.0
     {
@@ -49,7 +49,7 @@ fn compose_if_allows_newline_before_open_brace() {
 
 #[test]
 fn compose_for_allows_newline_before_open_brace() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     for i in 0 .. 3
     {
@@ -64,7 +64,7 @@ fn compose_for_allows_newline_before_open_brace() {
 
 #[test]
 fn compose_in_space_allows_newline_before_open_brace() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     in space centered(aspect: preserve)
     {
@@ -79,7 +79,7 @@ fn compose_in_space_allows_newline_before_open_brace() {
 
 #[test]
 fn compose_if_accepts_bool_literals_true_false() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     if true {
       circle(at: center, radius: 0.2) |> fill(#ffffff)
@@ -96,7 +96,7 @@ fn compose_if_accepts_bool_literals_true_false() {
 
 #[test]
 fn compose_if_allows_else_on_its_own_line() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     if true
     {

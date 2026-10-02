@@ -10,7 +10,9 @@ fn compile(
     let files = HashMap::from([
         (
             "main.fr".into(),
-            format!("canvas t(uv: coord, time: signal) -> color {{ {body} }}"),
+            format!(
+                "canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time); {body} }}"
+            ),
         ),
         (
             "engine/engine.fr".into(),

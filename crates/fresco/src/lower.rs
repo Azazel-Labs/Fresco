@@ -1288,18 +1288,12 @@ mod tests {
     use chumsky::Parser as _;
     use logos::Logos as _;
 
-    #[test]
-    fn scene_function_dedup_key_ignores_helper_names_for_equivalent_pass_lowering() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
-    compose {
-        fill(#0e1420)
-        circle(at: (0.5, 0.5), radius: 0.2) |> fill(#ffffff)
-    }
-}
-"#;
-
+    /// Parses `src` beside the shared engine `canvas` registration, resolves
+    /// the registered entry, and checks it.
+    fn check_registered_canvas(src: &str) -> Hir {
+        let src = format!("{}\n{src}", crate::test_support::CANVAS);
         let mut tokens = Vec::new();
-        for (tok, span) in crate::lexer::Token::lexer(src).spanned() {
+        for (tok, span) in crate::lexer::Token::lexer(&src).spanned() {
             match tok {
                 Ok(token) => tokens.push((token, span)),
                 Err(()) => panic!("expected lex success"),
@@ -1313,7 +1307,9 @@ mod tests {
             parse_errs.is_empty(),
             "expected parse success: {parse_errs:#?}"
         );
-        let program = program.unwrap_or_default();
+        let mut program = program.expect("parsed program");
+        crate::driver::entry_contract::resolve(&mut program)
+            .unwrap_or_else(|diags| panic!("expected entry resolution: {diags:#?}"));
         let entry = &program.raster_entries[0];
         let (hir, diags) = crate::check::check(
             &entry.as_normalized_root_entry(),
@@ -1342,6 +1338,20 @@ mod tests {
             diags.is_empty(),
             "expected no non-error diagnostics: {diags:#?}"
         );
+        hir
+    }
+
+    #[test]
+    fn scene_function_dedup_key_ignores_helper_names_for_equivalent_pass_lowering() {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
+    compose {
+        fill(#0e1420)
+        circle(at: (0.5, 0.5), radius: 0.2) |> fill(#ffffff)
+    }
+}
+"#;
+
+        let hir = check_registered_canvas(src);
 
         let scene_root = hir.effective_render_root();
         let layer_to_pass = vec![0usize; hir.layers.len()];
@@ -1397,7 +1407,7 @@ mod tests {
 
     #[test]
     fn scene_function_dedup_key_ignores_argument_local_and_named_expression_labels() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(#0e1420)
         circle(at: (0.5, 0.5), radius: 0.2) |> fill(#ffffff)
@@ -1405,50 +1415,7 @@ mod tests {
 }
 "#;
 
-        let mut tokens = Vec::new();
-        for (tok, span) in crate::lexer::Token::lexer(src).spanned() {
-            match tok {
-                Ok(token) => tokens.push((token, span)),
-                Err(()) => panic!("expected lex success"),
-            }
-        }
-        let eoi = src.len()..src.len();
-        let (program, parse_errs) = crate::parser::program()
-            .parse(crate::parser::input(&tokens, eoi))
-            .into_output_errors();
-        assert!(
-            parse_errs.is_empty(),
-            "expected parse success: {parse_errs:#?}"
-        );
-        let program = program.unwrap_or_default();
-        let entry = &program.raster_entries[0];
-        let (hir, diags) = crate::check::check(
-            &entry.as_normalized_root_entry(),
-            &program.functions,
-            &program.consts,
-            &program.enums,
-            &program.structs,
-            &program.params,
-            &program.texture_types,
-            &program.interfaces,
-            &program.conformances,
-            &program.effects,
-            &program.vertex_interfaces,
-            &program.vertex_formats,
-            &program.vertex_factories,
-            &crate::check::CheckOptions {
-                shape_aa_min_px: Some(1.5),
-                shape_aa_max_px: Some(3.0),
-                shape_aa_style: Some(crate::hir::ShapeAaStyle::Gradient),
-                projective_footprint_max_px: Some(64.0),
-                ..crate::check::CheckOptions::default()
-            },
-        )
-        .unwrap_or_else(|diags| panic!("expected check success, got diagnostics: {diags:#?}"));
-        assert!(
-            diags.is_empty(),
-            "expected no non-error diagnostics: {diags:#?}"
-        );
+        let hir = check_registered_canvas(src);
 
         let scene_root = hir.effective_render_root();
         let mut builder = ModuleBuilder::new();

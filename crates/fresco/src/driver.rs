@@ -13,7 +13,7 @@ mod compute_host;
 mod compute_operations;
 mod emit;
 mod engine_pass;
-mod entry_contract;
+pub(crate) mod entry_contract;
 mod explain;
 mod gpu_function;
 mod implementations;
@@ -773,16 +773,23 @@ mod tests {
 
     #[test]
     fn virtual_visualizer_resolves_engine_policy_and_rejects_missing_declarations() {
-        let src = "canvas t(uv: coord) -> color { compose { circle(at: center, radius: 0.2) |> fill(#fff) } }";
+        let src = "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); compose { circle(at: center, radius: 0.2) |> fill(#fff) } }";
         let expression = "circle(at: center, radius: 0.2)";
         let start = src.find(expression).expect("shape expression");
         let span = (start, start + expression.len());
         let mut files = HashMap::from([
             ("main.fr".into(), src.into()),
-            ("engine/engine.fr".into(), "import \"policy.fr\"".into()),
+            (
+                "engine/engine.fr".into(),
+                "import \"policy.fr\"\nimport \"canvas.fr\"".into(),
+            ),
             (
                 "engine/policy.fr".into(),
-                include_str!("../tests/fixtures/engines/policy/engine/engine.fr").into(),
+                crate::test_support::POLICY.into(),
+            ),
+            (
+                "engine/canvas.fr".into(),
+                crate::test_support::CANVAS.into(),
             ),
         ]);
         let result = compile_visualizer_with_files(
@@ -824,14 +831,28 @@ mod tests {
         explain: bool,
     ) -> Result<CompileBundleOutput, Vec<DiagnosticRecord>> {
         let mut files = files.clone();
+        // Engines that author their own `canvas` registration keep it; every
+        // other fixture receives the shared test registration.
+        let registers_canvas = files
+            .values()
+            .any(|source| source.contains("@entry(canvas,"));
         files.insert(
             "engine/render_policy.fr".into(),
-            include_str!("../tests/fixtures/engines/policy/engine/engine.fr").into(),
+            crate::test_support::POLICY.into(),
         );
-        if let Some(engine) = files.get_mut("engine/engine.fr")
-            && !engine.contains("#pragma check.shape_aa_min_px")
-        {
-            engine.push_str("\nimport \"render_policy.fr\"\n");
+        if !registers_canvas {
+            files.insert(
+                "engine/render_canvas.fr".into(),
+                crate::test_support::CANVAS.into(),
+            );
+        }
+        if let Some(engine) = files.get_mut("engine/engine.fr") {
+            if !engine.contains("#pragma check.shape_aa_min_px") {
+                engine.push_str("\nimport \"render_policy.fr\"\n");
+            }
+            if !registers_canvas {
+                engine.push_str("\nimport \"render_canvas.fr\"\n");
+            }
         }
         super::compile_bundle_virtual(&files, entrypoint, explain)
     }
@@ -904,7 +925,7 @@ mod tests {
     #[test]
     fn emitted_manifest_obeys_pass_plan_contract_required_fields() {
         let src = r#"
-canvas c(uv: coord, time: signal) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#ffffff)
   }
@@ -1036,7 +1057,7 @@ fn constructor_mix() -> vec4 {
              + vec4(12.0, 13.0, q)
 }
 
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
     let v = constructor_mix()
     compose {
         fill(rgba(v.x * 0.01, v.y * 0.01, v.z * 0.01, 1.0))
@@ -1052,13 +1073,13 @@ canvas c(uv: coord) -> color {
     #[test]
     fn emitted_manifest_pass_entry_points_exist_in_emitted_wgsl() {
         let src = r#"
-canvas badge(uv: coord, time: signal) -> color {
+canvas badge(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     fill(#ffffff)
   }
 }
 
-canvas blur_badge(uv: coord, time: signal) -> color {
+canvas blur_badge(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
         circle(at: (0.5, 0.5), radius: 0.2) |> fill(#ffffff) |> blur(24px)
   }
@@ -1168,7 +1189,7 @@ canvas second(ctx: CanvasContext) -> color {
 
     #[test]
     fn canvas_arrays_and_path_buffers_share_a_collision_free_binding_allocator() {
-        let source = r#"canvas first(uv: coord) -> color {
+        let source = r#"canvas first(ctx: CanvasContext) -> color { let uv = context(coord);
             param weights: array<f32> = [0.5]
             let curve = path {
                 move (0.10, 0.30)
@@ -1291,7 +1312,7 @@ canvas second(ctx: CanvasContext) -> color {
 
     #[test]
     fn length_only_paths_do_not_publish_unallocated_geometry_buffers() {
-        let source = r#"canvas length_only(uv: coord) -> color {
+        let source = r#"canvas length_only(ctx: CanvasContext) -> color { let uv = context(coord);
             let curve = path {
                 move (0.10, 0.30)
                 cubic (0.30, 0.85) (0.45, 0.05) (0.62, 0.55)
@@ -2050,7 +2071,7 @@ pass root_bad {
   stage: not_a_stage
 }
 
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     fill(#ffffff)
   }
@@ -2101,115 +2122,86 @@ pass implicit_bad {
     }
 
     #[test]
-    fn canvas_contract_form_compiles_via_canvas_interface_conformance() {
-        let src = r#"
-@group(3) group frame
-struct FrameGlobals {
-    time: f32
-    delta_time: f32
-    resolution: vec2
-}
-param frame: FrameGlobals
-
-struct ScreenVarying {
-    clip_pos: vec4
-    uv: vec2
-}
-
-struct CanvasViewConfig {
-    @config(editor) zoom: f32 = 1.0
-    @config(editor) pan: vec2 = vec2(0.0, 0.0)
-}
-
-interface canvas {
-    fn draw(uv: vec2) -> color
-}
-
+    fn registered_canvas_block_form_compiles_through_engine_interface() {
+        let mut files = executable_fullscreen_files("v.uv");
+        files.insert(
+            "main.fr".to_string(),
+            r#"
 canvas glow {
-    fn draw(uv: vec2) -> color {
-        return rgba(r: uv.x, g: uv.x, b: uv.x, a: 1.0)
+    fn draw(@context ctx: CanvasContext) -> color {
+        return rgba(r: ctx.uv.x, g: ctx.uv.x, b: ctx.uv.x, a: 1.0)
     }
 }
+"#
+            .to_string(),
+        );
 
-pass present_canvas for canvas {
-    stage: raster
-    draw: fullscreen
-
-    binding {
-        @group(frame) frame: uniform<FrameGlobals>
-    }
-
-    fn vertex(vertex_id: u32) -> ScreenVarying {
-        let p = fullscreen_triangle_position(vertex_id)
-        return ScreenVarying(
-            clip_pos: vec4(p, 0.0, 1.0),
-            uv: p * 0.5 + vec2(0.5, 0.5))
-    }
-
-    fn shade(v: ScreenVarying, t: canvas) -> color {
-        return t.draw(v.uv)
-    }
-}
-
-pipeline present for canvas {
-    present_canvas
-}
-"#;
-
-        let bundle = compile_source_bundle(src, TEST_SOURCE_PATH, false)
-            .expect("canvas contract form should normalize to interface conformance");
+        let bundle = compile_bundle_virtual(&files, "main.fr", false)
+            .expect("registered canvas block form should conform to the engine interface");
         assert!(
             bundle.diagnostics.is_empty(),
             "unexpected diagnostics: {bundle:#?}"
         );
         assert!(
             bundle.wgsl.contains("fn fresco_glow("),
-            "expected lowered WGSL function for contract canvas conformance, got: {}",
+            "expected lowered WGSL function for the registered canvas block, got: {}",
             bundle.wgsl
         );
         assert!(
-            bundle.manifest.contains("\"present\""),
+            bundle.manifest.contains("\"present_pipeline\""),
             "expected pipeline entry in manifest, got: {}",
             bundle.manifest
         );
         assert!(
-            bundle.manifest.contains("\"present_canvas\""),
+            bundle.manifest.contains("\"present\""),
             "expected pass entry in manifest, got: {}",
             bundle.manifest
         );
     }
 
     #[test]
-    fn canvas_contract_method_body_type_mismatch_is_rejected() {
-        let src = r#"
-struct CanvasContext {
-    time: f32
-    resolution: vec2
-    mouse: vec2
-    frame: u32
-}
-
-interface canvas {
-    fn draw(uv: vec2, ctx: CanvasContext) -> color
-}
-
+    fn canvas_block_without_the_registered_context_signature_is_rejected() {
+        // The retired contract form `fn draw(uv: vec2) -> color` is no longer
+        // adapted onto the engine contract; it must match the engine method.
+        let mut files = executable_fullscreen_files("v.uv");
+        files.insert(
+            "main.fr".to_string(),
+            r#"
 canvas glow {
-    fn draw(uv: vec2, ctx: CanvasContext) -> color {
-        return uv
+    fn draw(uv: vec2) -> color {
+        return rgba(r: uv.x, g: uv.x, b: uv.x, a: 1.0)
     }
 }
+"#
+            .to_string(),
+        );
 
-pass present_canvas for canvas {
-    stage: raster
-    draw: fullscreen
+        let err = compile_bundle_virtual(&files, "main.fr", false)
+            .expect_err("a draw method without the engine context must fail");
+        assert!(
+            err.iter().any(|diag| diag
+                .message
+                .contains("entry block `draw` signature does not match engine interface `Canvas`")),
+            "expected engine signature mismatch diagnostic, got: {err:#?}"
+        );
+    }
+
+    #[test]
+    fn registered_canvas_method_body_type_mismatch_is_rejected() {
+        let mut files = executable_fullscreen_files("v.uv");
+        files.insert(
+            "main.fr".to_string(),
+            r#"
+canvas glow {
+    fn draw(@context ctx: CanvasContext) -> color {
+        return ctx.uv
+    }
 }
+"#
+            .to_string(),
+        );
 
-pipeline present for canvas {
-    present_canvas
-}
-"#;
-
-        let err = compile_source_bundle(src, TEST_SOURCE_PATH, false)
+        let err = compile_bundle_virtual(&files, "main.fr", false)
             .expect_err("conformance method body type mismatch should fail");
         assert!(
             err.iter().any(|diag| {
@@ -2436,7 +2428,7 @@ conform glow: curve_provider {
             r#"
 import "lib.fr"
 
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#ffffff)
     }
@@ -2467,7 +2459,7 @@ surface imported_surface(sp: surf) -> material {
         files.insert(
             "main.fr".to_string(),
             r#"
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#ffffff)
     }
@@ -2497,7 +2489,7 @@ surface implicit_surface(sp: surf) -> material {
         let files = HashMap::from([
             (
                 "main.fr".to_string(),
-                "canvas c(uv: coord) -> color { compose { fill(engine_color()) } }".to_string(),
+                "canvas c(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(engine_color()) } }".to_string(),
             ),
             (
                 "engine/engine.fr".to_string(),
@@ -2526,7 +2518,7 @@ surface implicit_surface(sp: surf) -> material {
         let files = HashMap::from([
             (
                 "main.fr".to_string(),
-                "canvas c(uv: coord) -> color { compose { fill(#fff) } }".to_string(),
+                "canvas c(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(#fff) } }".to_string(),
             ),
             (
                 "engine/engine.fr".to_string(),
@@ -2548,7 +2540,7 @@ surface implicit_surface(sp: surf) -> material {
         let files = HashMap::from([
             (
                 "main.fr".to_string(),
-                "canvas c(uv: coord) -> color { compose { fill(#fff) } }".to_string(),
+                "canvas c(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(#fff) } }".to_string(),
             ),
             (
                 "engine/engine.fr".to_string(),
@@ -2574,7 +2566,7 @@ surface implicit_surface(sp: surf) -> material {
         let files = HashMap::from([
             (
                 "main.fr".to_string(),
-                "canvas c(uv: coord) -> color { compose { engine_tint(0.5) } }".to_string(),
+                "canvas c(ctx: CanvasContext) -> color { let uv = context(coord); compose { engine_tint(0.5) } }".to_string(),
             ),
             (
                 "engine/engine.fr".to_string(),
@@ -2600,7 +2592,7 @@ struct Surf {
     albedo: color
 }
 
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#ffffff)
     }
@@ -2622,15 +2614,15 @@ canvas c(uv: coord) -> color {
     fn struct_typed_global_param_binds_known_runtime_channels() {
         let src = r#"
 @group(3) group frame
-struct FrameGlobals {
+struct FrameData {
     time: f32
     delta_time: f32
     resolution: vec2
 }
 
-param frame: FrameGlobals
+param frame: FrameData
 
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     let t = frame.time
     let d = frame.delta_time
     let r = frame.resolution
@@ -2653,7 +2645,7 @@ canvas demo(uv: coord) -> color {
         let src = r#"
 param intensity: f32 = 1.0 in 0.0 .. 2.0
 
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(rgba(intensity, intensity, intensity, 1.0))
     }
@@ -2699,7 +2691,7 @@ canvas demo(uv: coord) -> color {
     #[test]
     fn authored_prelude_helper_compiles_in_user_code() {
         let src = r#"
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     let m = mask(0.2, 0.8, uv.x)
     compose {
         circle(at: center, radius: 0.25) |> fill(rgba(m, m, m, 1.0))
@@ -2717,7 +2709,7 @@ canvas demo(uv: coord) -> color {
     #[test]
     fn color_and_scalar_prelude_helpers_compile_in_user_code() {
         let src = r#"
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     let tint = color_mix(rgb(1.0, 0.25, 0.1), rgb(0.1, 0.35, 1.0), clamp01(uv.x))
     let _layer = grey(0.5)
     compose {
@@ -2736,7 +2728,7 @@ canvas demo(uv: coord) -> color {
     #[test]
     fn rgb24_helper_compiles_in_user_code() {
         let src = r#"
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     let c = rgb24(6737151.25)
     compose {
         circle(at: center, radius: 0.3) |> fill(c)
@@ -2754,7 +2746,7 @@ canvas demo(uv: coord) -> color {
     #[test]
     fn rgb24_integer_overload_compiles_in_user_code() {
         let src = r#"
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     let c = rgb24(-1)
     compose {
         circle(at: center, radius: 0.3) |> fill(c)
@@ -2772,7 +2764,7 @@ canvas demo(uv: coord) -> color {
     #[test]
     fn rgba32_u32_helper_compiles_in_user_code() {
         let src = r#"
-canvas demo(uv: coord) -> color {
+canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);
     let a = rgba32(4289379276)
     compose {
         circle(at: center, radius: 0.22) |> fill(a)
@@ -2793,7 +2785,7 @@ canvas demo(uv: coord) -> color {
         files.insert(
             "main.fr".to_string(),
             r#"
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     fill(#ffffff)
   }
@@ -2874,7 +2866,7 @@ fn bad(x: f32) -> f32 {
   return K
 }
 
-canvas c(uv: coord, time: signal) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let k = bad(time)
     let _keep = k
     compose {
@@ -2912,7 +2904,7 @@ fn scoped(x: f32) -> f32 {
     return x
 }
 
-canvas c(uv: coord, time: signal) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let keep = scoped(time)
     compose {
         fill(#ffffff)
@@ -2935,7 +2927,7 @@ fn bad_scope() -> f32 {
     return STEP
 }
 
-canvas c(uv: coord) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord);
     let v = bad_scope()
     let keep = v
     compose {
@@ -2961,7 +2953,7 @@ canvas c(uv: coord) -> color {
             r#"
 import "engine/core/02_functions.fr"
 
-canvas c(uv: coord, time: signal) -> color {
+canvas c(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let w = engine_weight(4u)
     let keep = w + time * 0.0
     compose {
@@ -3155,7 +3147,7 @@ mod tests_canvas_variant {
     #[test]
     fn compile_variant_matches_resolved_span_capture() {
         let src = r#"
-canvas shape_variant_alignment(uv: coord, time: signal) -> color {
+canvas shape_variant_alignment(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space stage = centered(aspect: preserve)
 
     let frame_outer = box(at: (0.5, 0.5), size: (0.64, 0.42)) |> round(0.08)
@@ -3216,7 +3208,7 @@ canvas shape_variant_alignment(uv: coord, time: signal) -> color {
     #[test]
     fn compile_variant_supports_space_capture() {
         let src = r#"
-canvas space_variant_preview(uv: coord, time: signal) -> color {
+canvas space_variant_preview(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space stage = centered(aspect: preserve)
 
     let card = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> round(0.04uv)
@@ -3249,7 +3241,7 @@ canvas space_variant_preview(uv: coord, time: signal) -> color {
     #[test]
     fn compile_variant_supports_piped_shape_capture() {
         let src = r#"
-canvas piped_shape_preview(uv: coord, time: signal) -> color {
+canvas piped_shape_preview(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let card = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> round(0.04uv)
 
     compose {

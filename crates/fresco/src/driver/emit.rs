@@ -1565,7 +1565,7 @@ surface probe(sp: surf) -> material(finish) {
             ),
         ] {
             let source = format!(
-                "texture_type Packed {{ r: coverage\n g: power }}\ncanvas probe(uv: coord) -> color {{ {declaration}\n {expression} }}"
+                "texture_type Packed {{ r: coverage\n g: power }}\ncanvas probe(ctx: CanvasContext) -> color {{ let uv = context(coord); {declaration}\n {expression} }}"
             );
             let output = crate::test_support::compile_source(&source, "main.fr", "manifest", false)
                 .expect("texture fixture compiles without the example engine");
@@ -1605,7 +1605,7 @@ surface probe(sp: surf) -> material(finish) {
         let source = r#"
 struct Inputs { gain: f32; direction: vec2 }
 param input: Inputs
-canvas probe(uv: coord) -> color {
+canvas probe(ctx: CanvasContext) -> color { let uv = context(coord);
     param samples: array<f32> = []
     rgba(input.gain, input.direction.x, uv.y, 1.0)
 }

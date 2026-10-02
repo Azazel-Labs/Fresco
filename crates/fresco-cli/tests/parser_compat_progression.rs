@@ -46,7 +46,7 @@ fn semicolon_terminated_statements_compile() {
   return 0.08 + 0.04 * base;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = radius_from(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -59,7 +59,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn c_style_for_increment_and_decrement_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     for (int i = 0; i < 4; i++) {
       circle(at: (0.2 + i * 0.15, 0.35), radius: 0.035) |> fill(#7dd3fc)
@@ -84,7 +84,7 @@ fn c_style_for_with_and_condition_compiles() {
   return t;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.02 + 0.02 * march(1.0 + uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -103,7 +103,7 @@ fn for_range_single_statement_body_compiles() {
   return t;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.03 + 0.02 * sum_steps();
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -122,7 +122,7 @@ fn c_style_for_single_statement_body_compiles() {
   return t;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.03 + 0.02 * sum_steps();
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -146,7 +146,7 @@ fn sample_count() -> f32 {
   return total;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.03 + 0.01 * sample_count();
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -168,7 +168,7 @@ fn break_in_function_for_loop_compiles() {
   return t;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.02 + 0.02 * march_limit(0.6 + uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -189,7 +189,7 @@ fn bit_helper_builtins_compile() {
   );
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = mask_bits(3.0);
   compose {
     circle(at: center, radius: 0.03 + 0.01 * b.x) |> fill(#ffffff)
@@ -712,7 +712,7 @@ fn pick_radius(x: i32) -> f32 {
   return 0.12 + f32(x) * 0.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = pick_radius(0.5);
   let b = pick_radius(3);
   compose {
@@ -887,7 +887,7 @@ texture_type ShadowDepthArray -> f32 {
   fn at(uv: vec2, layer: u32, reference: f32) -> f32
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
   }
@@ -1536,7 +1536,7 @@ fn pick_bits(x: u32) -> f32 {
   return x * 0.0 + 0.4;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = pick_bits(3);
   compose {
     circle(at: center, radius: b) |> fill(#ffffff)
@@ -1557,7 +1557,7 @@ fn declaration_union_scalar_overload_compiles() {
   return f32(x) * 0.0 + 0.25;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = pick_bits(-1);
   let b = pick_bits(4289379276);
   compose {
@@ -1575,7 +1575,7 @@ fn declaration_union_cross_family_overload_compiles() {
   return 0.21;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = lift(-1);
   let b = lift((0.1, 0.2));
   compose {
@@ -1597,7 +1597,7 @@ fn pick_bits(x: f32) -> f32 {
   return x * 0.0 + 0.4;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = pick_bits(3);
   compose {
     circle(at: center, radius: b) |> fill(#ffffff)
@@ -1618,7 +1618,7 @@ fn declaration_union_all_alternatives_validate_without_calls() {
   return x + 1.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -1638,7 +1638,7 @@ fn declaration_union_multi_param_cartesian_expansion_compiles() {
   return 0.31;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r1 = cart(-1, 0.5, (0.1, 0.2, 0.3));
   let r2 = cart(4289379276, (0.1, 0.2), 0.75);
   compose {
@@ -1656,7 +1656,7 @@ fn declaration_union_duplicate_signature_reports_diagnostic() {
   return 0.1;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -1676,7 +1676,7 @@ fn scalar_amp_operator_suggests_bit_and_builtin() {
   return i & 1.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = mask_bit(3.0);
   compose {
     circle(at: center, radius: 0.03 + 0.01 * b) |> fill(#ffffff)
@@ -1697,7 +1697,7 @@ fn scalar_bar_operator_suggests_bit_or_builtin() {
   return i | 1.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = mask_bit(3.0);
   compose {
     circle(at: center, radius: 0.03 + 0.01 * b) |> fill(#ffffff)
@@ -1717,7 +1717,7 @@ fn shift_operator_suggests_bit_shl_builtin() {
     let input = r#"fn shift_left(i: f32) -> f32 {
   return i << 2.0;
 }
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = shift_left(3.0);
   compose {
     circle(at: center, radius: 0.03 + 0.001 * b) |> fill(#ffffff)
@@ -1738,7 +1738,7 @@ fn modulo_operator_suggests_is_multiple_of_builtin() {
   return i % 2.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = has_even_stride(4.0);
   compose {
     circle(at: center, radius: 0.03 + 0.001 * b) |> fill(#ffffff)
@@ -1755,7 +1755,7 @@ fn xor_operator_suggests_bit_xor_builtin() {
   return i ^ 3.0;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = xor_bits(3.0);
   compose {
     circle(at: center, radius: 0.03 + 0.001 * b) |> fill(#ffffff)
@@ -1776,7 +1776,7 @@ fn ternary_operator_compiles() {
   return x > 0.5 ? 0.18 : 0.08;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = ternary_radius(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1789,7 +1789,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn typed_local_declaration_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   vec3 q = (uv.x - 0.5, uv.y - 0.5, sin(time));
   let r = 0.05 + 0.05 * q.x;
   compose {
@@ -1813,7 +1813,7 @@ fn glsl_style_function_accepts_tagged_vector_params() {
 
 #[test]
 fn typed_local_declaration_mismatch_errors() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   vec3 q = uv;
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -1836,7 +1836,7 @@ fn mutable_assignment_compiles() {
   return r;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = grow_radius(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1854,7 +1854,7 @@ fn mutable_assignment_to_undeclared_local_errors() {
   return y;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = broken(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1876,7 +1876,7 @@ fn function_brace_on_next_line_compiles() {
   return x + 0.1;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = radius(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1900,7 +1900,7 @@ fn samples() -> f32 {
   return AA;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.03 * samples();
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1918,7 +1918,7 @@ fn typed_local_float_alias_compiles() {
   return r;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = radius(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1938,7 +1938,7 @@ fn if_single_statement_body_compiles() {
   return tmax;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = clamp_up(uv, (1.0, 1.0), 1.0);
   compose {
     circle(at: center, radius: 0.05 + 0.02 * r) |> fill(#ffffff)
@@ -1958,7 +1958,7 @@ fn swizzle_field_assignment_compiles() {
   return mutv;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = nudge((uv.x - 0.5, uv.y - 0.5, 0.0));
   let r = 0.05 + 0.02 * (v.x + v.y);
   compose {
@@ -1977,7 +1977,7 @@ fn const_typed_local_declaration_compiles() {
   return k.y;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let r = 0.05 + 0.03 * pick_k();
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -1997,7 +1997,7 @@ fn compound_assignment_compiles() {
   return p;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = adjust(uv);
   let r = 0.03 + 0.04 * p.x;
   compose {
@@ -2017,7 +2017,7 @@ fn comma_separated_typed_declarations_compile() {
   return length(pa - ba * h);
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = capsule_terms((uv.x, uv.y, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 0.0));
   compose {
     circle(at: center, radius: 0.03 + 0.02 * v) |> fill(#ffffff)
@@ -2038,7 +2038,7 @@ fn uninitialized_typed_declaration_compiles() {
   return q;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = build();
   compose {
     circle(at: center, radius: 0.03 + 0.02 * v.x) |> fill(#ffffff)
@@ -2059,7 +2059,7 @@ fn if_else_chain_single_statement_compiles() {
   return q;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = pick((uv.x, uv.y, 0.2), 1.0);
   compose {
     circle(at: center, radius: 0.03 + 0.02 * v.x) |> fill(#ffffff)
@@ -2078,7 +2078,7 @@ fn glsl_vec_constructor_calls_compile() {
   return vec3(a.x + b.x, a.y + b.y, a.z);
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = mk();
   compose {
     circle(at: center, radius: 0.03 + 0.02 * v.x) |> fill(#ffffff)
@@ -2098,7 +2098,7 @@ fn glsl_float_cast_and_vec_constructor_variants_compile() {
   return a + b;
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = mk2(uv.x);
   compose {
     circle(at: center, radius: 0.03 + 0.02 * v.x) |> fill(#ffffff)
@@ -2115,7 +2115,7 @@ fn glsl_vec_ctor_wraps_clamp_vec3_result_compile() {
   return vec3(clamp(col, 0.0, 1.0));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let col = (uv.x * 2.0 - 0.5, uv.y * 2.0 - 0.5, sin(time));
   let v = saturate(col);
   compose {
@@ -2138,7 +2138,7 @@ fn make_state(uv: vec2) -> OrbitalState {
   return OrbitalState(center: uv, radius: 0.12)
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let state = make_state(center)
   compose {
     circle(at: state.center, radius: state.radius) |> fill(#ffffff)
@@ -2156,7 +2156,7 @@ fn record_keyword_declaration_is_rejected() {
   radius: f32,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -2178,7 +2178,7 @@ fn struct_layout_clause_is_rejected() {
   p: vec2,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -2199,7 +2199,7 @@ fn struct_constructor_requires_named_arguments() {
   gain: f32,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = Probe((0.25, 0.5), 0.8)
   compose {
     circle(at: bad.p, radius: bad.gain * 0.1) |> fill(#ffffff)
@@ -2221,7 +2221,7 @@ fn struct_constructor_rejects_unknown_field() {
   gain: f32,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = Probe(pos: center, gain: 0.8)
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -2243,7 +2243,7 @@ fn struct_constructor_reports_missing_fields() {
   gain: f32,
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = Probe(p: center)
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -2272,7 +2272,7 @@ fn nudge(input: Probe) -> Probe {
   return pr
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let probe = Probe(p: center, gain: 0.2)
   compose {
     circle(at: probe.p, radius: probe.gain) |> fill(#ffffff)
@@ -2296,7 +2296,7 @@ fn broken(input: Probe) -> Probe {
   return pr
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -2353,7 +2353,7 @@ fn plain_statements_require_a_separator() {
         "missing_statement_separator",
         r#"
 fn helper(x: f32) -> f32 { let y = x return y }
-canvas t(uv: coord) -> color { compose { circle(radius: helper(0.2)) |> fill(#ffffff) } }
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); compose { circle(radius: helper(0.2)) |> fill(#ffffff) } }
 "#,
         "unexpected `return`",
     );
@@ -2365,14 +2365,14 @@ fn closed_control_block_can_precede_same_line_statement() {
         "block_statement_boundary",
         r#"
 fn helper(x: f32) -> f32 { if x > 0.0 { return x } return 0.1 }
-canvas t(uv: coord) -> color { compose { circle(at: center, radius: helper(uv.x)) |> fill(#ffffff) } }
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); compose { circle(at: center, radius: helper(uv.x)) |> fill(#ffffff) } }
 "#,
     );
 }
 
 #[test]
 fn invalid_constant_clamp_reports_a_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   const f32 radius = clamp(0.5, 2.0, 1.0);
   compose {
     circle(at: center, radius: radius) |> fill(#ffffff)
@@ -2393,7 +2393,7 @@ fn constant_domain_errors_survive_shared_evaluation() {
         ("sqrt(-1.0)", "cannot take sqrt of a negative value"),
     ] {
         let input = format!(
-            "canvas t(uv: coord, time: signal) -> color {{\n  const f32 radius = {expression};\n  compose {{\n    circle(at: center, radius: radius) |> fill(#ffffff)\n  }}\n}}\n"
+            "canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time);\n  const f32 radius = {expression};\n  compose {{\n    circle(at: center, radius: radius) |> fill(#ffffff)\n  }}\n}}\n"
         );
         assert_fails_with_suffix("signal_const_domain", &input, message);
     }
@@ -2412,7 +2412,7 @@ fn exact(count: u32, enabled: bool) -> u32 {
     return count
 }
 fn signed(count: i32) -> i32 { return count >> 1 }
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     let amount = exact(u32(uv.x * 10.0), uv.y > 0.5)
     let radius = f32(amount - 16777217) * 0.01 + f32(signed(i32(-16777217))) * 0.000000001
     compose { circle(at: center, radius: radius) |> fill(#ffffff) }
@@ -2431,7 +2431,7 @@ fn wrong(count: u32, value: f32) -> u32 {
     result = value
     return result
 }
-canvas t(uv: coord) -> color { compose { fill(#ffffff) } }
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(#ffffff) } }
 "#,
         "expected u32, found f32",
     );
@@ -2447,7 +2447,7 @@ fn ids(value: uvec2) -> uvec2 {
     result = clamp(result + uvec2(1, 2), uvec2(0), uvec2(4294967295))
     return result
 }
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     let result = ids(uvec2(u32(uv.x), 0))
     compose { circle(at: center, radius: f32(result.x - 16777217) * 0.01) |> fill(#ffffff) }
 }
@@ -2468,7 +2468,7 @@ fn exact(x: u32) -> u32 {
     if same(enabled) { return same(x) }
     return 0
 }
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { circle(at: center, radius: f32(exact(u32(uv.x))) * 0.01) |> fill(#ffffff) }
 }
 "#,
@@ -2481,7 +2481,7 @@ fn native_integer_context_does_not_truncate_fractional_literals() {
         "typed_fractional_literal",
         r#"
 fn wrong(count: u32) -> u32 { return count + 0.25 }
-canvas t(uv: coord) -> color { compose { fill(#ffffff) } }
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(#ffffff) } }
 "#,
         "literal cannot be implicitly converted to u32",
     );

@@ -26,7 +26,7 @@ fn import_function_module_compiles() {
         &main,
         r#"import "math.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -68,7 +68,7 @@ fn import_surface_module_compiles() {
         &main,
         r#"import "materials.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -104,7 +104,7 @@ fn missing_import_reports_diagnostic() {
         &main,
         r#"import "does-not-exist.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -141,7 +141,7 @@ fn cyclic_import_reports_diagnostic_chain() {
         &main,
         r#"import "a.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -184,7 +184,7 @@ fn imported_module_parse_error_reports_imported_filename() {
         &main,
         r#"import "broken.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -233,7 +233,7 @@ fn imported_module_semantic_error_reports_imported_filename() {
         &main,
         r#"import "broken.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let _k = bad_fn(1.0)
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
@@ -294,7 +294,7 @@ fn virtual_bundle_compiles_library_function() {
         "main.fr".to_string(),
         r#"import "lib.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -332,7 +332,7 @@ fn virtual_bundle_compiles_imported_surface_module() {
         "main.fr".to_string(),
         r#"import "materials.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -401,7 +401,7 @@ schema_evaluator forward_plus_clustered for pbr_surface {
         &main,
         r#"import "models.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -431,7 +431,7 @@ fn virtual_bundle_missing_import_reports_diagnostic() {
         "main.fr".to_string(),
         r#"import "nonexistent.fr"
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }

@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 describe("bundle compile diagnostics keep source file provenance", () => {
   it("requires engine declarations for standalone rendering", () => {
-    const result = compile_fresco_with_options("canvas t(uv: coord) -> color { compose { fill(#fff) } }", false);
+    const result = compile_fresco_with_options("canvas t(ctx: CanvasContext) -> color { let uv = context(coord); compose { fill(#fff) } }", false);
     expect(result.ok).toBe(false);
     expect(result.diagnostics.filter(diag => diag.message.includes("missing required engine setting"))).toHaveLength(4);
   });
@@ -37,7 +37,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
   it("attributes pass validation diagnostics to imported files", () => {
     const files = {
       "engine/render_policy.fr": enginePolicy,
-      "main.fr": `import "lib.fr"\ncanvas demo(uv: coord) -> color {\n  compose {\n    fill(#ffffff)\n  }\n}\n`,
+      "main.fr": `import "lib.fr"\ncanvas demo(ctx: CanvasContext) -> color { let uv = context(coord);\n  compose {\n    fill(#ffffff)\n  }\n}\n`,
       "lib.fr": `pass bad_stage {\n  stage: not_a_stage\n}\n`,
     };
 
@@ -56,7 +56,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
   it("accepts quoted pass permutation literals without standalone axis declarations", () => {
     const files = {
       "engine/render_policy.fr": enginePolicy,
-      "main.fr": `canvas demo(uv: coord) -> color {\n  compose {\n    fill(#ffffff)\n  }\n}\n`,
+      "main.fr": `canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);\n  compose {\n    fill(#ffffff)\n  }\n}\n`,
       "engine/pipelines/10_forward.fr": `pass fwd_base {\n  stage: raster\n  permutations {\n    @known(compile) ambient: \"flat\"|\"sh2\"\n  }\n}\n`,
     };
 
@@ -70,7 +70,7 @@ describe("bundle compile diagnostics keep source file provenance", () => {
   it("threads runtime build profile through bundle compile", () => {
     const files = {
       "engine/render_policy.fr": enginePolicy,
-      "main.fr": `canvas demo(uv: coord) -> color {\n  compose {\n    fill(#ffffff)\n  }\n}\n`,
+      "main.fr": `canvas demo(ctx: CanvasContext) -> color { let uv = context(coord);\n  compose {\n    fill(#ffffff)\n  }\n}\n`,
     };
 
     const result = compile_fresco_bundle_with_profile(files, "main.fr", false, "runtime");
@@ -206,13 +206,21 @@ describe("bundle compile diagnostics keep source file provenance", () => {
     expect(invalid.diagnostics.some(diag => diag.message.includes("const `gain` expected"))).toBe(true);
   });
 
-  it("keeps standalone time dynamic with a policy-only engine", () => {
-    const source = "fn animated(x: f32) -> f32 { return x * sin(time) }\ncanvas t(uv: coord, time: signal) -> color { compose { circle(at: center, radius: sin(time) + animated(uv.x)) |> fill(#fff) } }";
+  it("keeps canvas context time dynamic through explicit helper inputs", () => {
+    const source = "fn animated(x: f32, time: f32) -> f32 { return x * sin(time) }\ncanvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); compose { circle(at: center, radius: sin(time) +animated(uv.x, time)) |> fill(#fff) } }";
     const result = compile_fresco_bundle({ "main.fr": source, "engine/engine.fr": enginePolicy }, "main.fr", false);
     expect(result.ok, JSON.stringify(result.diagnostics)).toBe(true);
     expect(result.wgsl).toContain("sin(t)");
-    expect(result.wgsl).toContain("sin(entry_time)");
+    expect(result.wgsl).toContain("sin(arg_time)");
+    expect(result.wgsl).not.toContain("sin(0f)");
     expect(result.manifest.raster_entries[0].global_uniforms).toEqual([]);
+  });
+
+  it("does not capture entry bindings implicitly in helpers", () => {
+    const source = "fn animated(x: f32) -> f32 { return x * sin(time) }\ncanvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); compose { circle(at: center, radius: animated(uv.x)) |> fill(#fff) } }";
+    const result = compile_fresco_bundle({ "main.fr": source, "engine/engine.fr": enginePolicy }, "main.fr", false);
+    expect(result.ok).toBe(false);
+    expect(result.diagnostics.some(diag => diag.message.includes("unknown name `time`"))).toBe(true);
   });
 
 });

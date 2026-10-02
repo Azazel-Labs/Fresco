@@ -7,7 +7,7 @@ use common::{normalize, run_fresco, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn style_builder_chain_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   style neon_outline(color: color = #fdb1ff, width: f32 = 0.0035) = stroke(width: width) |> fill(color)
   let mountain = box(at: center, size: (0.35, 0.2))
 
@@ -32,7 +32,7 @@ fn style_builder_chain_compiles() {
 
 #[test]
 fn style_builder_args_override_defaults() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   style neon(color: color = #ff93f5, width: f32 = 0.01) = stroke(width: width) |> fill(color)
   let mountain = box(at: center, size: (0.35, 0.2))
 
@@ -57,7 +57,7 @@ fn style_builder_args_override_defaults() {
 
 #[test]
 fn style_builder_unknown_arg_is_rejected() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   style neon(color: color = #ff93f5) = fill(color)
   let mountain = box(at: center, size: (0.35, 0.2))
 
@@ -88,7 +88,7 @@ fn style_builder_unknown_arg_is_rejected() {
 
 #[test]
 fn style_builder_cycle_is_rejected() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   style a = b
   style b = a
 
@@ -119,7 +119,7 @@ fn style_builder_cycle_is_rejected() {
 
 #[test]
 fn style_builder_explain_reports_stage_chain() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     style neon_outline(color: color = #fdb1ff, width: f32 = 0.0035) = stroke(width: width) |> fill(color)
 
     compose {

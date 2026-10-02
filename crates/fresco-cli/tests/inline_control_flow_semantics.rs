@@ -11,7 +11,7 @@ use common::wgsl::{Capabilities, assert_valid_wgsl};
 fn compile(body: &str, prelude: &str) -> naga::Module {
     let source = format!(
         "{prelude}\nfn choose(x: f32) -> color {{\n{body}\n}}\n\
-         canvas t(uv: coord, time: signal) -> color {{ compose {{ choose(uv.x) }} }}"
+         canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time); compose {{ choose(uv.x) }} }}"
     );
     let path = common::unique_temp_path("inline_semantics");
     fs::write(&path, &source).unwrap();
@@ -268,8 +268,17 @@ fn assert_samples_with_prelude(body: &str, prelude: &str, samples: &[(f64, [f64;
 const BLUE: [f64; 4] = [0.0, 0.0, 1.0, 1.0];
 const RED: [f64; 4] = [1.0, 0.0, 0.0, 1.0];
 
-const NORMALIZATION_PRELUDE: &str =
+const EXAMPLE_PRELUDE: &str =
     include_str!("../../../integrations/example-engine/engine/core/00_prelude.fr");
+
+/// The example engine's normalization helpers. The frame globals declared after
+/// them belong to an engine, and the shared test engine already supplies its own.
+fn normalization_prelude() -> &'static str {
+    EXAMPLE_PRELUDE
+        .split_once("// Required frame globals")
+        .expect("example prelude declares its helpers before the frame globals")
+        .0
+}
 
 #[test]
 fn inverse_sqrt_aliases_preserve_scalar_and_vector_results() {
@@ -293,10 +302,11 @@ fn normalization_overloads_reject_incompatible_arguments() {
         "normalize_or_zero(1.0)",
     ] {
         let path = common::unique_temp_path("normalization_invalid");
+        let prelude = normalization_prelude();
         fs::write(
             &path,
             format!(
-                "{NORMALIZATION_PRELUDE}\ncanvas t(uv: coord, time: signal) -> color {{\n\
+                "{prelude}\ncanvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time);\n\
              let invalid = {expression}\nrgba(1.0, 1.0, 1.0, 1.0)\n}}"
             ),
         )
@@ -316,7 +326,7 @@ fn normalization_overloads_reject_incompatible_arguments() {
 fn normalization_fallbacks_preserve_threshold_and_fallback_values() {
     assert_samples_with_prelude(
         "let v = normalize_or(vec2(x, 0.0), vec2(2.0, 3.0))\nreturn rgba(v.x, v.y, 0.0, 1.0)",
-        NORMALIZATION_PRELUDE,
+        normalization_prelude(),
         &[
             (0.0, [2.0, 3.0, 0.0, 1.0]),
             (0.00005, [2.0, 3.0, 0.0, 1.0]),
@@ -327,7 +337,7 @@ fn normalization_fallbacks_preserve_threshold_and_fallback_values() {
     );
     assert_samples_with_prelude(
         "let v = normalize_or_zero(vec2(3.0 * x, 4.0 * x))\nreturn rgba(v.x, v.y, 0.0, 1.0)",
-        NORMALIZATION_PRELUDE,
+        normalization_prelude(),
         &[
             (0.0, [0.0, 0.0, 0.0, 1.0]),
             (0.00001, [0.0, 0.0, 0.0, 1.0]),
@@ -351,20 +361,23 @@ fn normalization_fallbacks_support_three_and_four_lanes() {
     ] {
         assert_samples_with_prelude(
             body,
-            NORMALIZATION_PRELUDE,
+            normalization_prelude(),
             &[(1.0, expected), (1e30, expected)],
         );
     }
     assert_samples_with_prelude(
         "let a = normalize_or(vec3(x), vec3(2.0, 3.0, 4.0))\nlet b = normalize_or(vec4(x), vec4(5.0))\nreturn rgba(a.x, a.y, a.z + b.w, 1.0)",
-        NORMALIZATION_PRELUDE,
+        normalization_prelude(),
         &[(0.0, [2.0, 3.0, 9.0, 1.0])],
     );
 }
 
 #[test]
 fn normalization_overloads_follow_expression_and_function_result_types() {
-    let prelude = format!("{NORMALIZATION_PRELUDE}\nfn direction(v: vec3) -> vec3 {{ return v }}");
+    let prelude = format!(
+        "{}\nfn direction(v: vec3) -> vec3 {{ return v }}",
+        normalization_prelude()
+    );
     assert_samples_with_prelude(
         "let v = vec3(x, 2.0*x, 2.0*x)\n\
          let unit = normalize_or_zero(direction(v + vec3(0.0)))\n\

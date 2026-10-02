@@ -6,7 +6,7 @@ use common::{normalize, parse_scatter_lowering_value, run_fresco_with_args, uniq
 
 #[test]
 fn scatter_binning_note_and_caps_are_reported() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 1024 within screen seed 13 strategy compact {
     circle(at: instance.pos, radius: 1px) |> fill(#ffffff)
   }
@@ -43,7 +43,7 @@ fn scatter_binning_note_and_caps_are_reported() {
 
 #[test]
 fn scatter_output_is_deterministic_for_same_seed() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 320 within screen seed 7 strategy compact {
     circle(at: instance.pos, radius: rand(0.8px .. 1.2px)) |> fill(#ffffff)
   }
@@ -83,7 +83,7 @@ fn scatter_output_is_deterministic_for_same_seed() {
 
 #[test]
 fn scatter_region_reports_invalid_bounds() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 16 within region((0.8, 0.2) .. (0.1, 0.9)) seed 1 strategy compact {
     circle(at: instance.pos, radius: 1px) |> fill(#ffffff)
   }
@@ -118,7 +118,7 @@ fn scatter_body_is_extracted_as_helper_function() {
     // A scatter with a body-heavy shape (circle + glow) should produce a
     // named helper function rather than inlining the body once per instance.
     // This verifies the O(body + instances × call) codegen path.
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let dots = scatter 64 within screen seed 42 strategy compact {
     circle(at: instance.pos, radius: rand(0.4px .. 1.2px))
     |> fill(#ffcc88)
@@ -172,7 +172,7 @@ fn scatter_body_is_extracted_as_helper_function() {
 
 #[test]
 fn scatter_footprint_support_combines_shape_and_effect_extent() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 64 within screen seed 9 strategy compact {
     circle(at: instance.pos, radius: 2px)
     |> glow(reach: 3px, strength: 1.0)
@@ -205,7 +205,7 @@ fn scatter_footprint_support_combines_shape_and_effect_extent() {
 
 #[test]
 fn scatter_rand_uses_instance_id_in_generated_wgsl() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let dots = scatter 8 within screen seed 17 strategy compact {
     circle(at: instance.pos, radius: rand(0.8px .. 1.2px)) |> fill(#ffffff)
   }
@@ -240,7 +240,7 @@ fn scatter_rand_uses_instance_id_in_generated_wgsl() {
 fn scatter_procedural_emitted_instances_scale_with_count_and_exceed_base_cap() {
     let screen_input = |count: usize| {
         format!(
-            r#"canvas t(uv: coord, time: signal) -> color {{
+            r#"canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord); let time = context(time);
   let stars = scatter {count} within screen seed 19 strategy procedural {{
     circle(at: instance.pos, radius: 0.8px) |> fill(#ffffff)
   }}
@@ -253,7 +253,7 @@ fn scatter_procedural_emitted_instances_scale_with_count_and_exceed_base_cap() {
         )
     };
 
-    let bounded_footprint_input = r#"canvas t(uv: coord, time: signal) -> color {
+    let bounded_footprint_input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 60000 within region((0.45, 0.45) .. (0.55, 0.55)) seed 19 strategy procedural {
     circle(at: instance.pos, radius: 24px) |> fill(#ffffff)
   }
@@ -337,7 +337,7 @@ fn scatter_procedural_emitted_instances_scale_with_count_and_exceed_base_cap() {
 
 #[test]
 fn scatter_procedural_hard_max_clamps_near_extreme_counts() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars = scatter 1200000 within screen seed 21 strategy procedural {
     circle(at: instance.pos, radius: 0.8px) |> fill(#ffffff)
   }
@@ -387,7 +387,7 @@ fn scatter_procedural_hard_max_clamps_near_extreme_counts() {
 
 #[test]
 fn scatter_explain_reports_per_layer_metrics_for_multiple_scatter_layers() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let stars_a = scatter 18000 within screen seed 19 strategy procedural {
     circle(at: instance.pos, radius: 0.8px) |> fill(#ffffff)
   }

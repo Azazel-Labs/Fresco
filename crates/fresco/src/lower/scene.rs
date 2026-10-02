@@ -1727,7 +1727,7 @@ mod tests {
   return clamp(b, vec3(0.2), vec3(0.8));
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = vec_intrinsics(vec3(uv.x, uv.y, sin(time) * 0.5 + 0.5));
   compose {
     fill(rgb(q.x, q.y, q.z))
@@ -1756,7 +1756,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn gridline_lowering_avoids_fract_based_single_line_emulation() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let axes = gridline(along: x, at: 0.0) | gridline(along: y, at: 0.0)
   compose {
     axes |> stroke(2px) |> fill(#5a6d94)
@@ -1777,7 +1777,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn fbm_lowering_reuses_a_helper_function() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = fbm(uv + (0.05, 0.03))
   let b = fbm(uv + (0.10, 0.06))
   compose {
@@ -1802,7 +1802,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn noise2_lowering_reuses_a_helper_function() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = noise2(uv + (0.05, 0.03))
   let b = noise2(uv + (0.10, 0.06))
   compose {
@@ -1827,7 +1827,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn noise1_lowering_reuses_a_helper_function() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = noise1(uv.x + time * 0.1)
   let b = noise1(uv.y + time * 0.2)
   compose {
@@ -1852,7 +1852,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn noise3_lowering_reuses_a_helper_function() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = noise3((uv.x, uv.y, time * 0.1))
   let b = noise3((uv.x + 0.1, uv.y + 0.2, time * 0.2))
   compose {
@@ -1877,7 +1877,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn filtered_checker_width_uses_pixel_footprint_units() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = scale(1.0)
   filtering(on);
   compose {
@@ -1900,7 +1900,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn polar_dial_uses_periodic_finite_box_filter() {
-        let src = r#"canvas dial(uv: coord) -> color {
+        let src = r#"canvas dial(ctx: CanvasContext) -> color { let uv = context(coord);
             param progress: f32 = 0.72 in 0 .. 1
             space stage = centered(aspect: preserve)
             space dial_space = polar(center: center, from: -90deg, direction: clockwise)
@@ -1932,7 +1932,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn polar_box_domain_survives_separable_nested_spaces_and_does_not_leak() {
-        let src = r#"canvas t(uv: coord) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     param progress: f32 = 0.72 in 0 .. 1
     space dial = polar(center: center, from: -90deg, direction: clockwise)
     space move = translate(by: (0.1, 0.0)) . scale(2.0)
@@ -1959,7 +1959,7 @@ canvas t(uv: coord, time: signal) -> color {
     fn polar_box_filter_handles_reflection_and_retains_rounded_shape_geometry() {
         for direction in ["clockwise", "counterclockwise"] {
             let src = format!(
-                r#"canvas t(uv: coord) -> color {{
+                r#"canvas t(ctx: CanvasContext) -> color {{ let uv = context(coord);
     param progress: f32 = 1.0 in 0 .. 1
     space dial = polar(center: center, from: 35deg, direction: {direction}) . scale(-2.0) . orientation(y: down)
     compose {{
@@ -1983,7 +1983,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn stroked_line_family_uses_analytic_filtered_coverage() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(14deg) . scale(1.0 + uv.y * 2.0)
     let l = lines(along: x, every: 0.07uv, offset: 0.0) |> stroke(2px)
     compose {
@@ -2008,7 +2008,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn exact_shape_coverage_uses_directional_distance_band() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(10deg) . scale(1.0 + uv.y * 2.0)
   let ring = circle(at: (0.5, 0.5), radius: 0.18) |> stroke(2px)
   compose {
@@ -2043,7 +2043,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn non_exact_shape_coverage_still_uses_sdf_derivative_band() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(14deg) . scale(1.0 + uv.y * 1.8)
     let sample_value = star(at: (0.5, 0.5), outer: 0.22, inner: 0.10, points: 5)
     compose {
@@ -2071,7 +2071,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn linear_gradient_builtin_dispatches_and_skips_axis_normalization() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(gradient(
             along: y,
@@ -2093,7 +2093,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn canonical_two_stop_gradient_skips_identity_remap_and_alpha_mix() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(gradient(
             along: y,
@@ -2115,7 +2115,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn literal_three_stop_gradient_skips_safe_denominator_clamps() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(gradient(
             along: y,
@@ -2139,7 +2139,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn adjacent_equal_literal_stop_colors_skip_redundant_rgb_mix() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(gradient(
             along: y,
@@ -2164,7 +2164,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn reused_shape_anchor_gradients_share_one_local_point_normalization() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let card = box(at: (0.5, 0.5), size: (0.4, 0.2))
     compose {
         card |> fill(gradient(
@@ -2198,15 +2198,15 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn repeated_shape_anchor_gradients_share_time_only_stop_color_math() {
-        let src = r#"struct FrameGlobals {
+        let src = r#"struct FrameData {
     time: f32
 }
 
-param frame: FrameGlobals
+param frame: FrameData
 
 fn time() -> f32 { return frame.time }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let pulse = wave(period: 2s, shape: sine, range: 0.2 .. 0.8)
     compose {
         box(at: (0.3, 0.5), size: (0.2, 0.4))
@@ -2241,7 +2241,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn repeated_shape_anchor_gradients_share_length_based_stop_color_math() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let pulse = wave(period: 2s, shape: sine, range: 0.2 .. 0.8)
     let duo = length((pulse, pulse))
     compose {
@@ -2277,7 +2277,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn glow_and_inner_glow_share_shape_color_space_anchor_transform() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let card = box(at: (0.5, 0.5), size: (0.4, 0.2))
     compose {
         fill(#0e1420)
@@ -2314,7 +2314,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn glow_and_inner_glow_share_vec2_reach_warp_math() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let card = box(at: (0.5, 0.5), size: (0.4, 0.2))
     compose {
         fill(#0e1420)
@@ -2344,11 +2344,11 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn repeated_shape_anchor_gradients_share_pure_helper_stop_color_math() {
-        let src = r#"struct FrameGlobals {
+        let src = r#"struct FrameData {
     time: f32
 }
 
-param frame: FrameGlobals
+param frame: FrameData
 
 fn time() -> f32 { return frame.time }
 
@@ -2356,7 +2356,7 @@ fn pulse01(t: f32) -> f32 {
   return sin(t * 0.5) * 0.3 + 0.5
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         box(at: (0.3, 0.5), size: (0.2, 0.4))
             |> fill(gradient(
@@ -2390,7 +2390,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn repeated_gradient_fills_share_one_dither_hash_per_scene_function() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         box(at: (0.3, 0.5), size: (0.2, 0.4))
             |> fill(gradient(
@@ -2428,7 +2428,7 @@ canvas t(uv: coord, time: signal) -> color {
     #[test]
     fn standalone_layer_retains_dynamic_opacity_in_scene_output() {
         let wgsl = compile_wgsl(
-            "canvas t(uv: coord, time: signal) -> color { param strength: f32 = 0.5; fill(#ff0000) |> opacity(strength) }",
+            "canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); param strength: f32 = 0.5; fill(#ff0000) |> opacity(strength) }",
         );
         let module = naga::front::wgsl::parse_str(&wgsl).expect("valid WGSL");
         naga::valid::Validator::new(
@@ -2446,7 +2446,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn top_level_compose_scene_skips_dead_alpha_accumulator_chain() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(#0e1420)
         circle(at: (0.5, 0.5), radius: 0.2) |> fill(#ffffff)
@@ -2470,7 +2470,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn in_space_shape_coverage_uses_local_adaptive_aa() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(12deg) . scale(1.0 + uv.y * 1.5)
     let ring = circle(at: (0.5, 0.5), radius: 0.18) |> stroke(2px)
     compose {
@@ -2491,7 +2491,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn in_space_stroke_px_width_uses_local_pixel_span() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(8deg) . scale(0.25 + uv.y)
     let ring = circle(at: (0.5, 0.5), radius: 0.20) |> stroke(1px)
     compose {
@@ -2512,7 +2512,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn in_space_outline_stroke_emits_thin_fade_guard() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(10deg) . scale(0.12 + uv.y * 0.35)
     let ring = circle(at: (0.5, 0.5), radius: 0.20) |> stroke(1px)
     compose {
@@ -2535,7 +2535,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn explain_reports_outline_thin_fade_receipt() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(10deg) . scale(0.12 + uv.y * 0.35)
     let ring = circle(at: (0.5, 0.5), radius: 0.20) |> stroke(1px)
     compose {
@@ -2556,7 +2556,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn soften_emits_mean_coverage_saturation_guard() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(10deg) . scale(0.12 + uv.y * 0.35)
     let ring = circle(at: (0.5, 0.5), radius: 0.20)
     compose {
@@ -2577,7 +2577,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn shadow_emits_mean_coverage_saturation_guard() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(10deg) . scale(0.12 + uv.y * 0.35)
     let ring = circle(at: (0.5, 0.5), radius: 0.20)
     compose {
@@ -2598,7 +2598,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn glow_falloff_path_does_not_emit_soft_saturation_markers() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let core = circle(at: center, radius: 0.09) |> fill(#ffffff)
     let haze = core |> glow(
         reach: (0.18, 0.08),
@@ -2633,7 +2633,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn in_space_line_thickness_px_uses_local_pixel_span() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(12deg) . scale(0.15 + uv.y * 0.6)
     let l = line(from: (0.1, 0.8), to: (0.9, 0.2), thickness: 1px)
     compose {
@@ -2657,7 +2657,7 @@ canvas t(uv: coord, time: signal) -> color {
         let src = r#"#pragma check.shape_aa_min_px = 0.75
     #pragma check.shape_aa_max_px = 5.5
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(18deg) . scale(1.0 + uv.y * 2.2)
     let ring = circle(at: (0.5, 0.5), radius: 0.2) |> stroke(2px)
     compose {
@@ -2682,7 +2682,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn shape_coverage_band_is_derivative_only_not_footprint_symbols() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space warped = rotate(14deg) . scale(1.0 + uv.y * 1.8)
     let sample_value = star(at: (0.5, 0.5), outer: 0.22, inner: 0.10, points: 5)
     compose {
@@ -2710,7 +2710,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn repeat_zero_period_is_guarded_by_safe_every_clamps() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(#101820)
         in space repeat(every: (0.0000001, 0.0000001)) {
@@ -2730,7 +2730,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn perspective_rotate_uses_signed_denominator_guard() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let flip = time * 90deg
     compose {
         fill(#101820)
@@ -2760,7 +2760,7 @@ canvas t(uv: coord, time: signal) -> color {
 
     #[test]
     fn canvas_space_statement_is_rejected() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     canvas_space = rotate(45deg) . scale(0.8)
     let frame = box(at: (0.5, 0.5), size: (0.7, 0.5)) |> stroke(2px)
     compose {

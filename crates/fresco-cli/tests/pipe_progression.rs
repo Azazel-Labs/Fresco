@@ -6,7 +6,7 @@ use common::compile_to_wgsl;
 fn pipe_first_arg_builtin_color_transforms_compile() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_color_transforms",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let accent = #5eead4
   let lo = accent |> darken(by: 0.35)
   let hi = accent |> lighten(by: 0.2)
@@ -33,7 +33,7 @@ fn pipe_first_arg_builtin_color_transforms_compile() {
 fn pipe_first_arg_builtin_math_and_vector_helpers_compile() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_math_and_vector_helpers",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = uv.x |> abs() |> clamp(lo: 0.0, hi: 1.0)
     let b = (uv - (0.5, 0.5)) |> length()
     let c = 0.25 |> mix(b, t: 0.5)
@@ -59,7 +59,7 @@ fn pipe_first_arg_builtin_math_and_vector_helpers_compile() {
 fn pipe_first_arg_builtin_array_len_compile() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_array_len",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let values = [0.15, 0.4, 0.65, 0.9]
     let count = values |> len()
     let direct = len([1, 2, 3])
@@ -82,7 +82,7 @@ fn pipe_first_arg_builtin_array_len_compile() {
 fn pipe_first_arg_builtin_distribute_compile() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_distribute",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let values = [0.3, 0.5, 0.42, 0.61]
     let slot = 2 |> distribute(count: len(values), start: 0.08, end: 0.92)
     let x = slot.center
@@ -105,7 +105,7 @@ fn pipe_first_arg_builtin_distribute_compile() {
 fn pipe_first_arg_builtin_distribute_slot_fields_compile() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_distribute_slot_fields",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let values = [0.3, 0.5, 0.42, 0.61]
     let slot = 2 |> distribute(count: len(values))
     let span = slot.right - slot.left
@@ -128,7 +128,7 @@ fn pipe_first_arg_builtin_distribute_slot_fields_compile() {
 fn pipe_first_arg_builtin_distribute_spacing_mode_compile() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_distribute_spacing_mode",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let values = [0.3, 0.5, 0.42, 0.61]
     let slot = 2 |> distribute(count: len(values), width: 0.12, gap: 0.02, anchor: 0.5)
     let x = slot.center
@@ -151,7 +151,7 @@ fn pipe_first_arg_builtin_distribute_spacing_mode_compile() {
 fn pipe_first_arg_builtin_scalar_overload_compiles() {
     let wgsl = compile_to_wgsl(
         "pipe_builtin_scalar_saturate",
-        r#"canvas t(uv: coord, time: signal) -> color {
+        r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let x = (uv.x * 1.8 - 0.4) |> saturate()
   compose {
         grey(x)
@@ -174,7 +174,7 @@ fn pipe_first_arg_user_function_compiles() {
   darken(c, by: amount)
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let accent = #5eead4
   let shaded = accent |> grade(amount: 0.25)
   compose {

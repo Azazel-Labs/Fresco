@@ -8,7 +8,7 @@ use common::{assert_compile_fails_with, assert_compiles_valid_wgsl, compile_to_w
 #[test]
 fn local_fn_decl_scalar_return_inside_canvas() {
     // A local fn that returns a scalar can be used as a helper called inside the canvas.
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn double(x: f32) -> f32 {
     return x * 2.0;
   }
@@ -23,7 +23,7 @@ fn local_fn_decl_scalar_return_inside_canvas() {
 
 #[test]
 fn local_fn_decl_vec2_return_inside_canvas() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn flip(p: vec2) -> vec2 {
     return vec2(p.y, p.x);
   }
@@ -39,7 +39,7 @@ fn local_fn_decl_vec2_return_inside_canvas() {
 #[test]
 fn local_fn_decl_shape_return_inside_canvas() {
     // A local fn that returns a shape is evaluated inline at each call site.
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn my_circle(r: f32) -> shape {
     circle(at: center, radius: r)
   }
@@ -53,7 +53,7 @@ fn local_fn_decl_shape_return_inside_canvas() {
 
 #[test]
 fn local_fn_decl_layer_return_inside_canvas() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn red_dot(r: f32) -> layer {
     circle(at: center, radius: r) |> fill(#ff0000)
   }
@@ -67,7 +67,7 @@ fn local_fn_decl_layer_return_inside_canvas() {
 
 #[test]
 fn local_fn_decl_multiple_inside_canvas() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn bias(x: f32) -> f32 {
     return x + 0.5;
   }
@@ -93,7 +93,7 @@ fn local_fn_decl_inside_fn_body() {
   return inner(x) + 1.0;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let v = outer(uv.x);
   compose {
     circle(at: center, radius: v * 0.1) |> fill(#ffffff)
@@ -106,7 +106,7 @@ canvas t(uv: coord) -> color {
 #[test]
 fn local_fn_decl_wgsl_emits_helper_function() {
     // A local scalar fn should be lowered to a real WGSL helper.
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn remap(x: f32) -> f32 {
     return x * 0.5 + 0.5;
   }
@@ -138,7 +138,7 @@ fn radius(kind: BlendKind) -> f32 {
   return 0.05 * (kind + 1.0);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let selected = choose(BlendKind.Screen);
   let normal_radius = radius(BlendKind.Normal);
   let selected_radius = radius(selected);
@@ -171,7 +171,7 @@ fn apply(f: fn(f32)->f32, x: f32) -> f32 {
   return f(x);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = apply(double, uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -192,7 +192,7 @@ fn make_shape(f: fn(f32)->shape, r: f32) -> shape {
   f(r)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     make_shape(my_dot, 0.2) |> fill(#0000ff)
   }
@@ -208,7 +208,7 @@ fn callable_param_local_fn_reference() {
   return f(x);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   fn triple(x: f32) -> f32 {
     return x * 3.0;
   }
@@ -232,7 +232,7 @@ fn invoke(f: fn()->f32) -> f32 {
   return f();
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = invoke(const_val);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -253,7 +253,7 @@ fn add1(x: f32) -> f32 {
   return x + 1.0;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = twice(add1, uv.x);
   compose {
     circle(at: center, radius: r * 0.1) |> fill(#ffffff)
@@ -276,7 +276,7 @@ fn apply(f: fn(f32)->f32, x: f32) -> f32 {
   return f(x);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = apply(double, uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -294,7 +294,7 @@ canvas t(uv: coord) -> color {
 /// `Value::Distance` but `field fbm(p) at new_coord` returned `Value::Mask`.
 #[test]
 fn field_at_type_matches_field() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.008
   let base = field fbm(coord)
   let bump = field fbm(coord) at (coord + (e, 0.0))
@@ -313,7 +313,7 @@ fn field_at_type_matches_field() {
 /// fbm call arguments rather than the ambient `p` coordinates.
 #[test]
 fn field_at_emits_offset_in_wgsl() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.004
   let bump = field fbm(coord) at (coord + (e, 0.0))
   compose {
@@ -336,7 +336,7 @@ fn field_at_emits_offset_in_wgsl() {
 /// variable rather than an inline `field` expression.
 #[test]
 fn field_at_variable_reference_form() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.008
   let base = field fbm(coord)
   // Binary `at` operator: `base` is a bound field variable, not an inline
@@ -356,7 +356,7 @@ fn field_at_variable_reference_form() {
 /// ambient `p` coordinates.
 #[test]
 fn field_at_variable_reference_emits_offset_in_wgsl() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.004
   let base = field fbm(coord)
   let bump = base at (coord + (e, 0.0))
@@ -376,13 +376,13 @@ fn field_at_variable_reference_emits_offset_in_wgsl() {
 /// (variable-reference form) must produce identical WGSL output.
 #[test]
 fn field_at_inline_and_var_ref_produce_same_wgsl() {
-    let inline = r#"canvas t(uv: coord) -> color {
+    let inline = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.005
   let bump = field fbm(coord) at (coord + (e, 0.0))
   compose { grey(bump) }
 }
 "#;
-    let var_ref = r#"canvas t(uv: coord) -> color {
+    let var_ref = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.005
   let base = field fbm(coord)
   let bump = base at (coord + (e, 0.0))
@@ -401,7 +401,7 @@ fn field_at_inline_and_var_ref_produce_same_wgsl() {
 /// values, not only on single bound variables.
 #[test]
 fn field_at_on_arithmetic_expression() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let e = 0.006
   let a = field fbm(coord)
   let b = field fbm(coord * 2.0)
@@ -420,7 +420,7 @@ fn field_at_on_arithmetic_expression() {
 /// return a fully-formed layer consumed by `compose`.
 #[test]
 fn fn_layer_return_with_field_at() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   fn cloud(scale: f32, tint: color) -> layer {
     let base  = field fbm(coord * scale)
     let e     = 0.006

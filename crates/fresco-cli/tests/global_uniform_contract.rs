@@ -3,8 +3,9 @@ mod common;
 
 use common::wgsl::{Capabilities, assert_valid_wgsl};
 
-use fresco::driver::compile_source_bundle;
+use fresco::driver::{compile_bundle_virtual, compile_source_bundle};
 use serde_json::{Value, json};
+use std::collections::HashMap;
 
 #[test]
 fn spatial_uniform_fields_keep_their_layout_and_following_fields() {
@@ -16,7 +17,7 @@ struct SceneData {
     viewport: vec2 in screen
 }
 param scene: SceneData
-canvas sample(uv: coord) -> color {
+canvas sample(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { circle(at: center, radius: (scene.position.x + scene.weight + scene.viewport.y) * scene.gain) |> fill(#fff) }
 }
 
@@ -62,31 +63,57 @@ canvas sample(uv: coord) -> color {
     }
 }
 
-#[test]
-fn engine_accessors_can_use_custom_buffer_and_field_names() {
-    let source = r#"
-struct Clock {
-    seconds: f32
-    step: f32
-    viewport: vec2
+/// An engine whose `canvas` context supplies runtime roles through custom
+/// buffer and field names; `time_ty` lets a test mistype the time role.
+fn clock_engine(source: &str, time_ty: &str) -> HashMap<String, String> {
+    let policy = include_str!("../../fresco/tests/fixtures/engines/policy/engine/engine.fr");
+    HashMap::from([
+        (
+            "engine/engine.fr".into(),
+            format!(
+                r#"{policy}
+struct Clock {{
+    @semantic(time) seconds: {time_ty}
+    @semantic(delta_time) step: f32
+    @semantic(resolution) viewport: vec2
+}}
+struct CanvasContext {{
+    @semantic(coord) uv: vec2
+    clock: Clock
+}}
+@entry(canvas, draw)
+interface Canvas {{
+    fn draw(@context ctx: CanvasContext) -> color
+}}
+"#
+            ),
+        ),
+        ("main.fr".into(), source.into()),
+    ])
 }
 
-param clock: Clock
-fn time() -> f32 { return clock.seconds * 2.0 }
-fn delta_time() -> f32 { return clock.step }
-fn resolution() -> vec2 { return clock.viewport }
-canvas sample(uv: coord, t: signal) -> color {
-    compose { circle(at: center, radius: t * 0.01) |> fill(#fff) }
+#[test]
+fn engine_context_roles_can_use_custom_buffer_and_field_names() {
+    let source = r#"
+canvas sample(ctx: CanvasContext) -> color { let t = context(time);
+    compose { circle(at: center, radius: t * 0.01 + context(delta_time) + context(resolution).x) |> fill(#fff) }
 }
 "#;
-    let output = compile_source_bundle(source, common::TEST_SOURCE_PATH, false)
+    let output = compile_bundle_virtual(&clock_engine(source, "f32"), "main.fr", false)
         .unwrap_or_else(|diags| panic!("{diags:?}"));
-    assert!(output.wgsl.contains("clock.seconds"));
+    for field in [
+        "ctx_1.clock.seconds",
+        "ctx_1.clock.step",
+        "ctx_1.clock.viewport",
+    ] {
+        assert!(
+            output.wgsl.contains(field),
+            "context role must resolve through `{field}`: {}",
+            output.wgsl
+        );
+    }
     let manifest: Value = serde_json::from_str(&output.manifest).unwrap();
-    assert_eq!(
-        manifest["raster_entries"][0]["global_uniforms"][0]["name"],
-        "clock"
-    );
+    assert!(manifest["raster_entries"][0]["global_uniforms"].is_null());
 }
 
 #[test]
@@ -128,10 +155,10 @@ surface sample(sp: surf) -> material(ink) {
 }
 
 #[test]
-fn standalone_canvas_reads_runtime_arguments_instead_of_zero() {
+fn canvas_reads_runtime_context_instead_of_zero() {
     let output = compile_source_bundle(
         r#"
-canvas animated(uv: coord, t: signal, dt: delta, viewport: resolution) -> color {
+canvas animated(ctx: CanvasContext) -> color { let uv = context(coord); let t = context(time); let dt = context(delta_time); let viewport = context(resolution);
     compose { circle(at: center, radius: sin(t) * dt + viewport.x / viewport.y) |> fill(#fff) }
 }
 "#,
@@ -157,32 +184,31 @@ canvas animated(uv: coord, t: signal, dt: delta, viewport: resolution) -> color 
 }
 
 #[test]
-fn incorrectly_typed_engine_accessor_is_not_replaced_by_an_entry_argument() {
-    let errors = compile_source_bundle(
-        r#"
-fn time() -> vec2 { return (1.0, 2.0) }
-canvas broken(uv: coord, t: signal) -> color {
+fn incorrectly_typed_engine_context_role_is_rejected() {
+    let source = r#"
+canvas broken(ctx: CanvasContext) -> color { let t = context(time);
     compose { circle(at: center, radius: t) |> fill(#fff) }
 }
-"#,
-        common::TEST_SOURCE_PATH,
-        false,
-    )
-    .unwrap_err();
-    assert!(errors.iter().any(|diag| {
-        diag.message
-            .contains("runtime accessor `time` must return scalar")
-    }));
+"#;
+    let errors =
+        compile_bundle_virtual(&clock_engine(source, "vec2"), "main.fr", false).unwrap_err();
+    assert!(
+        errors.iter().any(|diag| {
+            diag.message
+                .contains("unknown or incorrectly typed context semantic `time`")
+        }),
+        "{errors:?}"
+    );
 }
 
 #[test]
-fn standalone_helpers_capture_runtime_inputs_transitively() {
+fn helpers_receive_canvas_context_inputs_explicitly() {
     let output = compile_source_bundle(
         r#"
-fn animated(x: f32) -> f32 { return x * sin(time) * dt + viewport.x / viewport.y + coord.x }
-fn outer(x: f32) -> f32 { return animated(x) + 0.01 }
-canvas t(uv: coord, time: signal, dt: delta, viewport: resolution) -> color {
-    compose { circle(at: center, radius: outer(uv.x)) |> fill(#fff) }
+fn animated(x: f32, time: f32, dt: f32, viewport: vec2, coord: vec2) -> f32 { return x * sin(time) * dt + viewport.x / viewport.y + coord.x }
+fn outer(x: f32, time: f32, dt: f32, viewport: vec2, coord: vec2) -> f32 { return animated(x, time, dt, viewport, coord) + 0.01 }
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
+    compose { circle(at: center, radius: outer(uv.x, context(time), context(delta_time), context(resolution), uv)) |> fill(#fff) }
 }
 "#,
         common::TEST_SOURCE_PATH,
@@ -199,11 +225,32 @@ canvas t(uv: coord, time: signal, dt: delta, viewport: resolution) -> color {
         assert_eq!(
             helper.arguments.len(),
             5,
-            "{name} must capture coordinate, time, delta, and resolution"
+            "{name} must take coordinate, time, delta, and resolution explicitly"
         );
     }
-    assert!(output.wgsl.contains("sin(entry_time)"), "{}", output.wgsl);
+    assert!(output.wgsl.contains("sin(arg_time)"), "{}", output.wgsl);
     assert!(!output.wgsl.contains("sin(0f)"));
-    assert!(output.wgsl.contains("entry_coord.x"));
     assert!(output.wgsl.contains("ctx.delta"));
+    assert!(output.wgsl.contains("ctx.res"));
+}
+
+#[test]
+fn helpers_do_not_capture_entry_bindings_implicitly() {
+    let errors = compile_source_bundle(
+        r#"
+fn animated(x: f32) -> f32 { return x * sin(time) }
+canvas t(ctx: CanvasContext) -> color { let time = context(time);
+    compose { circle(at: center, radius: animated(0.1)) |> fill(#fff) }
+}
+"#,
+        common::TEST_SOURCE_PATH,
+        false,
+    )
+    .unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|diag| diag.message.contains("unknown name `time`")),
+        "{errors:?}"
+    );
 }

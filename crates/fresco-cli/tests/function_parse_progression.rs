@@ -10,7 +10,7 @@ fn top_level_fn_decl_parses_when_unused() {
   amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
@@ -29,7 +29,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn compose_block_allows_newline_before_open_brace() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose
   {
     circle(at: center, radius: 20px) |> fill(#ffffff)
@@ -53,7 +53,7 @@ fn fn_call_compiles_for_scalar_helpers() {
   amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -77,7 +77,7 @@ fn fn_call_compiles_for_vec2_helpers() {
   center + offset
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = wobble(center, (0.02, 0.0))
   compose {
     circle(at: p, radius: 18px) |> fill(#ffffff)
@@ -101,7 +101,7 @@ fn fn_call_accepts_keyword_only_parameter_by_name() {
   amount + boost
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = grade(0.25, boost: 0.5)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -125,7 +125,7 @@ fn fn_call_rejects_positional_argument_for_keyword_only_parameter() {
   amount + boost
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = grade(0.25, 0.5)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -159,7 +159,7 @@ fn fn_decl_rejects_trailing_keyword_only_separator() {
   amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = grade(0.25)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -189,7 +189,7 @@ fn fn_decl_rejects_duplicate_keyword_only_separator() {
   amount + boost
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = grade(0.25, boost: 0.5)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -215,7 +215,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn local_fn_decl_rejects_trailing_keyword_only_separator() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   fn grade(amount: f32, *) -> f32 {
     amount
   }
@@ -245,7 +245,7 @@ fn local_fn_decl_rejects_trailing_keyword_only_separator() {
 
 #[test]
 fn local_fn_decl_rejects_duplicate_keyword_only_separator() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   fn grade(amount: f32, *, *, boost: f32) -> f32 {
     amount + boost
   }
@@ -279,7 +279,7 @@ fn fn_call_reports_return_type_mismatch() {
   amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let _p = bad(0.2)
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
@@ -312,7 +312,7 @@ fn fn_body_reports_compose_statement_as_unsupported() {
   1.0
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let _k = build()
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
@@ -342,7 +342,7 @@ fn fn_call_compiles_with_explicit_return_statement() {
   return amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -368,7 +368,7 @@ fn fn_reports_unreachable_statement_after_return() {
   extra
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -398,7 +398,7 @@ fn fn_reports_missing_return_on_fallthrough_path() {
   let v = amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -435,7 +435,7 @@ fn fn_if_else_returns_scalar_compiles() {
   }
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0, time)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -463,7 +463,7 @@ fn fn_if_else_reports_branch_value_type_mismatch() {
   }
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let _k = bad(1.0, time)
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
@@ -497,7 +497,7 @@ fn fn_for_loop_body_without_return_compiles() {
   amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -524,7 +524,7 @@ fn fn_for_loop_reports_return_in_body_as_unsupported() {
   amount
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let k = sparkle(1.0)
   compose {
     circle(at: center, radius: 20px * k) |> fill(#ffffff)
@@ -554,7 +554,7 @@ fn canvas_resolution_param_compiles_and_is_callable_in_functions() {
   res.x / max(res.y, 1.0)
 }
 
-canvas t(uv: coord, time: signal, res: resolution) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); let res = context(resolution);
   let a = aspect(res)
   let p = ((uv.x - 0.5) * a, uv.y - 0.5)
   compose {
@@ -574,27 +574,45 @@ canvas t(uv: coord, time: signal, res: resolution) -> color {
 }
 
 #[test]
-fn duplicate_canvas_resolution_param_reports_error() {
-    let input = r#"canvas t(uv: coord, r0: resolution, r1: resolution) -> color {
+fn duplicate_canvas_context_resolution_role_reports_error() {
+    // The retired standalone ABI rejected two `: resolution` parameters; the
+    // engine-registered contract rejects two `resolution` roles in its context.
+    let policy = include_str!("../../fresco/tests/fixtures/engines/policy/engine/engine.fr");
+    let engine = format!(
+        r#"{policy}
+struct FrameGlobals {{
+    @semantic(time) time: f32
+    @semantic(resolution) r0: vec2
+    @semantic(resolution) r1: vec2
+}}
+struct CanvasContext {{
+    @semantic(coord) uv: vec2
+    frame: FrameGlobals
+}}
+@entry(canvas, draw)
+interface Canvas {{
+    fn draw(@context ctx: CanvasContext) -> color
+}}
+"#
+    );
+    let input = r#"canvas t(ctx: CanvasContext) -> color {
   compose {
     circle(at: center, radius: 20px) |> fill(#ffffff)
   }
 }
 "#;
+    let files = std::collections::HashMap::from([
+        ("engine/engine.fr".to_string(), engine),
+        ("main.fr".to_string(), input.to_string()),
+    ]);
 
-    let output = run_source("canvas_resolution_param_duplicate", input, &[]);
-
+    let errors = fresco::driver::compile_bundle_virtual(&files, "main.fr", false)
+        .expect_err("expected duplicate resolution roles to fail");
     assert!(
-        !output.status.success(),
-        "expected duplicate resolution params to fail\nstdout:\n{}\nstderr:\n{}",
-        normalize(&output.stdout),
-        normalize(&output.stderr)
-    );
-
-    let stderr = normalize(&output.stderr);
-    assert!(
-        stderr.contains("duplicate `resolution` canvas parameter"),
-        "expected duplicate resolution diagnostic\nstderr:\n{stderr}"
+        errors.iter().any(|diag| diag
+            .message
+            .contains("duplicate context semantic `resolution`")),
+        "expected duplicate resolution diagnostic, got: {errors:?}"
     );
 }
 
@@ -604,7 +622,7 @@ fn fn_vec3_ops_and_swizzle_compiles() {
   base * gain + (0.05, 0.0, 0.08)
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v = tint((0.2, 0.4, 0.7), 1.1)
   let r = v.r
   let g = v.g
@@ -627,7 +645,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn canvas_delta_param_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal, dt: delta) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); let dt = context(delta_time);
   let pulse = 0.5 + 0.5 * sin(time + dt * 60.0)
   compose {
     circle(at: center, radius: 20px * (0.7 + 0.4 * pulse)) |> fill(#ffffff)
@@ -667,7 +685,7 @@ fn warp4(i: vec4, n: vec4, eta: f32) -> vec4 {
   r * (0.5 + 0.5 * d) + t * (0.2 + 0.1 * w)
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = warp3((uv.x, uv.y, sin(time)), (0.0, 1.0, 0.5), 0.8)
   let b = warp4((a.x, a.y, a.z, 1.0), (0.0, 1.0, 0.0, 0.5), 0.9)
   compose {
@@ -694,7 +712,7 @@ fn fn_matrix_constructors_and_mul_compile() {
   (a + b) * 0.5
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let c0 = (1.0, 0.0, 0.0)
   let c1 = (0.0, 1.0, 0.0)
   let c2 = (0.0, 0.0, 1.0)
@@ -736,7 +754,7 @@ fn fn_vector_step_smoothstep_and_swizzles_compile() {
   base + shape
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let v3 = (uv.x, uv.y, 0.5 + 0.5 * sin(time))
   let v4 = (v3.x, v3.y, v3.z, 1.0)
   let out = shade(v3, v4)
@@ -764,7 +782,7 @@ fn fn_component_wise_vec_mul_div_compile() {
   d
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = (uv.x + 0.1, uv.y + 0.2, 0.5 + 0.5 * sin(time))
   let b = (0.9, 0.8, 0.7)
   let out = shade(a, b)
@@ -792,7 +810,7 @@ fn fn_vec_scalar_add_sub_compile() {
   c
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = (uv.x + 0.1, uv.y + 0.2, 0.5 + 0.5 * sin(time))
   let out = shade(a)
   compose {
@@ -823,7 +841,7 @@ fn compose_postprocess_function_compiles() {
   )
 }
 
-canvas t(uv: coord, time: signal, res: resolution) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); let res = context(resolution);
   compose {
     fill(#203040)
     circle(at: center, radius: 0.18) |> fill(#ff66aa) |> blend(add)
@@ -847,7 +865,7 @@ fn compose_postprocess_rejects_incompatible_function_signature() {
   return src
 }
 
-canvas t(uv: coord, time: signal, res: resolution) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time); let res = context(resolution);
   compose {
     fill(#203040)
     circle(at: center, radius: 0.18) |> fill(#ff66aa) |> blend(add)
@@ -882,7 +900,7 @@ fn compose_promotes_color_returning_function_to_layer() {
   )
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     sky(uv)
   }

@@ -6,7 +6,7 @@ use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn anisotropic_glow_with_gradient_and_gaussian_falloff_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let haze = capsule(from: (0.12, 0.5), to: (0.88, 0.5), radius: 0.02)
     |> glow(
       reach: (0.24, 0.08),
@@ -44,7 +44,7 @@ fn anisotropic_glow_with_gradient_and_gaussian_falloff_compiles() {
 
 #[test]
 fn layer_glow_with_gradient_and_linear_falloff_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let core = circle(at: center, radius: 0.09) |> fill(#ffffff)
   let haze = core |> glow(
     reach: (0.18, 0.08),

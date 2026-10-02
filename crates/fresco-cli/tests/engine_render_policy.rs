@@ -9,13 +9,23 @@ const POLICY: &str = "#pragma check.shape_aa_min_px = 1.5\n\
 #pragma check.shape_aa_style = gradient\n\
 #pragma check.projective_footprint_max_px = 64.0\n";
 
+/// The engine registers the `canvas` entry kind in its own module so each
+/// policy variant below changes only the rendering settings.
+const CANVAS: &str = include_str!("../../fresco/tests/fixtures/engines/canvas.fr");
+const IMPORT_CANVAS: &str = "\nimport \"canvas.fr\"\n";
+
+fn engine(policy: &str) -> String {
+    format!("{policy}{IMPORT_CANVAS}")
+}
+
 fn files() -> HashMap<String, String> {
     HashMap::from([
-        ("engine/engine.fr".into(), POLICY.into()),
+        ("engine/engine.fr".into(), engine(POLICY)),
+        ("engine/canvas.fr".into(), CANVAS.into()),
         (
             "main.fr".into(),
             r#"
-canvas probe(uv: coord) -> color {
+canvas probe(ctx: CanvasContext) -> color { let uv = context(coord);
     in space scale(0.2) {
         star(at: (0.5, 0.5), outer: 0.2, inner: 0.1, points: 5) |> fill(#ffffff)
     }
@@ -31,7 +41,7 @@ fn each_engine_setting_is_required_with_an_actionable_suggestion() {
     for line in POLICY.lines() {
         let key = line.split_whitespace().nth(1).unwrap();
         let mut sources = files();
-        sources.insert("engine/engine.fr".into(), POLICY.replace(line, ""));
+        sources.insert("engine/engine.fr".into(), engine(&POLICY.replace(line, "")));
         let errors = compile_bundle_virtual(&sources, "main.fr", false).unwrap_err();
         let missing = errors
             .iter()
@@ -50,7 +60,7 @@ fn each_engine_setting_is_required_with_an_actionable_suggestion() {
 #[test]
 fn entry_pragmas_and_api_values_cannot_replace_engine_declarations() {
     let mut sources = files();
-    sources.remove("engine/engine.fr");
+    sources.insert("engine/engine.fr".into(), IMPORT_CANVAS.into());
     let source = sources.get_mut("main.fr").unwrap();
     source.insert_str(0, POLICY);
     let mut context = CompileContext::default();
@@ -78,7 +88,7 @@ fn entry_pragmas_and_api_values_cannot_replace_engine_declarations() {
 #[test]
 fn imported_engine_policy_changes_lowering() {
     let mut sources = files();
-    sources.insert("engine/engine.fr".into(), "import \"policy.fr\"".into());
+    sources.insert("engine/engine.fr".into(), engine("import \"policy.fr\""));
     sources.insert("engine/policy.fr".into(), POLICY.into());
     let initial = compile_bundle_virtual(&sources, "main.fr", false).unwrap();
     for (before, after) in [
@@ -105,7 +115,10 @@ fn invalid_and_duplicate_engine_settings_are_rejected() {
         ("gradient", "potato"),
     ] {
         let mut sources = files();
-        sources.insert("engine/engine.fr".into(), POLICY.replace(before, after));
+        sources.insert(
+            "engine/engine.fr".into(),
+            engine(&POLICY.replace(before, after)),
+        );
         let errors = compile_bundle_virtual(&sources, "main.fr", false).unwrap_err();
         assert!(errors.iter().any(|diag| diag.file == "engine/engine.fr"));
     }
@@ -129,7 +142,7 @@ fn invalid_and_duplicate_engine_settings_are_rejected() {
 #[test]
 fn ordinary_imports_cannot_supply_engine_policy() {
     let mut sources = files();
-    sources.remove("engine/engine.fr");
+    sources.insert("engine/engine.fr".into(), IMPORT_CANVAS.into());
     sources.insert("policy.fr".into(), POLICY.into());
     sources
         .get_mut("main.fr")
@@ -159,7 +172,7 @@ fn split_policy_is_validated_after_all_engine_imports() {
     let mut sources = files();
     sources.insert(
         "engine/engine.fr".into(),
-        "import \"minimum.fr\"\nimport \"rest.fr\"".into(),
+        engine("import \"minimum.fr\"\nimport \"rest.fr\""),
     );
     sources.insert(
         "engine/minimum.fr".into(),

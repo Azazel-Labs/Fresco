@@ -6,7 +6,7 @@ use common::{normalize, run_fresco, unique_temp_path};
 
 #[test]
 fn rejects_legacy_postfix_round_syntax() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let b = box(at: center, size: (0.3, 0.2))
   let c = b round 0.04
   compose {
@@ -36,7 +36,7 @@ fn rejects_legacy_postfix_round_syntax() {
 
 #[test]
 fn rejects_legacy_postfix_smooth_syntax() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let a = circle(at: center, radius: 0.2)
   let b = box(at: center, size: (0.3, 0.2))
   let d = a | b smooth 0.05

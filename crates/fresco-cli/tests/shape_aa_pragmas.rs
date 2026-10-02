@@ -8,7 +8,7 @@ fn shape_aa_pragmas_tune_emitted_band_limits() {
     let input = r#"#pragma check.shape_aa_min_px = 0.75
 #pragma check.shape_aa_max_px = 5.5
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space warped = rotate(14deg) . scale(1.0 + uv.y * 2.0)
   let ring = circle(at: (0.5, 0.5), radius: 0.18) |> stroke(2px)
 
@@ -42,7 +42,7 @@ fn shape_aa_style_and_level_pragmas_apply() {
     let input = r#"#pragma check.shape_aa_style = conservative
 #pragma check.shape_aa_level = max
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space warped = rotate(14deg) . scale(1.0 + uv.y * 2.0)
   let ring = star(at: (0.5, 0.5), outer: 0.18, inner: 0.09, points: 5) |> stroke(2px)
 
@@ -79,7 +79,7 @@ canvas t(uv: coord, time: signal) -> color {
 fn shape_aa_style_pragma_invalid_value_reports_diagnostic() {
     let input = r#"#pragma check.shape_aa_style = potato
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.2) |> stroke(2px) |> fill(#ffffff)
   }
@@ -106,7 +106,7 @@ fn shape_aa_pragmas_invalid_range_reports_diagnostic() {
     let input = r#"#pragma check.shape_aa_min_px = 6.0
 #pragma check.shape_aa_max_px = 2.0
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.2) |> stroke(2px) |> fill(#ffffff)
   }
@@ -132,7 +132,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn shape_aa_polar_space_avoids_derivative_span_regression() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   space dial = polar(center: (0.5, 0.5), from: -90deg, direction: clockwise)
   let track = box(at: (0.5, 0.32), size: (1.0, 0.045))
 

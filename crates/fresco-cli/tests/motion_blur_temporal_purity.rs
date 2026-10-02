@@ -7,7 +7,7 @@ use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn motion_blur_rejects_previous_frame_history_leaf() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let base = image(previous_frame)
   compose {
     base |> motion_blur(shutter: 8ms)
@@ -36,7 +36,7 @@ fn motion_blur_rejects_previous_frame_history_leaf() {
 
 #[test]
 fn motion_blur_allows_signal_driven_scene() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let base = circle(at: (0.5 + sin(time) * 0.1, 0.5), radius: 0.1) |> fill(#ffffff)
   compose {
     base |> motion_blur(shutter: 8ms)
@@ -59,7 +59,7 @@ fn motion_blur_allows_signal_driven_scene() {
 
 #[test]
 fn motion_blur_rejects_previous_frame_prefixed_feedback_texture() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let base = image(previous_frame_feedback)
     compose {
     base |> motion_blur(shutter: 8ms)

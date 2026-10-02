@@ -13,7 +13,7 @@ fn assert_intrinsic_call_count_at_most(wgsl: &str, needle: &str, max_count: usiz
 
 #[test]
 fn direct_lowering_preserves_vec2_max_scalar_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = abs(vec2(uv.x - 0.5, uv.y - 0.5)) - vec2(0.2, 0.2);
   let d = length(max(q, 0.0));
   compose {
@@ -32,7 +32,7 @@ fn direct_lowering_preserves_vec2_max_scalar_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec3_max_scalar_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = abs(vec3(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2)) - vec3(0.2, 0.2, 0.2);
   let d = length(max(q, 0.0));
   compose {
@@ -51,7 +51,7 @@ fn direct_lowering_preserves_vec3_max_scalar_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec4_max_scalar_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = abs(vec4(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2, 1.0)) - vec4(0.2, 0.2, 0.2, 0.2);
   let d = length(max(q, 0.0));
   compose {
@@ -70,7 +70,7 @@ fn direct_lowering_preserves_vec4_max_scalar_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec2_min_scalar_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = abs(vec2(uv.x - 0.5, uv.y - 0.5)) - vec2(0.2, 0.2);
   let d = length(min(q, 0.0));
   compose {
@@ -89,7 +89,7 @@ fn direct_lowering_preserves_vec2_min_scalar_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec3_min_scalar_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = abs(vec3(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2)) - vec3(0.2, 0.2, 0.2);
   let d = length(min(q, 0.0));
   compose {
@@ -108,7 +108,7 @@ fn direct_lowering_preserves_vec3_min_scalar_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec4_min_scalar_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let q = abs(vec4(uv.x - 0.5, uv.y - 0.5, sin(time) * 0.2, 1.0)) - vec4(0.2, 0.2, 0.2, 0.2);
   let d = length(min(q, 0.0));
   compose {
@@ -127,7 +127,7 @@ fn direct_lowering_preserves_vec4_min_scalar_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec2_clamp_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let rg = clamp(vec2(uv.x, uv.y), vec2(0.0), vec2(1.0));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * rg.x) |> fill(#ffffff)
@@ -145,7 +145,7 @@ fn direct_lowering_preserves_vec2_clamp_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec3_clamp_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let rgb = clamp(vec3(uv.x, uv.y, sin(time) * 0.5 + 0.5), vec3(0.0), vec3(1.0));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * rgb.x) |> fill(#ffffff)
@@ -163,7 +163,7 @@ fn direct_lowering_preserves_vec3_clamp_shape() {
 
 #[test]
 fn direct_lowering_preserves_vec4_clamp_shape() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let rgba = clamp(vec4(uv.x, uv.y, sin(time) * 0.5 + 0.5, 1.0), vec4(0.0), vec4(1.0));
   compose {
     circle(at: center, radius: 0.02 + 0.01 * rgba.x) |> fill(#ffffff)
@@ -181,7 +181,7 @@ fn direct_lowering_preserves_vec4_clamp_shape() {
 
 #[test]
 fn direct_lowering_dot_vec2_on_vec3_swizzle_keeps_vec2_arity() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = vec3(uv.x - 0.5, uv.y - 0.5, sin(time));
   let d = dot(vec2(p.x, p.y), vec2(0.5, 0.25));
   compose {

@@ -9,7 +9,7 @@ fn generic_id_function_compiles() {
   return x;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = id(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -26,7 +26,7 @@ fn generic_same_type_multiple_params_compile() {
   return b;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = choose_second(0.1, uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -47,7 +47,7 @@ fn const_template_u32_drives_unroll_bound() {
   return acc;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.03 + 0.001 * tap_sum<4>(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -68,7 +68,7 @@ fn const_template_missing_specialization_is_rejected() {
   return acc;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.03 + 0.001 * tap_sum(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -93,7 +93,7 @@ fn const_template_rejects_non_integer_literal() {
   return acc;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.03 + 0.001 * tap_sum<0.5>(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -114,7 +114,7 @@ fn const_template_i32_positive_and_negative_literal_compile() {
   return x + f32(DELTA);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r0 = offset<-2>(uv.x);
   let r1 = offset<3>(uv.x);
   let r = 0.03 + 0.001 * (r0 + r1);
@@ -133,7 +133,7 @@ fn const_template_i32_rejects_out_of_range_literal() {
   return x + f32(DELTA);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.03 + 0.001 * offset<2147483648>(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -154,7 +154,7 @@ fn const_template_missing_specialization_reports_template_signature() {
   return x + f32(DELTA);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.03 + 0.001 * offset(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -175,7 +175,7 @@ fn const_template_specializations_compile_for_helper_keys() {
   return x + f32(B) * 0.001;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let a = bias<-1>(uv.x);
   let b = bias<2>(uv.x);
   let r = 0.03 + 0.001 * (a + b);
@@ -198,7 +198,7 @@ fn outer<const N: u32>(x: f32) -> f32 {
   return inner<N>(x);
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.03 + 0.001 * outer<4>(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -229,7 +229,7 @@ fn keep<T: MyBound>(x: T) -> T {
   return x;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = keep(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -256,7 +256,7 @@ fn keep<T: Spreadable>(x: T) -> T {
   return x;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = keep(uv.x);
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -279,7 +279,7 @@ conform f32 : Spreadable {
   }
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: uv.x) |> fill(#ffffff)
   }
@@ -303,7 +303,7 @@ fn keep<T: Sdf>(x: T) -> T {
   return x;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let bad = keep(#ffffff);
   compose {
     circle(at: center, radius: 0.2) |> fill(bad)
@@ -328,7 +328,7 @@ fn foo(x: Sdf) -> Sdf {
   return x;
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
   }
@@ -351,7 +351,7 @@ fn typevar_typed_declaration_compiles() {
   return y
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = pass_through(uv.x)
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -373,7 +373,7 @@ fn identity_blend(w: BlendKind) -> BlendKind {
   return result
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = uv.x
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -388,7 +388,7 @@ canvas t(uv: coord) -> color {
 fn qualified_enum_variant_is_usable_in_normal_expressions() {
     let input = r#"enum BlendKind { Normal, Multiply, Screen }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   BlendKind mode = BlendKind.Screen
   let r = 0.08 * (mode + 1.0)
   compose {
@@ -405,7 +405,7 @@ fn ambiguous_bare_enum_variant_is_rejected_in_expressions() {
     let input = r#"enum AxisA { down }
 enum AxisB { down }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let v = down
   compose {
     circle(at: center, radius: v + 0.05) |> fill(#ffffff)
@@ -432,7 +432,7 @@ fn weight(kind: LightKind) -> f32 {
   }
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.05 + 0.01 * weight(LightKind.directional)
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -455,7 +455,7 @@ fn weight(kind: LightKind) -> f32 {
   return 0.0
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let r = 0.05 + 0.01 * weight(LightKind.directional)
   compose {
     circle(at: center, radius: r) |> fill(#ffffff)
@@ -476,7 +476,7 @@ fn axis_group_declaration_is_rejected() {
   ambient: flat|sh2|lightmap|lightmap_dir
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -492,7 +492,7 @@ fn pass_use_block_is_rejected() {
   use direct_lit { fog }
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -508,7 +508,7 @@ fn pipeline_use_block_is_rejected() {
   use direct_lit { fog }
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
   }
@@ -527,7 +527,7 @@ fn choose(kind: BlendKind) -> BlendKind {
   return kind
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let selected = choose(ToneKind.Warm)
   compose {
     circle(at: center, radius: 0.08 * (selected + 1.0)) |> fill(#ffffff)
@@ -550,7 +550,7 @@ fn choose(kind: BlendKind) -> BlendKind {
   return kind
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let selected = choose(1.5)
   compose {
     circle(at: center, radius: 0.08 * (selected + 1.0)) |> fill(#ffffff)
@@ -573,7 +573,7 @@ fn bad(kind: BlendKind) -> BlendKind {
   return 7.0
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let selected = bad(BlendKind.Normal)
   compose {
     circle(at: center, radius: 0.08 * (selected + 1.0)) |> fill(#ffffff)
@@ -595,7 +595,7 @@ fn generic_function_over_field_type_compiles() {
   return y
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let sample_value = field_identity(field fbm(uv))
   let t = field_identity(field (uv.x * 0.5))
   compose {
@@ -613,7 +613,7 @@ fn field_type_requires_single_type_argument() {
   return 0.0
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
   }

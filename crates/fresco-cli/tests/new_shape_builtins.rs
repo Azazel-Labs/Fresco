@@ -7,7 +7,7 @@ use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn new_shape_builtins_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let c = center
     let p = plus(at: c, size: (0.5, 0.08), thickness: 0.08)
     let x = x_cross(at: c, size: (0.42, 0.42), thickness: 0.05)

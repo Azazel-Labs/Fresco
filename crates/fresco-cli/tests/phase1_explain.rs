@@ -7,7 +7,7 @@ use common::{normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn explain_reports_phase1_loop_and_reduce_notes() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let ys = [0.62, 0.58, 0.54]
   let cuts = [for y in ys => box(at: (0.5, y), size: (0.3, 0.02))]
   let base = circle(at: center, radius: 0.25)

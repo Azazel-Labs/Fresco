@@ -7,7 +7,7 @@ use common::{normalize, run_fresco, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn trapezoid_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let mountain = trapezoid(at: (0.5, 0.6), top: 0.25, bottom: 0.55, height: 0.3)
 
   compose {
@@ -31,7 +31,7 @@ fn trapezoid_compiles() {
 
 #[test]
 fn polygon2_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let snow = polygon2(
     points: [
       (0.20, 0.20),
@@ -63,7 +63,7 @@ fn polygon2_compiles() {
 
 #[test]
 fn polygon3_compiles_with_vec3_points() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let panel = polygon3(
     points: [
       (0.15, 0.20, 0.0),
@@ -96,7 +96,7 @@ fn polygon3_compiles_with_vec3_points() {
 
 #[test]
 fn polygon2_rejects_too_few_points() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = polygon2(points: [(0.2, 0.2), (0.8, 0.2)])
 
   compose {
@@ -126,7 +126,7 @@ fn polygon2_rejects_too_few_points() {
 
 #[test]
 fn explain_reports_polygon_lowering_notes() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p2 = polygon2(points: [(0.2, 0.2), (0.8, 0.2), (0.7, 0.7), (0.3, 0.8)])
   let p3 = polygon3(points: [(0.2, 0.2, 0.0), (0.8, 0.2, 0.0), (0.7, 0.7, 0.3)])
 
@@ -162,7 +162,7 @@ fn explain_reports_polygon_lowering_notes() {
 
 #[test]
 fn shape_constructors_accept_rotate_argument() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let verts = [
     (0.2, 0.2),
     (0.35, 0.2),

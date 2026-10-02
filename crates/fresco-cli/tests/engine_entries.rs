@@ -5,7 +5,9 @@ mod wgsl;
 use wgsl::{Capabilities, assert_valid_wgsl};
 
 fn files(kind: &str, method: &str, body: &str) -> HashMap<String, String> {
-    let policy = include_str!("../../../tests/render-policy/engine/engine.fr");
+    // These engines register their own entry vocabulary (including `canvas`),
+    // so they take only the rendering policy, not the shared `canvas` contract.
+    let policy = include_str!("../../fresco/tests/fixtures/engines/policy/engine/engine.fr");
     HashMap::from([
         (
             "engine/engine.fr".into(),

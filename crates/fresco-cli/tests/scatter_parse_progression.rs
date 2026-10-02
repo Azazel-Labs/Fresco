@@ -6,7 +6,7 @@ use common::{normalize, run_fresco, unique_temp_path};
 
 #[test]
 fn scatter_parses_and_compiles_with_mvp_semantics() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let stars = scatter 12 within screen seed 9 strategy compact
                             lifetime star: 0.7s respawn every 2s {
     circle(at: center, radius: 0.1) |> fill(#ffffff)
@@ -32,7 +32,7 @@ fn scatter_parses_and_compiles_with_mvp_semantics() {
 
 #[test]
 fn scatter_lifecycle_rand_lowers_to_instance_driven_wgsl() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let sparks = scatter 6 within screen seed 13 strategy compact
                                                     lifetime spark: rand(0.3s .. 0.9s) respawn every rand(2s .. 5s) {
     circle(at: spark.pos, radius: 1px) |> fill(#ffffff)
@@ -69,7 +69,7 @@ fn scatter_lifecycle_rand_lowers_to_instance_driven_wgsl() {
 
 #[test]
 fn scatter_requires_explicit_strategy_clause() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let stars = scatter 8 within screen seed 5 {
         circle(at: instance.pos, radius: 1px) |> fill(#ffffff)
     }
@@ -101,7 +101,7 @@ fn scatter_requires_explicit_strategy_clause() {
 
 #[test]
 fn scatter_reports_unknown_strategy_value() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let stars = scatter 8 within screen seed 5 strategy turbo {
         circle(at: instance.pos, radius: 1px) |> fill(#ffffff)
     }
@@ -133,7 +133,7 @@ fn scatter_reports_unknown_strategy_value() {
 
 #[test]
 fn scatter_procedural_strategy_rejects_lifecycle_bindings() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let stars = scatter 8 within screen seed 5 strategy procedural
                                                     lifetime star: 0.7s respawn every 2s {
         circle(at: star.pos, radius: 1px) |> fill(#ffffff)
@@ -166,7 +166,7 @@ fn scatter_procedural_strategy_rejects_lifecycle_bindings() {
 
 #[test]
 fn scatter_accepts_newlines_between_required_clauses() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let stars = scatter 180
                     within region((0.0, 0.0) .. (1.0, 1.0))
                     seed 19
@@ -195,7 +195,7 @@ fn scatter_accepts_newlines_between_required_clauses() {
 
 #[test]
 fn scatter_procedural_allows_counts_above_v0_nonprocedural_bound() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let stars = scatter 18000
                     within region((0.0, 0.0) .. (1.0, 1.0))
                     seed 19
@@ -224,7 +224,7 @@ fn scatter_procedural_allows_counts_above_v0_nonprocedural_bound() {
 
 #[test]
 fn scatter_instance_aliases_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let sparks = scatter 16 within screen seed 17 strategy compact {
         let age = wrap(x: time + instance.rand, range: 0 .. 1)
         circle(at: instance.pos + instance.jitter * 0.02, radius: 0.01 + instance.rand2 * 0.01)

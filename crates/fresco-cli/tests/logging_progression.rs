@@ -7,7 +7,7 @@ use common::{fresco_command, normalize, run_fresco_with_args, unique_temp_path};
 
 #[test]
 fn verbose_mode_emits_pipeline_progress_logs() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
     circle(at: center, radius: 0.2) |> fill(#ffffff)
   }
@@ -52,7 +52,7 @@ fn verbose_mode_emits_pipeline_progress_logs() {
 
 #[test]
 fn verbose_mode_emits_expression_watchdog_heartbeat() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = (uv.x, uv.y);
   let q = (p.x + 0.1, p.y + 0.2);
   compose {
@@ -97,7 +97,7 @@ fn verbose_mode_emits_expression_watchdog_heartbeat() {
 
 #[test]
 fn expr_timeout_emits_timeout_checkpoint() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let p = (uv.x, uv.y);
   compose {
     circle(at: p, radius: 0.2 + sin(time) * 0.01) |> fill(#ffffff)

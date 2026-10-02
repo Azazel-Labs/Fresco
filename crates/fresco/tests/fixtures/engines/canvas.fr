@@ -1,0 +1,17 @@
+// Raster entry vocabulary for compiler regressions: the engine, not the
+// compiler, registers the `canvas` entry kind and its typed context.
+struct FrameGlobals {
+    @semantic(time) time: f32
+    @semantic(delta_time) delta_time: f32
+    @semantic(resolution) resolution: vec2
+}
+
+struct CanvasContext {
+    @semantic(coord) uv: vec2
+    frame: FrameGlobals
+}
+
+@entry(canvas, draw)
+interface Canvas {
+    fn draw(@context ctx: CanvasContext) -> color
+}

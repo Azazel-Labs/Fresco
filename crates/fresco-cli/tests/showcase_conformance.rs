@@ -98,7 +98,7 @@ fn showcase_perspective_flip_card_preserves_background_through_compose_alpha() {
 
 #[test]
 fn compose_if_keeps_derivative_work_uniform_and_selects_one_face() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let front = circle(at: center, radius: 0.25) |> fill(#f5f5f5ff)
     let back = circle(at: center, radius: 0.25) |> fill(#1f2937ff)
     let spin = cos(time)
@@ -164,7 +164,7 @@ fn compose_if_keeps_derivative_work_uniform_and_selects_one_face() {
 
 #[test]
 fn compose_else_if_chain_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: center, radius: 0.2) |> fill(#ef4444ff)
     let b = circle(at: center, radius: 0.2) |> fill(#22c55eff)
     let c = circle(at: center, radius: 0.2) |> fill(#3b82f6ff)
@@ -194,7 +194,7 @@ fn compose_else_if_chain_compiles() {
 
 #[test]
 fn compose_for_body_supports_if_else_statements() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let treble = 0.72
 
     compose {
@@ -226,7 +226,7 @@ fn compose_for_body_supports_if_else_statements() {
 
 #[test]
 fn compose_for_if_branches_accept_blend_pipe_syntax() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         for i in 0 .. 8 {
             let fi = i / 8.0
@@ -263,7 +263,7 @@ fn compose_accepts_dynamic_color_returned_from_function_call() {
     )
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         tone(uv, time)
     }
@@ -282,7 +282,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn warp_and_closed_form_signals_compile_with_coord_ambient() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space shimmer = warp(by: (
         (fbm(uv * 6.0 + (time * 0.1, 0.0), octaves: 3) - 0.5) * 0.03,
         (fbm(uv * 6.0 + (7.0, time * 0.08), octaves: 3) - 0.5) * 0.02
@@ -312,7 +312,7 @@ fn warp_and_closed_form_signals_compile_with_coord_ambient() {
 
 #[test]
 fn millisecond_units_compile_for_signal_windows() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let flash = pulse(every: 2s, width: 100ms, ease: out_quad)
     let arrive = ramp(from: 0ms, over: 1200ms, ease: out_back)
 
@@ -335,7 +335,7 @@ fn millisecond_units_compile_for_signal_windows() {
 
 #[test]
 fn turn_units_compile_for_angle_math() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     let spin = 0.25turn
 
     compose {
@@ -358,7 +358,7 @@ fn turn_units_compile_for_angle_math() {
 
 #[test]
 fn pulse_and_ramp_support_transition_and_mode_args() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let flash = pulse(every: 2s, width: 120ms, transition: quad, mode: ease_in_out)
     let arrive = ramp(from: 0ms, over: 1200ms, transition: cubic, mode: out_in)
 
@@ -381,7 +381,7 @@ fn pulse_and_ramp_support_transition_and_mode_args() {
 
 #[test]
 fn pulse_rejects_mixing_ease_with_transition_mode() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let flash = pulse(every: 2s, width: 120ms, ease: out_quad, transition: quad, mode: out)
     compose {
         circle(at: center, radius: 0.1) |> fill(rgb(0.2, 0.4, 0.8) * flash)
@@ -407,7 +407,7 @@ fn pulse_rejects_mixing_ease_with_transition_mode() {
 
 #[test]
 fn nested_warp_chains_with_coord_driven_shape_params_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space coarse = warp(by: (
         (noise2(uv * 4.0 + (time * 0.1, 0.0)) - 0.5) * 0.04,
         (noise2(uv * 4.0 + (11.0, time * 0.1)) - 0.5) * 0.03
@@ -440,7 +440,7 @@ fn nested_warp_chains_with_coord_driven_shape_params_compile() {
 
 #[test]
 fn warp_rejects_non_vec2_displacement_with_clear_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     in space warp(by: 0.03) {
         compose {
             circle(at: center, radius: 0.2) |> fill(#ffffff)
@@ -531,7 +531,7 @@ fn showcase_basic_sine_phase_example_compiles() {
 
 #[test]
 fn field_layer_forms_compile_with_grey_bridge() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let wobble = field (time * 0.25)
   let fog = layer grey(wobble)
 
@@ -553,7 +553,7 @@ fn field_layer_forms_compile_with_grey_bridge() {
 
 #[test]
 fn color_params_and_optional_scalar_ranges_compile_and_emit_manifest_defaults() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   param accent: color = rgb(0.1, 0.2, 0.3)
   param spread: f32 = 0.35
 
@@ -609,7 +609,7 @@ fn color_params_and_optional_scalar_ranges_compile_and_emit_manifest_defaults() 
 
 #[test]
 fn glow_and_shadow_accept_dynamic_color_expressions() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     param tint: color = rgb(0.12, 0.56, 0.92)
     let pulse = wave(period: 2s, shape: sine, range: 0.55 .. 1.0)
 
@@ -640,7 +640,7 @@ fn glow_and_shadow_accept_dynamic_color_expressions() {
 
 #[test]
 fn typed_scalar_and_bool_params_emit_manifest_defaults() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     param steps: i32 = 4 in 1 .. 9
     param bands: u32 = 6 in 1 .. 12
     param enabled: bool = true
@@ -712,7 +712,7 @@ fn typed_scalar_and_bool_params_emit_manifest_defaults() {
 
 #[test]
 fn param_type_info_is_present_in_manifest() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     param speed: f32 = 1.0
     param tint: color = rgb(1.0, 0.5, 0.0)
     param stops: array<f32, 3> = [0.2, 0.5, 0.8]
@@ -773,7 +773,7 @@ fn param_type_info_is_present_in_manifest() {
 
 #[test]
 fn dynamic_array_param_type_has_no_size() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     param weights: array<f32> = []
 
     compose {
@@ -859,7 +859,7 @@ fn dynamic_array_example_emits_readonly_storage_buffer_access() {
 
 #[test]
 fn dynamic_array_non_empty_default_populates_manifest() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     param weights: array<f32> = [0.25, 0.5, 0.75]
 
     compose {
@@ -906,7 +906,7 @@ fn dynamic_array_non_empty_default_populates_manifest() {
 
 #[test]
 fn layer_form_rejects_scalar_without_bridge() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let bad = layer 0.5
   compose {
     bad
@@ -932,7 +932,7 @@ fn layer_form_rejects_scalar_without_bridge() {
 
 #[test]
 fn wave_saw_with_reversed_range_compiles_with_normalization_warning() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let drift = wave(period: 4s, shape: saw, phase: 0.25, range: 0.3 .. -0.3)
   compose {
     circle(at: center + (drift, 0), radius: 18px) |> fill(#ffffff)
@@ -958,7 +958,7 @@ fn wave_saw_with_reversed_range_compiles_with_normalization_warning() {
 
 #[test]
 fn rand_with_reversed_range_is_rejected_outside_scatter() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let jitter = rand(range: 1.0 .. -1.0)
   compose {
     circle(at: center + (jitter * 0.05, 0), radius: 14px) |> fill(#ffffff)
@@ -984,7 +984,7 @@ fn rand_with_reversed_range_is_rejected_outside_scatter() {
 
 #[test]
 fn wrap_with_reversed_range_compiles_with_normalization_warning() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let x = wrap(x: time, range: 0.8 .. -0.2)
   compose {
     circle(at: (x, 0.5), radius: 10px) |> fill(#ffffff)
@@ -1010,7 +1010,7 @@ fn wrap_with_reversed_range_compiles_with_normalization_warning() {
 
 #[test]
 fn cross_kind_distance_and_coverage_arithmetic_is_rejected() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let d = field(0.2)
     let c = wave(period: 2s, shape: sine, range: 0.0 .. 1.0)
     let bad = d + c
@@ -1040,7 +1040,7 @@ fn cross_kind_distance_and_coverage_arithmetic_is_rejected() {
 
 #[test]
 fn scalar_kind_promotion_allows_scalar_with_mask_arithmetic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let c = wave(period: 2s, shape: triangle, range: 0.0 .. 1.0)
     let biased = c * 0.4 + 0.2
     compose {
@@ -1061,7 +1061,7 @@ fn scalar_kind_promotion_allows_scalar_with_mask_arithmetic() {
 
 #[test]
 fn rand_dynamic_range_is_rejected_outside_scatter() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let low = 0.2 + time * 0.0
     let high = 0.8 - time * 0.0
     let jitter = rand(range: low .. high)
@@ -1089,7 +1089,7 @@ fn rand_dynamic_range_is_rejected_outside_scatter() {
 
 #[test]
 fn wave_dynamic_range_endpoints_are_preserved() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let low = 0.15 + time * 0.0
     let high = 0.85 - time * 0.0
     let drift = wave(period: 3s, shape: saw, phase: 0.1, range: low .. high)
@@ -1123,7 +1123,7 @@ fn wave_dynamic_range_endpoints_are_preserved() {
 
 #[test]
 fn wrap_dynamic_range_endpoints_are_preserved() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let low = 0.2 + time * 0.0
     let high = 0.8 - time * 0.0
     let x = wrap(x: time * 0.25, range: low .. high)
@@ -1155,7 +1155,7 @@ fn wrap_dynamic_range_endpoints_are_preserved() {
 
 #[test]
 fn wave_accepts_explicit_numeric_list_argument() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let drift = wave(period: 4s, shape: saw, phase: 0.25, range: (0.3, -0.3))
   compose {
     circle(at: center + (drift, 0), radius: 18px) |> fill(#ffffff)
@@ -1175,7 +1175,7 @@ fn wave_accepts_explicit_numeric_list_argument() {
 
 #[test]
 fn compose_unknown_names_do_not_emit_block_level_fallback_error() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   compose {
         reflection_fill |> blend(add)
         reflection_rim |> blend(add)
@@ -1214,7 +1214,7 @@ fn compose_unknown_names_do_not_emit_block_level_fallback_error() {
 
 #[test]
 fn top_level_no_layer_diagnostic_anchors_to_canvas_name_span() {
-    let input = r#"canvas anchor_test(uv: coord, time: signal) -> color {
+    let input = r#"canvas anchor_test(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let pulse = wave(period: 1s, shape: sine, range: 0.2 .. 0.8)
 }
 "#;
@@ -1243,7 +1243,7 @@ fn top_level_no_layer_diagnostic_anchors_to_canvas_name_span() {
 
 #[test]
 fn scatter_region_lifecycle_and_instance_index01_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
   let meteors = scatter 8 within region((0, 0) .. (1, 0.55)) seed 7 strategy compact
                       lifetime meteor: 0.7s respawn every rand(5s .. 9s) {
         let drift = wave(period: 8s, shape: saw, phase: meteor.index01, range: 0.2 .. -0.2)
@@ -1270,7 +1270,7 @@ fn scatter_region_lifecycle_and_instance_index01_compile() {
 
 #[test]
 fn centered_space_and_rotate_around_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space stage = centered(aspect: preserve)
     let spin = wave(period: 3s, shape: sine, range: -20deg .. 20deg)
 
@@ -1294,7 +1294,7 @@ fn centered_space_and_rotate_around_compile() {
 
 #[test]
 fn field_stdlib_noise_fbm_wrap_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let p = center + (time * 0.05, 0.0)
     let n = field noise2(p)
     let f = field fbm(p, octaves: 5)
@@ -1319,7 +1319,7 @@ fn field_stdlib_noise_fbm_wrap_compile() {
 
 #[test]
 fn layer_color_expression_math_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let ripple = field wave(period: 5s, shape: saw, range: 0.2 .. 0.9)
     let blow = layer (#224466 / (0.1 - ripple))
 
@@ -1341,7 +1341,7 @@ fn layer_color_expression_math_compiles() {
 
 #[test]
 fn gradient_supports_vector_direction() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let hills = (circle(at: (0.3, 0.1), radius: 0.4) | circle(at: (0.75, 0.05), radius: 0.45))
               |> smooth(0.08)
 
@@ -1369,7 +1369,7 @@ fn gradient_supports_vector_direction() {
 
 #[test]
 fn gradient_supports_multiple_stops() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let hills = (circle(at: (0.3, 0.1), radius: 0.4) | circle(at: (0.75, 0.05), radius: 0.45))
               |> smooth(0.08)
 
@@ -1399,7 +1399,7 @@ fn gradient_supports_multiple_stops() {
 
 #[test]
 fn gradient_supports_radial_kind() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let orb = circle(at: center, radius: 0.35)
 
     compose {
@@ -1429,7 +1429,7 @@ fn gradient_supports_radial_kind() {
 
 #[test]
 fn gradient_supports_paramized_stops_and_colors() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     param split: f32 = 0.42 in 0.0 .. 1.0
     param warm: f32 = 0.78 in 0.0 .. 1.0
     let orb = circle(at: center, radius: 0.35)
@@ -1461,7 +1461,7 @@ fn gradient_supports_paramized_stops_and_colors() {
 
 #[test]
 fn gradient_supports_legacy_start_end_syntax() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let orb = circle(at: center, radius: 0.3)
 
     compose {
@@ -1482,7 +1482,7 @@ fn gradient_supports_legacy_start_end_syntax() {
 
 #[test]
 fn dynamic_shape_fill_color_expression_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let pulse = wave(period: 2s, shape: triangle, range: 0.2 .. 1.0)
     compose {
         circle(at: center, radius: 0.22) |> fill(rgb(r: pulse, g: 0.25, b: 0.8))
@@ -1506,7 +1506,7 @@ fn local_function_can_shadow_stdlib_noise2_wrapper() {
     return 0.25
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let n = noise2(uv)
     compose {
         circle(at: center, radius: 0.12 + n * 0.08) |> fill(#66aaff)
@@ -1534,7 +1534,7 @@ fn wobble(x: f32, gain: f32) -> f32 {
     return x * gain
 }
 
-canvas t(uv: coord, time: signal) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = wobble(0.2)
     let b = wobble(0.2, 0.8)
     compose {
@@ -1555,7 +1555,7 @@ canvas t(uv: coord, time: signal) -> color {
 
 #[test]
 fn wave_triangle_and_square_shapes_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let tri = wave(period: 3s, shape: triangle, range: -0.2 .. 0.2)
     let sq = wave(period: 2s, shape: square, range: 0.1 .. 0.3)
 
@@ -1577,7 +1577,7 @@ fn wave_triangle_and_square_shapes_compile() {
 
 #[test]
 fn wave_supports_transition_and_mode_phase_shaping() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let pulse_a = wave(period: 2.2s, shape: sine, transition: quad, mode: in_out, range: 0.05 .. 0.18)
     let pulse_b = wave(period: 2.2s, shape: triangle, ease: out_in_cubic, range: 0.02 .. 0.08)
 
@@ -1599,7 +1599,7 @@ fn wave_supports_transition_and_mode_phase_shaping() {
 
 #[test]
 fn wave_rejects_mixing_ease_with_transition_mode() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let bad = wave(period: 2s, shape: sine, ease: out_quad, transition: quad, mode: out, range: 0.05 .. 0.16)
     compose {
         circle(at: center, radius: bad) |> fill(#ffffff)
@@ -1625,7 +1625,7 @@ fn wave_rejects_mixing_ease_with_transition_mode() {
 
 #[test]
 fn centered_fit_and_fill_modes_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space framed_fit = centered(aspect: fit)
     space framed_fill = centered(aspect: fill)
 
@@ -1653,7 +1653,7 @@ fn centered_fit_and_fill_modes_compile() {
 
 #[test]
 fn color_component_selectors_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let base = rgb(r: 0.2, g: 0.4, b: 0.8)
     let drift = wave(period: 2s, shape: triangle, range: 0.1 .. 0.9)
 
@@ -1679,7 +1679,7 @@ fn color_component_selectors_compile() {
 
 #[test]
 fn noise2_and_fbm_value_noise_paths_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let p = center + (time * 0.07, 0.0)
     let n = field noise2(p)
     let f = field fbm(p, octaves: 6, lacunarity: 2.1, gain: 0.52)
@@ -1702,7 +1702,7 @@ fn noise2_and_fbm_value_noise_paths_compile() {
 
 #[test]
 fn selector_chain_reports_scalar_terminal_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
       let base = rgb(r: 0.2, g: 0.4, b: 0.8)
       let bad = base.r.x
 
@@ -1730,7 +1730,7 @@ fn selector_chain_reports_scalar_terminal_diagnostic() {
 
 #[test]
 fn selector_unknown_component_reports_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
       let base = rgb(r: 0.2, g: 0.4, b: 0.8)
       let bad = base.q
 
@@ -1758,7 +1758,7 @@ fn selector_unknown_component_reports_diagnostic() {
 
 #[test]
 fn unknown_name_short_circuits_dependent_diagnostics() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = missing_name
     let b = a + 1.0
 
@@ -1790,7 +1790,7 @@ fn unknown_name_short_circuits_dependent_diagnostics() {
 
 #[test]
 fn compose_pipe_blend_syntax_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: (0.42, 0.50), radius: 0.18) |> fill(#ff7dbb)
     let b = circle(at: (0.58, 0.50), radius: 0.18) |> fill(#6ba6ff)
 
@@ -1814,7 +1814,7 @@ fn compose_pipe_blend_syntax_compiles() {
 
 #[test]
 fn compose_legacy_blend_suffix_is_rejected() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: (0.42, 0.50), radius: 0.18) |> fill(#ff7dbb)
 
     compose {
@@ -1842,7 +1842,7 @@ fn compose_legacy_blend_suffix_is_rejected() {
 
 #[test]
 fn color_arithmetic_invalid_operand_mix_reports_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let c = rgb(r: 0.2, g: 0.4, b: 0.8)
     let bad = c + center
 
@@ -1871,7 +1871,7 @@ fn color_arithmetic_invalid_operand_mix_reports_diagnostic() {
 
 #[test]
 fn explain_includes_centered_and_noise_receipts() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space stage = centered(aspect: fit)
     let n = field noise2(center + (time * 0.03, 0.0))
 
@@ -1908,7 +1908,7 @@ fn explain_includes_centered_and_noise_receipts() {
 
 #[test]
 fn ambient_selector_reports_component_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let bad = center.z
 
     compose {
@@ -1935,7 +1935,7 @@ fn ambient_selector_reports_component_diagnostic() {
 
 #[test]
 fn ambient_selector_chain_reports_scalar_terminal_diagnostic() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let bad = center.x.r
 
     compose {
@@ -1986,7 +1986,7 @@ fn conformance_file_has_no_confusable_grave_or_smart_quotes() {
 
 #[test]
 fn new_effects_soften_dilate_erode_inner_glow_bevel_compile() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let core = circle(at: center, radius: 0.11)
     let ring = core |> dilate(radius: 0.03) |> erode(radius: 0.01)
 
@@ -2010,7 +2010,7 @@ fn new_effects_soften_dilate_erode_inner_glow_bevel_compile() {
 
 #[test]
 fn blur_merge_explain_reports_exact_sqrt_radius() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let haze = circle(at: center, radius: 0.2)
         |> fill(#dbeafe)
         |> blur(radius: 0.01)
@@ -2040,7 +2040,7 @@ fn blur_merge_explain_reports_exact_sqrt_radius() {
 
 #[test]
 fn wide_effects_emit_non_fatal_warnings() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let a = circle(at: (0.45, 0.5), radius: 0.16)
     let b = box(at: (0.55, 0.5), size: (0.26, 0.18)) |> round(radius: 0.05)
     let joined = (a | b) |> smooth(radius: 0.04)
@@ -2073,7 +2073,7 @@ fn wide_effects_emit_non_fatal_warnings() {
 fn math_builtins_compile_and_produce_valid_wgsl() {
     // Exercises all newly added math builtins in a single canvas.
     let input = r#"
-canvas math_builtins(uv: coord, time: signal) -> color {
+canvas math_builtins(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let sample_value = sin(uv.x)
     let c = cos(uv.y)
     let at = atan(1.0)
@@ -2141,7 +2141,7 @@ canvas math_builtins(uv: coord, time: signal) -> color {
 
 #[test]
 fn angle_constructor_supports_turn_units() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     let dir = angle(0.25turn)
 
     compose {
@@ -2162,7 +2162,7 @@ fn angle_constructor_supports_turn_units() {
 
 #[test]
 fn param_defaults_accept_px_literals() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     param stroke_w: f32 = 3px
 
     compose {
@@ -2183,7 +2183,7 @@ fn param_defaults_accept_px_literals() {
 
 #[test]
 fn layer_mask_receiver_compiles() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let base = circle(at: center, radius: 0.15) |> fill(#ffffff)
     let fade = smoothstep(lo: 0.2, hi: 0.8, x: time)
 
@@ -2205,7 +2205,7 @@ fn layer_mask_receiver_compiles() {
 
 #[test]
 fn ramp_accepts_in_out_ease_alias() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let draw = ramp(from: 0s, over: 1s, ease: in_out)
 
     compose {
@@ -2226,7 +2226,7 @@ fn ramp_accepts_in_out_ease_alias() {
 
 #[test]
 fn motion_blur_rejects_velocity_and_accepts_shutter_only() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let base = circle(at: center + (time * 0.05, 0.0), radius: 0.06) |> fill(#ffffff)
 
     compose {
@@ -2251,7 +2251,7 @@ fn motion_blur_rejects_velocity_and_accepts_shutter_only() {
         "expected migration diagnostic for velocity removal\nstderr:\n{stderr}"
     );
 
-    let ok_input = r#"canvas t(uv: coord, time: signal) -> color {
+    let ok_input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let base = circle(at: center + (time * 0.05, 0.0), radius: 0.06) |> fill(#ffffff)
 
     compose {
@@ -2272,7 +2272,7 @@ fn motion_blur_rejects_velocity_and_accepts_shutter_only() {
 
 #[test]
 fn explain_reports_instruction_attribution_for_features() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
       space warped = rotate(12deg) . scale(1.0 + uv.y * 1.5)
       let ring = circle(at: (0.5, 0.5), radius: 0.18) |> stroke(2px)
         compose {
@@ -2307,7 +2307,7 @@ fn explain_reports_instruction_attribution_for_features() {
 fn explain_feature_label_pragma_renames_attribution_rows() {
     let input = r#"#pragma explain.label.motion_blur = camera_smear
 
-    canvas t(uv: coord, time: signal) -> color {
+    canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
       let base = circle(at: center, radius: 0.2) |> fill(#ffffff)
 
       compose {
@@ -2334,7 +2334,7 @@ fn explain_feature_label_pragma_renames_attribution_rows() {
 
 #[test]
 fn explain_reports_scatter_and_pattern_filtering_attribution() {
-    let input = r#"canvas t(uv: coord, time: signal) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let guide = lines(along: x, every: 0.08uv)
 
     let stars = scatter 24 within screen seed 7 strategy compact {
@@ -2372,7 +2372,7 @@ fn explain_reports_scatter_and_pattern_filtering_attribution() {
 
 #[test]
 fn integer_parameter_metadata_preserves_exact_defaults() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
         param identity: u32 = 16777217
         param signed: i32 = -16777217
         param counts: array<u32, 2> = [16777217, 4294967295]

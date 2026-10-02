@@ -5,7 +5,7 @@ use common::{assert_compile_fails_with, assert_compiles};
 
 #[test]
 fn path_length_property_is_typed_as_scalar() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let p = path {
     move (0.1, 0.2)
     arc center: (0.4, 0.5) radius: 0.1 sweep: 180deg
@@ -22,7 +22,7 @@ fn path_length_property_is_typed_as_scalar() {
 
 #[test]
 fn path_channel_member_is_typed_for_placeholder_lowering() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let p = path {
     move (0.1, 0.2)
     arc center: (0.4, 0.5) radius: 0.1 sweep: 180deg
@@ -39,7 +39,7 @@ fn path_channel_member_is_typed_for_placeholder_lowering() {
 
 #[test]
 fn path_point_at_is_typed_for_placeholder_lowering() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let p = path {
     move (0.1, 0.2)
     arc center: (0.4, 0.5) radius: 0.1 sweep: 180deg
@@ -56,7 +56,7 @@ fn path_point_at_is_typed_for_placeholder_lowering() {
 
 #[test]
 fn path_point_at_rejects_non_path_argument() {
-    let input = r#"canvas t(uv: coord) -> color {
+    let input = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
   let q = point_at(path: uv, s: 0.5)
   compose {
     circle(at: q, radius: 0.05) |> fill(#ffffff)

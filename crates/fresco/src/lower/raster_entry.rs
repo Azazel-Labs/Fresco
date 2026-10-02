@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn single_pass_raster_entry_omits_redundant_pass_entry_wrapper() {
-        let src = r#"canvas t(uv: coord, time: signal) -> color {
+        let src = r#"canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     compose {
         fill(#0e1420)
         circle(at: (0.5, 0.5), radius: 0.2) |> fill(#ffffff)

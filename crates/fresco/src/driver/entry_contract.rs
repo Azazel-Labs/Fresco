@@ -3,7 +3,7 @@ use crate::ast::{Arg, EntryParam, Expr, FnDecl, Program, RasterEntry, Spanned, S
 use crate::diag::Diag;
 use std::collections::{HashMap, HashSet};
 
-pub(super) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
+pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
     let mut registrations = HashMap::new();
     for interface in &program.interfaces {
         if let Some((kind, method)) = &interface.entry {

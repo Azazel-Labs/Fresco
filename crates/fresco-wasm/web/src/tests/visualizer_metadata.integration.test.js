@@ -5,7 +5,7 @@ import initWasm, { fresco_compile_visualizer } from "../../pkg/fresco_wasm.js";
 
 import enginePolicy from "../../../../../tests/render-policy/engine/engine.fr?raw";
 
-const SPACE_SOURCE = `canvas badge(uv: coord, time: signal) -> color {
+const SPACE_SOURCE = `canvas badge(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     space stage = centered(aspect: preserve)  // @viz
 
     compose {
@@ -16,7 +16,7 @@ const SPACE_SOURCE = `canvas badge(uv: coord, time: signal) -> color {
 }
 `;
 
-const SHAPE_SOURCE = `canvas badge(uv: coord, time: signal) -> color {
+const SHAPE_SOURCE = `canvas badge(ctx: CanvasContext) -> color { let uv = context(coord); let time = context(time);
     let b = box(at: (0.5, 0.5), size: (0.30uv, 0.20uv)) |> round(0.04uv)  // @viz
 
     compose {

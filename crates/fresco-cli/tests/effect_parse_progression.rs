@@ -37,7 +37,7 @@ effect tint_red(amount: f32) point {
     fill(rgba(r: amount, g: 0.0, b: 0.0, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         circle(at: center, radius: 50px) |> fill(#ffffff)
     }
@@ -56,7 +56,7 @@ effect edge_glow(strength: f32) local {
     fill(rgba(r: strength, g: strength, b: 0.0, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -75,7 +75,7 @@ effect neighborhood(radius: f32) local(radius * 2.0) {
     fill(rgba(r: 0.0, g: radius, b: 0.5, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -94,7 +94,7 @@ effect full_pass(strength: f32) global {
     fill(rgba(r: strength, g: 0.0, b: 0.5, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -115,7 +115,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -136,7 +136,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a) when a > b
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -157,7 +157,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a) within 0.5 / 255.0
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -176,7 +176,7 @@ effect white_fill() point {
     fill(#ffffff)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000)
     }
@@ -197,7 +197,7 @@ effect bad_effect(x: f32) {
     fill(#ffffff)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -217,7 +217,7 @@ effect bright(amount: f32) point {
     fill(rgba(r: amount, g: amount, b: amount, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         bright(0.5)
     }
@@ -236,7 +236,7 @@ effect tint_blue(amount: f32) point {
     fill(rgba(r: 0.0, g: 0.0, b: amount, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         circle(at: center, radius: 50px) |> fill(#ff0000) |> tint_blue(0.8)
     }
@@ -254,7 +254,7 @@ effect tint_blue(amount: f32) point {
     layer rgba(r: self.r, g: self.g, b: amount, a: self.a)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         circle(at: center, radius: 50px) |> fill(rgba(r: 0.125, g: 0.25, b: 0.5, a: 1.0)) |> tint_blue(0.8)
     }
@@ -274,7 +274,7 @@ effect chromatic_split(spread: f32) local(spread) {
     layer rgba(r: left.r, g: self.g, b: right.b, a: self.a)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         circle(at: center, radius: 50px) |> fill(#e8d5b7) |> chromatic_split(0.03)
     }
@@ -298,7 +298,7 @@ effect soft_edge(r: f32) local(r) {
     fill(rgba(r: 0.5, g: r, b: 0.5, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         soft_edge(0.1)
     }
@@ -317,7 +317,7 @@ effect tinted(r: f32, g: f32, b: f32) point {
     fill(rgba(r: r, g: g, b: b, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         tinted(1.0, 0.5, 0.0)
     }
@@ -338,7 +338,7 @@ effect two_arg(x: f32, y: f32) point {
     fill(rgba(r: x, g: y, b: 0.0, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         two_arg(0.5)
     }
@@ -358,7 +358,7 @@ effect blur(radius: f32) local(radius) {
     fill(rgba(r: 0.5, g: 0.5, b: 0.5, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -380,7 +380,7 @@ effect my_fx(y: f32) point {
     fill(rgba(r: 0.0, g: y, b: 0.0, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -399,7 +399,7 @@ effect bad_point(r: f32) point {
     circle(at: center, radius: 20px) |> fill(#ffffff) |> blur(r * 2.0)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -421,7 +421,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(c)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -441,7 +441,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a) within a
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -461,7 +461,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a) within 0.0
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose { fill(#000000) }
 }
 "#,
@@ -478,7 +478,7 @@ fn blur_compose_fill_regression() {
     assert_compiles_valid_wgsl(
         "blur_compose_fill_regression",
         r#"
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     let sample_value = circle(at: center, radius: 50px)
     compose {
         sample_value |> fill(#ff0000) |> blur(4.0)
@@ -523,7 +523,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000) |> grain(0.1) |> grain(0.2)
     }
@@ -546,7 +546,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a) when a > b
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000) |> grain(0.2) |> grain(0.8)
     }
@@ -569,7 +569,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a) when a > b
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000) |> grain(0.8) |> grain(0.2)
     }
@@ -591,7 +591,7 @@ effect grain(amount: f32) point {
     rewrite grain(a) compose grain(b) => grain(a)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000) |> grain(0.1) |> grain(0.5)
     }
@@ -616,7 +616,7 @@ effect bright(amount: f32) point {
     fill(rgba(r: amount, g: amount, b: amount, a: 1.0))
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         fill(#000000) |> grain(0.1) |> bright(0.9)
     }
@@ -644,7 +644,7 @@ fn apply_effect(f: fn(f32)->layer, v: f32) -> layer {
     f(v)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         apply_effect(shimmer, 0.5)
     }
@@ -668,7 +668,7 @@ fn apply_effect(f: fn(f32)->layer, v: f32) -> layer {
     f(v)
 }
 
-canvas t(uv: coord) -> color {
+canvas t(ctx: CanvasContext) -> color { let uv = context(coord);
     compose {
         apply_effect(shimmer, 0.5)
     }

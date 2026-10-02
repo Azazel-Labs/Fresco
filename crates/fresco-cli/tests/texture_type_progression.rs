@@ -32,7 +32,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let r = orm.at(uv).roughness
     compose {
@@ -61,7 +61,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let r = orm.at(uv).roughness
     compose {
@@ -107,7 +107,7 @@ texture_type Packed {
     a: emissive
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param packed: texture<Packed> = "packed.png"
     let g = packed.at(uv).g
     compose {
@@ -130,7 +130,7 @@ canvas test(uv: coord) -> color {
 #[test]
 fn plain_texture_param_requires_explicit_sampling() {
     let src = r#"
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param albedo: texture = "albedo.png"
     compose {
         albedo.at(uv)
@@ -152,7 +152,7 @@ canvas test(uv: coord) -> color {
 #[test]
 fn error_unknown_texture_type() {
     let src = r#"
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<NoSuchType> = "orm.png"
     compose {
         circle(at: center, radius: 0.3) |> fill(#ffffff)
@@ -185,7 +185,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let v = orm.at(uv).emissive
     compose {
@@ -219,7 +219,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let sampled = orm.at(uv)
     let occ = sampled.occlusion
@@ -247,7 +247,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let rough = image(orm, at: uv * 2.0).roughness
     compose {
@@ -274,7 +274,7 @@ texture_type AlbedoRGB -> color {
     return rgb(r, g, b)
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param albedo: texture<AlbedoRGB> = "albedo.png"
     let sampled = albedo.at(uv)
     compose {
@@ -293,7 +293,7 @@ canvas test(uv: coord) -> color {
 #[test]
 fn plain_texture_explicit_uv_sample_compiles() {
     let src = r#"
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param albedo: texture = "albedo.png"
     compose {
         image(albedo, at: uv * 3.0)
@@ -319,7 +319,7 @@ texture_type NormalGL -> vec3 {
     return normalize(vec3(nx, ny, nz))
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param normal_tex: texture<NormalGL> = "normal.png"
     let normal = normal_tex.at(uv)
     compose {
@@ -344,7 +344,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let rough = orm.at(uv * 2.0).roughness
     compose {
@@ -369,7 +369,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let sampled = orm.at(uv)
     let rough = sampled.roughness
@@ -390,7 +390,7 @@ canvas test(uv: coord) -> color {
 #[test]
 fn plain_texture_at_helper_syntax_compiles() {
     let src = r#"
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param albedo: texture = "albedo.png"
     compose {
         albedo.at(uv * 3.0)
@@ -414,7 +414,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let rough = orm.roughness
     compose {
@@ -450,7 +450,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let rough = orm.roughness
     compose {
@@ -477,7 +477,7 @@ texture_type ORM {
     b: metallic
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param orm: texture<ORM> = "orm.png"
     let rough = orm.roughness
     compose {
@@ -496,7 +496,7 @@ canvas test(uv: coord) -> color {
 #[test]
 fn tex_at_helper_missing_coordinate_has_texture_specific_diagnostic() {
     let src = r#"
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param albedo: texture = "albedo.png"
     compose {
         albedo.at()
@@ -527,7 +527,7 @@ texture_type Packed {
     b: metallic = unpack_snorm8(raw, byte: 2) * 0.5 + 0.5
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param packed: texture<Packed> = "packed.png"
     let sample_value = packed.at(uv)
     compose {
@@ -546,7 +546,7 @@ canvas test(uv: coord) -> color {
 #[test]
 fn bit_pack_unpack_helpers_compile() {
     let src = r#"
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     let packed = pack_unorm8x4(0.2, 0.4, 0.8, 1.0)
     let b = unpack_unorm8(packed, byte: 2)
     compose {
@@ -570,7 +570,7 @@ texture_type PackedRG {
     g: high_bits = bit_extract(texel.r * 255.0 + texel.g * 65535.0, lsb: 8, bits: 8) / 255.0
 }
 
-canvas test(uv: coord) -> color {
+canvas test(ctx: CanvasContext) -> color { let uv = context(coord);
     param packed: texture<PackedRG> = "packed.png"
     let sample_value = packed.at(uv)
     compose {
