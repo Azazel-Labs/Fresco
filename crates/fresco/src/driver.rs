@@ -733,11 +733,19 @@ pub fn compile_visualizer_with_files(
         semantic_type: &variant.semantic_type,
         range_hint,
     };
+    // Raster entries always bind an engine context record; the visualizer
+    // samples through that record rather than a positional entry ABI.
+    let entry_context = variant.entry_context.as_ref().ok_or_else(|| {
+        vec![file_failure(
+            filename,
+            "visualizer requires an engine-registered entry context",
+        )]
+    })?;
     let shaders = viz::build_shaders(
         &variant.wgsl,
         &variant.manifest,
         &visualizer_spec,
-        variant.entry_context.as_ref(),
+        entry_context,
     )
     .map_err(|message| vec![file_failure(filename, message)])?;
     let metadata = viz::build_metadata(&visualizer_spec, expr_text);

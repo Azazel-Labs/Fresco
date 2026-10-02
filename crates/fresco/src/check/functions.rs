@@ -4619,14 +4619,7 @@ pub fn check_with_workbook(
     )
     .entered();
     let mut prep_diags = Vec::new();
-    let contract = if matches!(entry.kind, RootEntryKind::Raster) {
-        crate::context::raster_contract(&entry.entry_kind, interfaces, structs)?
-    } else {
-        None
-    };
-    if contract.is_none() {
-        validate_normalized_root_entry_params(entry, &mut prep_diags);
-    }
+    let contract = crate::context::required_raster_contract(entry, interfaces, structs)?;
     let mut enum_defs = HashMap::new();
     let mut struct_defs = HashMap::new();
 
@@ -4968,21 +4961,8 @@ pub fn check_with_workbook(
 
     c.check_effect_decls(effects);
 
-    if let Some(contract) = contract {
-        c.bind_entry_context(entry, contract);
-        c.append_context_components();
-    } else {
-        for param in &entry.params {
-            match param.ty_name.as_str() {
-                "coord" => {
-                    c.bind(param.name.clone(), Value::Vec2((Sx::CoordX, Sx::CoordY)));
-                }
-                other => {
-                    c.bind_runtime_channel_param(&param.name, other);
-                }
-            }
-        }
-    }
+    c.bind_entry_context(entry, contract);
+    c.append_context_components();
 
     c.validate_registered_function_overloads();
 

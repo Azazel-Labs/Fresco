@@ -2780,7 +2780,7 @@ impl Checker {
 
                 self.diags.push(
                     Diag::error(e.span.clone(), format!("unknown name `{name}`"))
-                        .with_help("use names declared in this entry scope (a standalone raster entry declares one `: coord` parameter and optional `: signal` / `: delta` / `: resolution` parameters)"),
+                        .with_help("use names declared in this scope; engine-provided inputs are read through the entry's `@context` parameter (for example `ctx.uv`) or `context(<semantic>)`, and helpers receive them as explicit arguments"),
                 );
                 Some(Value::Error)
             }

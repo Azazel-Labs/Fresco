@@ -369,8 +369,8 @@ pub fn example_engine_sources_json() -> String {
 /// Compile a multi-file Fresco program supplied as a virtual file system.
 /// `files` must be a JS object mapping virtual path strings to source strings
 /// (e.g. `{ "main.fr": "...", "lib.fr": "..." }`).  `entrypoint` must be one
-/// of those keys. It may declare entries (engine-registered `@entry` kinds,
-/// standalone raster entries, or surfaces) or only helpers; entry-free
+/// of those keys. It may declare entries (engine-registered `@entry` kinds
+/// or surfaces) or only helpers; entry-free
 /// sources compile but produce no previewable root entry.
 #[wasm_bindgen]
 pub fn compile_fresco_bundle(files: JsValue, entrypoint: &str, include_explain: bool) -> JsValue {

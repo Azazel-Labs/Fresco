@@ -1140,20 +1140,8 @@ pub fn check(
         enum_count = enums.len()
     )
     .entered();
-    info!("checker phase start: validate_entry_template_params");
     let mut prep_diags = Vec::new();
-    let contract = if matches!(entry.kind, RootEntryKind::Raster) {
-        crate::context::raster_contract(&entry.entry_kind, interfaces, structs)?
-    } else {
-        None
-    };
-    if contract.is_none() {
-        validate_normalized_root_entry_params(entry, &mut prep_diags);
-    }
-    info!(
-        prep_diags = prep_diags.len(),
-        "checker phase done: validate_normalized_root_entry_params"
-    );
+    let contract = crate::context::required_raster_contract(entry, interfaces, structs)?;
     let mut enum_defs = HashMap::new();
     let mut struct_defs = HashMap::new();
 
@@ -1539,21 +1527,8 @@ pub fn check(
         params = entry.params.len(),
         "checker phase start: bind_entry_params"
     );
-    if let Some(contract) = contract {
-        c.bind_entry_context(entry, contract);
-        c.append_context_components();
-    } else {
-        for param in &entry.params {
-            match param.ty_name.as_str() {
-                "coord" => {
-                    c.bind(param.name.clone(), Value::Vec2((Sx::CoordX, Sx::CoordY)));
-                }
-                other => {
-                    c.bind_runtime_channel_param(&param.name, other);
-                }
-            }
-        }
-    }
+    c.bind_entry_context(entry, contract);
+    c.append_context_components();
     info!("checker phase done: bind_entry_params");
 
     info!("checker phase start: validate_function_overloads");
@@ -1952,8 +1927,8 @@ mod tests {
     use super::{check, create_checker_for_surface, validate_conformance_method_bodies};
     use crate::ast::{
         ConformanceDecl, Expr, FnDecl, FnParam, InterfaceDecl, InterfaceMethodDecl,
-        NormalizedRootEntry, NormalizedRootEntryParam, RootEntryKind, RootEntryParamRole, Spanned,
-        TextureChannelDef, TextureTypeDecl,
+        NormalizedRootEntry, NormalizedRootEntryParam, RootEntryKind, Spanned, TextureChannelDef,
+        TextureTypeDecl,
     };
     use crate::check::CheckOptions;
 
@@ -1982,28 +1957,6 @@ mod tests {
         }
     }
 
-    fn normalized_root_entry_fixture(
-        name: &str,
-        param_name: &str,
-        ty_name: &str,
-    ) -> NormalizedRootEntry {
-        NormalizedRootEntry {
-            entry_kind: "canvas".into(),
-            kind: RootEntryKind::Raster,
-            name: name.to_string(),
-            name_span: span(0, 7),
-            params: vec![NormalizedRootEntryParam {
-                name: param_name.to_string(),
-                name_span: span(8, 10),
-                ty_name: ty_name.to_string(),
-                role: RootEntryParamRole::Primary,
-            }],
-            material_ty: None,
-            body: Vec::new(),
-            span: span(0, 15),
-        }
-    }
-
     fn channel(channel: &str, semantic_name: &str) -> TextureChannelDef {
         TextureChannelDef {
             channel: channel.to_string(),
@@ -2015,35 +1968,24 @@ mod tests {
     }
 
     #[test]
-    fn check_accepts_shared_entry_template() {
-        let entry = normalized_root_entry_fixture("preview", "uv", "coord");
-
-        let result = check(
-            &entry,
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &CheckOptions::default(),
-        );
-
-        assert!(
-            result.is_err(),
-            "expected shared entry template check to fail validation for an empty body"
-        );
-    }
-
-    #[test]
-    fn check_accepts_surface_style_shared_entry_template() {
-        let entry = normalized_root_entry_fixture("preview_surface", "sp", "surf");
+    fn check_requires_an_engine_registration_for_raster_entries() {
+        // Raster entries no longer fall back to a compiler-owned standalone
+        // ABI: checking an entry whose kind has no `@entry` registration is
+        // rejected with the same diagnostic entry binding reports.
+        let entry = NormalizedRootEntry {
+            entry_kind: "canvas".into(),
+            kind: RootEntryKind::Raster,
+            name: "preview".to_string(),
+            name_span: span(0, 7),
+            params: vec![NormalizedRootEntryParam {
+                name: "uv".to_string(),
+                name_span: span(8, 10),
+                ty_name: "coord".to_string(),
+            }],
+            material_ty: None,
+            body: Vec::new(),
+            span: span(0, 15),
+        };
 
         let diags = check(
             &entry,
@@ -2061,53 +2003,13 @@ mod tests {
             &[],
             &CheckOptions::default(),
         )
-        .expect_err("expected empty surface-style entry template to fail at body validation");
+        .expect_err("unregistered raster entry must be rejected");
 
-        assert!(diags.iter().all(|diag| {
-            !diag
-                .message
-                .contains("unsupported entry parameter `sp: surf`")
-        }));
         assert!(
             diags
                 .iter()
-                .all(|diag| !diag.message.contains("missing a primary input parameter"))
-        );
-    }
-
-    #[test]
-    fn check_accepts_template_decl_as_reusable_entry_contract() {
-        let entry = NormalizedRootEntry {
-            entry_kind: "canvas".into(),
-            kind: RootEntryKind::Raster,
-            name: "fullscreen_effect".to_string(),
-            name_span: span(0, 17),
-            params: Vec::new(),
-            material_ty: None,
-            body: Vec::new(),
-            span: span(0, 40),
-        };
-
-        let result = check(
-            &entry,
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &CheckOptions::default(),
-        );
-
-        assert!(
-            result.is_err(),
-            "expected template-backed entry contract to fail validation for an empty body"
+                .any(|diag| diag.message == "unregistered entry declaration `canvas`"),
+            "{diags:?}"
         );
     }
 

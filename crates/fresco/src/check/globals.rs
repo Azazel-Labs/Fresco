@@ -293,23 +293,6 @@ impl Checker {
         }
     }
 
-    /// Bind one root-entry/surface parameter to the runtime channel value,
-    /// resolved through the FR-authored `time()`/`delta_time()`/`resolution()`
-    /// accessor functions when the merged program defines them.
-    pub(crate) fn bind_runtime_channel_param(&mut self, param_name: &str, ty_name: &str) -> bool {
-        let value = match ty_name {
-            "signal" => Value::Scalar(self.runtime_time()),
-            "delta" => Value::Scalar(self.runtime_delta_time()),
-            "resolution" => {
-                let (x, y) = self.runtime_resolution();
-                Value::Vec2((x, y))
-            }
-            _ => return false,
-        };
-        self.bind(param_name.to_string(), value);
-        true
-    }
-
     /// Evaluate a zero-argument function body already resolved by name, used
     /// to call FR-authored accessor functions (`time()`, `delta_time()`,
     /// `resolution()`) from native compiler internals instead of hardcoding
@@ -372,10 +355,12 @@ impl Checker {
         out
     }
 
-    /// The `time` runtime value, resolved by calling the FR-authored `time()`
-    /// function when the merged program defines one. Standalone entries use
-    /// their existing entry ABI arguments; absence of an engine is not a
-    /// request to replace dynamic inputs with constants.
+    /// The `time` runtime value. Inside an entry or evaluation context it is
+    /// the context's `time` role; otherwise it resolves through the
+    /// FR-authored `time()` accessor when the merged program defines one, and
+    /// the host-provided [`hir::EntryInput`] when it does not. Absence of an
+    /// engine accessor is not a request to replace dynamic inputs with
+    /// constants.
     pub(crate) fn runtime_time(&mut self) -> Sx {
         self.runtime_scalar_channel("time", hir::EntryInput::Time, |cache| &mut cache.time)
     }

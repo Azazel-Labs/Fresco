@@ -86,6 +86,33 @@ impl EntryContext {
     }
 }
 
+/// The engine context contract a raster root entry is checked against.
+///
+/// Raster entries exist only after entry-contract binding resolved them
+/// against an engine `@entry` registration, so a missing registration here is
+/// reported as the same diagnostic that binding emits.
+pub(crate) fn required_raster_contract(
+    entry: &crate::ast::NormalizedRootEntry,
+    interfaces: &[InterfaceDecl],
+    structs: &[StructDecl],
+) -> Result<EntryContext, Vec<Diag>> {
+    let contract = match entry.kind {
+        crate::ast::RootEntryKind::Raster => {
+            raster_contract(&entry.entry_kind, interfaces, structs)?
+        }
+        crate::ast::RootEntryKind::Surface => None,
+    };
+    contract.ok_or_else(|| {
+        vec![
+            Diag::error(
+                entry.name_span.clone(),
+                format!("unregistered entry declaration `{}`", entry.entry_kind),
+            )
+            .with_help("the engine must declare @entry(declaration_name, method) on an interface"),
+        ]
+    })
+}
+
 pub fn raster_contract(
     entry_kind: &str,
     interfaces: &[InterfaceDecl],

@@ -534,23 +534,12 @@ pub enum RootEntryKind {
     Surface,
 }
 
-/// The semantic role of a root-entry parameter after normalization.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RootEntryParamRole {
-    Primary,
-    Signal,
-    Delta,
-    Resolution,
-    Other,
-}
-
-/// One normalized root-entry parameter with an explicit semantic role.
+/// One normalized root-entry parameter.
 #[derive(Debug, Clone)]
 pub struct NormalizedRootEntryParam {
     pub name: String,
     pub name_span: Span,
     pub ty_name: String,
-    pub role: RootEntryParamRole,
 }
 
 /// A first-class normalized root-entry node.
@@ -570,21 +559,6 @@ pub struct NormalizedRootEntry {
     pub span: Span,
 }
 
-/// Classifies a root-entry parameter's role from its declared type alone, so
-/// role is a function of what the parameter *is*, never of its position.
-/// Validation elsewhere in the checker treats this as the source of truth
-/// for "is this the primary/signal/delta/resolution parameter?" and only
-/// falls back to `ty_name` to distinguish `coord` from `surf` for messages.
-fn normalized_root_entry_param_role(ty_name: &str) -> RootEntryParamRole {
-    match ty_name.trim() {
-        "coord" | "surf" => RootEntryParamRole::Primary,
-        "signal" => RootEntryParamRole::Signal,
-        "delta" => RootEntryParamRole::Delta,
-        "resolution" => RootEntryParamRole::Resolution,
-        _ => RootEntryParamRole::Other,
-    }
-}
-
 fn normalized_root_entry_params(params: &[EntryParam]) -> Vec<NormalizedRootEntryParam> {
     params
         .iter()
@@ -592,7 +566,6 @@ fn normalized_root_entry_params(params: &[EntryParam]) -> Vec<NormalizedRootEntr
             name: param.name.clone(),
             name_span: param.name_span.clone(),
             ty_name: param.ty_name.clone(),
-            role: normalized_root_entry_param_role(&param.ty_name),
         })
         .collect()
 }

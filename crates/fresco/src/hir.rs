@@ -1544,7 +1544,10 @@ impl SxVec {
     }
 }
 
-/// Inputs provided by the standalone raster/surface entry ABI when no engine accessor is declared.
+/// Host-provided runtime inputs. Engine context roles (`@semantic(time)`,
+/// `@semantic(delta_time)`, `@semantic(resolution)`) bind to these, and code
+/// checked outside an entry context reads them when no engine accessor is
+/// declared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EntryInput {
     Time,

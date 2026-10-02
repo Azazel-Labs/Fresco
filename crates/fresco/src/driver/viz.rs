@@ -62,7 +62,7 @@ pub(crate) fn build_shaders(
     variant_wgsl: &str,
     manifest_text: &str,
     spec: &VisualizerSpec<'_>,
-    context: Option<&crate::context::EntryContext>,
+    context: &crate::context::EntryContext,
 ) -> Result<VisualizerShaderSet, String> {
     let fn_name = serde_json::from_str::<ManifestRoot>(manifest_text)
         .ok()
@@ -158,7 +158,37 @@ pub(crate) fn build_shader(
     manifest_text: &str,
     spec: &VisualizerSpec<'_>,
 ) -> Result<String, String> {
-    build_shaders(variant_wgsl, manifest_text, spec, None).map(|set| set.draw_wgsl)
+    build_shaders(variant_wgsl, manifest_text, spec, &test_canvas_context())
+        .map(|set| set.draw_wgsl)
+}
+
+/// The registered canvas context the visualizer tests sample through:
+/// `CanvasContext { @semantic(coord) uv, @semantic(time) time,
+/// @semantic(resolution) res }`.
+#[cfg(test)]
+pub(crate) fn test_canvas_context() -> crate::context::EntryContext {
+    use crate::context::{ContextField, ContextStruct, ContextType, EntryContext};
+    let field = |name: &str, ty, semantic: &str| ContextField {
+        name: name.to_string(),
+        ty,
+        semantic: Some(semantic.to_string()),
+        span: 0..0,
+    };
+    EntryContext {
+        parameter: "ctx".to_string(),
+        interface: "Canvas".to_string(),
+        method: "draw".to_string(),
+        ty: ContextStruct {
+            name: "CanvasContext".to_string(),
+            fields: vec![
+                field("uv", ContextType::Vector(2), "coord"),
+                field("time", ContextType::Float, "time"),
+                field("res", ContextType::Vector(2), "resolution"),
+            ],
+        },
+        components: Vec::new(),
+        roles: HashMap::new(),
+    }
 }
 
 /// A caller-supplied sweep length, when it is finite and positive.
@@ -673,7 +703,7 @@ fn build_viz_call_args(
     wgsl: &str,
     fn_name: &str,
     manifest_text: &str,
-    context: Option<&crate::context::EntryContext>,
+    context: &crate::context::EntryContext,
     options: CallOptions<'_>,
 ) -> Result<Vec<String>, String> {
     let reflected_params = parse_entry_params(wgsl, fn_name);
@@ -681,28 +711,10 @@ fn build_viz_call_args(
         return Ok(Vec::new());
     }
 
-    let (has_delta, mut fixed_count) = entry_prefix_info_from_types(
-        &reflected_params
-            .iter()
-            .map(|p| p.ty.clone())
-            .collect::<Vec<_>>(),
-    );
-    let mut args = Vec::new();
-    if let Some(context) = context {
-        args.push(viz_context_expression(&context.ty, &options)?);
-        fixed_count = 1;
-    } else {
-        args.push(options.uv_expr.to_string());
-        if reflected_params.len() > 1 {
-            args.push(options.time_expr.to_string());
-        }
-        if has_delta && reflected_params.len() > 2 {
-            args.push(options.delta_expr.to_string());
-        }
-        if reflected_params.len() >= fixed_count {
-            args.push(options.res_expr.to_string());
-        }
-    }
+    // Registered entries take their engine context record first; any
+    // remaining parameters are the entry's own `param` declarations.
+    let fixed_count = 1;
+    let mut args = vec![viz_context_expression(&context.ty, &options)?];
 
     let reflected_by_name = reflected_params
         .iter()
@@ -853,38 +865,15 @@ fn detect_fresco_entry_function(wgsl: &str) -> Option<String> {
             continue;
         };
         let params_start = start + name_len + open_idx_rel + 1;
-        let Some(close_idx_rel) = wgsl[params_start..].find(')') else {
-            search_from = params_start;
-            continue;
-        };
-        let params_text = &wgsl[params_start..params_start + close_idx_rel];
-        let types = params_text
-            .split(',')
-            .map(str::trim)
-            .filter(|part| !part.is_empty())
-            .map(|part| {
-                part.split_once(':')
-                    .map(|(_, ty)| compact_type(ty))
-                    .unwrap_or_default()
-            })
-            .collect::<Vec<_>>();
-        candidates.push((name, types));
-        search_from = params_start + close_idx_rel;
+        candidates.push(name);
+        search_from = params_start;
     }
 
     candidates
         .iter()
-        .find(|(name, types)| {
-            !is_generated_helper_function_name(name) && is_standalone_raster_entry_signature(types)
-        })
-        .map(|(name, _)| name.clone())
-        .or_else(|| {
-            candidates
-                .iter()
-                .find(|(name, _)| !is_generated_helper_function_name(name))
-                .map(|(name, _)| name.clone())
-        })
-        .or_else(|| candidates.first().map(|(name, _)| name.clone()))
+        .find(|name| !is_generated_helper_function_name(name))
+        .or_else(|| candidates.first())
+        .cloned()
 }
 
 fn is_generated_helper_function_name(name: &str) -> bool {
@@ -893,37 +882,6 @@ fn is_generated_helper_function_name(name: &str) -> bool {
     } else {
         false
     }
-}
-
-fn is_standalone_raster_entry_signature(types: &[String]) -> bool {
-    let t = types
-        .iter()
-        .map(|item| compact_type(item))
-        .collect::<Vec<_>>();
-    (t.len() >= 3 && t[0] == "vec2<f32>" && t[1] == "f32" && t[2] == "vec2<f32>")
-        || (t.len() >= 4
-            && t[0] == "vec2<f32>"
-            && t[1] == "f32"
-            && t[2] == "f32"
-            && t[3] == "vec2<f32>")
-}
-
-fn entry_prefix_info_from_types(types: &[String]) -> (bool, usize) {
-    let t = types
-        .iter()
-        .map(|item| compact_type(item))
-        .collect::<Vec<_>>();
-    let has_base = t.len() >= 3 && t[0] == "vec2<f32>" && t[1] == "f32";
-    if !has_base {
-        return (false, t.len().min(3));
-    }
-    if t[2] == "vec2<f32>" {
-        return (false, 3);
-    }
-    if t.len() >= 4 && t[2] == "f32" && t[3] == "vec2<f32>" {
-        return (true, 4);
-    }
-    (false, 3)
 }
 
 fn is_color_like_param_type(ty: &str) -> bool {
@@ -973,8 +931,9 @@ mod tests {
     fn detects_canvas_entry_function() {
         let wgsl = r#"
 fn fresco_helper_scatter_l0(p: vec2<f32>) -> vec4<f32> { return vec4<f32>(0.0); }
-fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>, speed: f32) -> vec4<f32> {
-  return vec4<f32>(uv, time, 1.0);
+struct CanvasContext { uv: vec2<f32>, time: f32, res: vec2<f32> }
+fn fresco_demo(ctx: CanvasContext, speed: f32) -> vec4<f32> {
+  return vec4<f32>(ctx.uv, ctx.time, 1.0);
 }
 "#;
         assert_eq!(
@@ -986,8 +945,9 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>, speed: f32) -> vec4<f32
     #[test]
     fn builds_sparkline_shader_with_manifest_backed_params() {
         let wgsl = r#"
-fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>, gain: f32, tint: vec4<f32>) -> vec4<f32> {
-  return vec4<f32>(uv.x * gain + tint.x, uv.y, 0.0, 1.0);
+struct CanvasContext { uv: vec2<f32>, time: f32, res: vec2<f32> }
+fn fresco_demo(ctx: CanvasContext, gain: f32, tint: vec4<f32>) -> vec4<f32> {
+  return vec4<f32>(ctx.uv.x * gain + tint.x, ctx.uv.y, 0.0, 1.0);
 }
 "#;
         let manifest = r#"{
@@ -1025,8 +985,9 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>, gain: f32, tint: vec4<f
     #[test]
     fn builds_swatch_shader_with_time_sweep() {
         let wgsl = r#"
-fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
-  return vec4<f32>(uv.x, time, 0.0, 1.0);
+struct CanvasContext { uv: vec2<f32>, time: f32, res: vec2<f32> }
+fn fresco_demo(ctx: CanvasContext) -> vec4<f32> {
+  return vec4<f32>(ctx.uv.x, ctx.time, 0.0, 1.0);
 }
 "#;
         let shader = build_shader(
@@ -1049,8 +1010,9 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
     #[test]
     fn builds_reduce_shader_with_explicit_range_hint() {
         let wgsl = r#"
-fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
-  return vec4<f32>(uv.x, time, 0.0, 1.0);
+struct CanvasContext { uv: vec2<f32>, time: f32, res: vec2<f32> }
+fn fresco_demo(ctx: CanvasContext) -> vec4<f32> {
+  return vec4<f32>(ctx.uv.x, ctx.time, 0.0, 1.0);
 }
 "#;
         let shaders = build_shaders(
@@ -1063,7 +1025,7 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
                 semantic_type: "scalar",
                 range_hint: Some((0.25, 0.75)),
             },
-            None,
+            &test_canvas_context(),
         )
         .expect("visualizer shader set should build");
         assert!(shaders.reduce_wgsl.contains("viz_range = vec2<f32>("));
@@ -1074,8 +1036,9 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
     #[test]
     fn builds_thumbnail_shader_for_shape_semantics() {
         let wgsl = r#"
-fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
-  return vec4<f32>(uv.x - 0.5, 0.0, 0.0, 1.0);
+struct CanvasContext { uv: vec2<f32>, time: f32, res: vec2<f32> }
+fn fresco_demo(ctx: CanvasContext) -> vec4<f32> {
+  return vec4<f32>(ctx.uv.x - 0.5, 0.0, 0.0, 1.0);
 }
 "#;
         let shader = build_shader(
@@ -1098,8 +1061,9 @@ fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec4<f32> {
     #[test]
     fn builds_thumbnail_shader_for_space_semantics() {
         let wgsl = r#"
-fn fresco_demo(uv: vec2<f32>, time: f32, res: vec2<f32>) -> vec2<f32> {
-  return vec2<f32>(uv.x * 0.8 + 0.1, uv.y);
+struct CanvasContext { uv: vec2<f32>, time: f32, res: vec2<f32> }
+fn fresco_demo(ctx: CanvasContext) -> vec2<f32> {
+  return vec2<f32>(ctx.uv.x * 0.8 + 0.1, ctx.uv.y);
 }
 "#;
         let shader = build_shader(
