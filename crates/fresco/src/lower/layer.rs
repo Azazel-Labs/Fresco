@@ -433,23 +433,28 @@ impl<'h> FnCtx<'h> {
             instance.age_norm,
         ];
         for param in &self.hir.params {
-            if let Some((elem_ty_str, len)) = crate::hir::parse_array_param_type(&param.ty_name) {
-                let Some(elem_type) = crate::hir::ArrayElemType::from_str(elem_ty_str) else {
-                    unreachable!("checker validated array element type");
-                };
-                for index in 0..len {
-                    for suffix in elem_type.slot_suffixes() {
-                        let slot = crate::hir::array_elem_slot(&param.name, index, suffix);
-                        args.push(
-                            *self
-                                .ir
-                                .param_scalars
-                                .get(&slot)
-                                .expect("array param slot must exist"),
-                        );
+            match crate::hir::parse_array_param_type_ex(&param.ty_name) {
+                Some((elem_ty_str, crate::hir::ArrayParamSize::Fixed(len))) => {
+                    let Some(elem_type) = crate::hir::ArrayElemType::from_str(elem_ty_str) else {
+                        unreachable!("checker validated array element type");
+                    };
+                    for index in 0..len {
+                        for suffix in elem_type.slot_suffixes() {
+                            let slot = crate::hir::array_elem_slot(&param.name, index, suffix);
+                            args.push(
+                                *self
+                                    .ir
+                                    .param_scalars
+                                    .get(&slot)
+                                    .expect("array param slot must exist"),
+                            );
+                        }
                     }
+                    continue;
                 }
-                continue;
+                // Dynamic arrays are read from their storage buffer globals.
+                Some((_, crate::hir::ArrayParamSize::Dynamic)) => continue,
+                None => {}
             }
             match param.ty_name.as_str() {
                 "f32" | "i32" | "u32" | "bool" => {

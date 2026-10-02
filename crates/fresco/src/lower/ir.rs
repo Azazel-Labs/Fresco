@@ -744,10 +744,28 @@ impl IrBuilder {
         let inst_index01 = function.arg("inst_index01", t.f32_);
         let inst_age_norm = function.arg("inst_age_norm", t.f32_);
 
-        // Entry params: scalars pass through directly; color params are
-        // decomposed into per-component f32 args to avoid aggregates.
+        // Entry params: scalars pass through directly; colors and fixed-size
+        // arrays are flattened into per-slot f32 args to avoid aggregates.
+        // Dynamic arrays stay in their storage buffers and take no arg.
         let mut param_scalars = HashMap::new();
         for param in params {
+            match crate::hir::parse_array_param_type_ex(&param.ty_name) {
+                Some((elem_ty_str, crate::hir::ArrayParamSize::Fixed(len))) => {
+                    let Some(elem_type) = crate::hir::ArrayElemType::from_str(elem_ty_str) else {
+                        unreachable!("checker validated array element type");
+                    };
+                    for index in 0..len {
+                        for suffix in elem_type.slot_suffixes() {
+                            let slot = crate::hir::array_elem_slot(&param.name, index, suffix);
+                            let h = function.arg(&slot.replace('.', "_"), t.f32_);
+                            param_scalars.insert(slot, h);
+                        }
+                    }
+                    continue;
+                }
+                Some((_, crate::hir::ArrayParamSize::Dynamic)) => continue,
+                None => {}
+            }
             match param.ty_name.as_str() {
                 "f32" | "i32" | "u32" | "bool" => {
                     let h = function.arg(&param.name, t.f32_);
@@ -778,8 +796,6 @@ impl IrBuilder {
             tex_globals: tex_globals.clone(),
             sampler_global,
             global_uniform_globals: global_uniform_globals.clone(),
-            // Scatter helper functions do not access dynamic array params directly;
-            // they receive expanded scalar arguments. Leave param storage globals empty.
             ..IrBuilder::from_parts(
                 function,
                 *t,

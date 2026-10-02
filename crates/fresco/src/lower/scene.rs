@@ -1468,8 +1468,9 @@ pub(super) fn lower_scatter_body_fn(
     tex_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
     sampler_global: Option<Handle<naga::GlobalVariable>>,
     global_uniform_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
+    param_storage_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
 ) -> naga::Function {
-    let (ir, instance_ctx) = IrBuilder::new_scatter_body(
+    let (mut ir, instance_ctx) = IrBuilder::new_scatter_body(
         format!("fresco_{}_scatter_l{scatter_id}", hir.name),
         t,
         &hir.params,
@@ -1478,6 +1479,7 @@ pub(super) fn lower_scatter_body_fn(
         sampler_global,
         global_uniform_globals,
     );
+    ir.param_storage_globals.clone_from(param_storage_globals);
     let p = ir.uv;
 
     let mut cx = FnCtx {

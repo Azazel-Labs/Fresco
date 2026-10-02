@@ -1138,6 +1138,7 @@ pub fn lower_all_with_policy(
                     &tex_globals,
                     sampler_global,
                     &global_uniform_globals,
+                    &param_storage_globals,
                 );
                 let handle = builder.push_function_dedup(f);
                 (scatter_id, handle)
