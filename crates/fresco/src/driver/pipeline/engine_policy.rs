@@ -50,7 +50,11 @@ pub(super) fn apply(
         }
     }
 
-    if resolved.program.root_entries().next().is_some() {
+    // Authored entries are bound to their engine registrations after policy
+    // resolution, so they count as rendering entry points here as well.
+    if resolved.program.root_entries().next().is_some()
+        || !resolved.program.authored_entries.is_empty()
+    {
         for (key, suggestion) in REQUIRED {
             if !declarations.contains_key(key) {
                 errors.push(FileDiagnostics::one(filename, src, vec![

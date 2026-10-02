@@ -65,7 +65,6 @@ pub fn engine_keyword_spans(
     for (i, (token, span)) in tokens.iter().enumerate() {
         let name = match token {
             Token::Ident(name) => Some(name.as_str()),
-            Token::Canvas => Some("canvas"),
             Token::Surface => Some("surface"),
             _ => None,
         };
@@ -119,5 +118,23 @@ mod tests {
         );
         assert!(words("fn swarm() -> f32 { let tick = 1; return tick }", &files).is_empty());
         assert!(words("swarm x {}", &HashMap::new()).is_empty());
+    }
+
+    #[test]
+    fn canvas_highlights_only_when_the_engine_registers_it() {
+        let registered = HashMap::from([(
+            "engine/engine.fr".into(),
+            crate::test_support::CANVAS.to_string(),
+        )]);
+        let source = "canvas glow { draw { return rgba(1.0, 1.0, 1.0, 1.0) } }";
+        assert_eq!(words(source, &registered), ["canvas", "draw"]);
+        assert!(
+            words(
+                "canvas glow(ctx: CanvasContext) -> color { }",
+                &HashMap::new()
+            )
+            .is_empty()
+        );
+        assert!(words("fn f(canvas: vec2) -> f32 { return canvas.x }", &registered).is_empty());
     }
 }

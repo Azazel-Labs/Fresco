@@ -1388,15 +1388,9 @@ fn load_implicit_engine_modules(
         };
 
         let declared_entry = program
-            .raster_entries
+            .authored_entries
             .first()
-            .map(|entry| (&entry.entry_kind, &entry.name))
-            .or_else(|| {
-                program
-                    .authored_entries
-                    .first()
-                    .map(|entry| (&entry.kind, &entry.name))
-            });
+            .map(|entry| (&entry.kind, &entry.name));
         if let Some((entry_kind, entry_name)) = declared_entry {
             diags.push(FileDiagnostics::one(
                 canonical.clone(),
@@ -1535,7 +1529,7 @@ fn load_import_functions(
                 .push((canonical.clone(), imported.pragmas.clone()));
         }
 
-        if let Some(entry) = imported.raster_entries.first() {
+        if let Some(entry) = imported.authored_entries.first() {
             ctx.diags.push(FileDiagnostics::one(
                 current_canonical,
                 current_src,
@@ -1545,7 +1539,7 @@ fn load_import_functions(
                         format!(
                             "imported module `{}` contains `{}` entry `{}`, \
                          which is not supported in imported modules",
-                            import.path, entry.entry_kind, entry.name
+                            import.path, entry.kind, entry.name
                         ),
                     )
                     .with_help("keep entry points in the root file; imported modules may provide helpers and surfaces"),
@@ -1564,16 +1558,6 @@ fn load_import_functions(
             skip_imports_to_visited,
             engine_scope,
         );
-        if !imported.authored_entries.is_empty() {
-            ctx.diags.push(FileDiagnostics::one(
-                canonical.clone(),
-                src.as_str(),
-                Diag::fail(
-                    &imported.authored_entries[0].span,
-                    "authored entries must be declared in the root module",
-                ),
-            ));
-        }
         ctx.out_enums.extend(imported.enums);
         ctx.out_structs.extend(imported.structs);
         ctx.out_consts.extend(imported.consts);
@@ -1624,7 +1608,6 @@ fn check_and_rewrite(
     context: &CompileContext,
 ) -> Result<(Vec<Hir>, Vec<MaterialHir>, Vec<Diag>, CheckRewriteTimings), Vec<Diag>> {
     let mut normalized_program = program.clone();
-    normalize_root_entry_contract_instances(&mut normalized_program)?;
     check::bindings::validate(&normalized_program)?;
     super::surface_properties::resolve(&mut normalized_program)?;
 
@@ -1736,508 +1719,6 @@ fn check_and_rewrite(
     Ok((hirs, material_hirs, non_error_diags, timings))
 }
 
-fn normalize_root_entry_contract_instances(program: &mut Program) -> Result<(), Vec<Diag>> {
-    fn num_expr(value: f64, span: Span) -> crate::ast::SExpr {
-        crate::ast::Spanned {
-            node: crate::ast::Expr::Num(value, crate::ast::Unit::None),
-            span,
-        }
-    }
-
-    fn var_expr(name: &str, span: Span) -> crate::ast::SExpr {
-        crate::ast::Spanned {
-            node: crate::ast::Expr::Var(name.to_string()),
-            span,
-        }
-    }
-
-    fn vec2_zero_expr(span: Span) -> crate::ast::SExpr {
-        crate::ast::Spanned {
-            node: crate::ast::Expr::Vec2(
-                Box::new(num_expr(0.0, span.clone())),
-                Box::new(num_expr(0.0, span.clone())),
-            ),
-            span,
-        }
-    }
-
-    fn vec3_zero_expr(span: Span) -> crate::ast::SExpr {
-        crate::ast::Spanned {
-            node: crate::ast::Expr::Vec3(
-                Box::new(num_expr(0.0, span.clone())),
-                Box::new(num_expr(0.0, span.clone())),
-                Box::new(num_expr(0.0, span.clone())),
-            ),
-            span,
-        }
-    }
-
-    fn vec4_zero_expr(span: Span) -> crate::ast::SExpr {
-        crate::ast::Spanned {
-            node: crate::ast::Expr::Vec4(
-                Box::new(num_expr(0.0, span.clone())),
-                Box::new(num_expr(0.0, span.clone())),
-                Box::new(num_expr(0.0, span.clone())),
-                Box::new(num_expr(0.0, span.clone())),
-            ),
-            span,
-        }
-    }
-
-    #[derive(Clone)]
-    struct WrapperInputs {
-        primary: String,
-        signal: Option<String>,
-        resolution: Option<String>,
-    }
-
-    #[derive(Default)]
-    struct WrapperNeeds {
-        signal: bool,
-        resolution: bool,
-    }
-
-    fn strip_spatial_suffix(ty_name: &str) -> &str {
-        let trimmed = ty_name.trim();
-        if let Some((base, _)) = trimmed.rsplit_once(" in ")
-            && !base.trim().is_empty()
-        {
-            return base.trim();
-        }
-        if let Some((base, _)) = trimmed.rsplit_once(" from ")
-            && !base.trim().is_empty()
-        {
-            return base.trim();
-        }
-        trimmed
-    }
-
-    fn synthesize_arg_for_type(
-        ty_name: &str,
-        field_name_hint: Option<&str>,
-        inputs: &WrapperInputs,
-        span: Span,
-        struct_defs: &HashMap<String, crate::ast::StructDecl>,
-        visiting_structs: &mut HashSet<String>,
-    ) -> Option<crate::ast::SExpr> {
-        let normalized = strip_spatial_suffix(ty_name);
-        match normalized {
-            "coord" | "coord_like" => Some(var_expr(&inputs.primary, span)),
-            "resolution" => Some(match &inputs.resolution {
-                Some(name) => var_expr(name, span),
-                None => vec2_zero_expr(span),
-            }),
-            "signal" | "delta" => Some(match &inputs.signal {
-                Some(name) => var_expr(name, span),
-                None => num_expr(0.0, span),
-            }),
-            "f32" | "f64" | "half" | "i32" | "u32" | "angle" | "length" | "mask" | "coverage" => {
-                Some(num_expr(0.0, span))
-            }
-            "bool" => Some(var_expr("false", span)),
-            "vec2" => {
-                let hint = field_name_hint.unwrap_or_default().to_ascii_lowercase();
-                if hint.contains("uv") || hint.contains("coord") {
-                    Some(var_expr(&inputs.primary, span))
-                } else if hint.contains("res") {
-                    Some(match &inputs.resolution {
-                        Some(name) => var_expr(name, span),
-                        None => vec2_zero_expr(span),
-                    })
-                } else {
-                    Some(vec2_zero_expr(span))
-                }
-            }
-            "vec3" => Some(vec3_zero_expr(span)),
-            "vec4" => Some(vec4_zero_expr(span)),
-            "color" => Some(crate::ast::Spanned {
-                node: crate::ast::Expr::Color([0.0, 0.0, 0.0, 1.0]),
-                span,
-            }),
-            "array" => Some(crate::ast::Spanned {
-                node: crate::ast::Expr::Array(Vec::new()),
-                span,
-            }),
-            _ => {
-                if normalized.starts_with("array<") {
-                    return Some(crate::ast::Spanned {
-                        node: crate::ast::Expr::Array(Vec::new()),
-                        span,
-                    });
-                }
-
-                let struct_decl = struct_defs.get(normalized)?;
-                if !visiting_structs.insert(normalized.to_string()) {
-                    return None;
-                }
-
-                let mut args = Vec::new();
-                for field in &struct_decl.fields {
-                    let value = synthesize_arg_for_type(
-                        &field.ty_name,
-                        Some(&field.name),
-                        inputs,
-                        span.clone(),
-                        struct_defs,
-                        visiting_structs,
-                    )?;
-                    args.push(crate::ast::Arg {
-                        name: Some(field.name.clone()),
-                        value,
-                    });
-                }
-                visiting_structs.remove(normalized);
-
-                Some(crate::ast::Spanned {
-                    node: crate::ast::Expr::Call {
-                        name: normalized.to_string(),
-                        name_span: span.clone(),
-                        const_args: Vec::new(),
-                        args,
-                    },
-                    span,
-                })
-            }
-        }
-    }
-
-    fn collect_wrapper_needs(
-        ty_name: &str,
-        struct_defs: &HashMap<String, crate::ast::StructDecl>,
-        visiting_structs: &mut HashSet<String>,
-        needs: &mut WrapperNeeds,
-    ) {
-        let normalized = strip_spatial_suffix(ty_name);
-        match normalized {
-            "signal" | "delta" => needs.signal = true,
-            "resolution" => needs.resolution = true,
-            other => {
-                let Some(struct_decl) = struct_defs.get(other) else {
-                    return;
-                };
-                if !visiting_structs.insert(other.to_string()) {
-                    return;
-                }
-                for field in &struct_decl.fields {
-                    collect_wrapper_needs(&field.ty_name, struct_defs, visiting_structs, needs);
-                }
-                visiting_structs.remove(other);
-            }
-        }
-    }
-
-    let struct_defs: HashMap<String, crate::ast::StructDecl> = program
-        .structs
-        .iter()
-        .cloned()
-        .map(|decl| (decl.name.clone(), decl))
-        .collect();
-    let interfaces = program.interfaces.clone();
-
-    let mut retained_entries = Vec::with_capacity(program.raster_entries.len());
-    let mut normalized_conformances = Vec::new();
-    let mut diags = Vec::new();
-
-    for raster in program.raster_entries.drain(..) {
-        let mut methods = Vec::new();
-        let mut instance_params = Vec::new();
-        let mut saw_unsupported_stmt = false;
-        for stmt in &raster.body {
-            match stmt {
-                crate::ast::Stmt::LocalFnDecl(method) => methods.push(method.clone()),
-                crate::ast::Stmt::Param { .. } => instance_params.push(stmt.clone()),
-                _ => saw_unsupported_stmt = true,
-            }
-        }
-
-        let is_contract_instance = raster.params.is_empty() && !methods.is_empty();
-        if !is_contract_instance {
-            retained_entries.push(raster);
-            continue;
-        }
-
-        if saw_unsupported_stmt {
-            diags.push(
-                Diag::error(
-                    raster.name_span.clone(),
-                    format!("contract-style canvas `{}` contains a statement that is neither an instance parameter nor a plug implementation", raster.name),
-                )
-                .with_help(
-                    "keep only `param ...` and `fn ...` declarations in this block, or use legacy `canvas name(uv: coord) -> color { ... }` entry syntax",
-                ),
-            );
-            continue;
-        }
-
-        let matching_interfaces = interfaces
-            .iter()
-            .filter(|interface| {
-                !interface.methods.is_empty()
-                    && interface
-                        .methods
-                        .iter()
-                        .all(|required| methods.iter().any(|method| method.name == required.name))
-            })
-            .collect::<Vec<_>>();
-        let selected_interface = interfaces
-            .iter()
-            .find(|interface| interface.name == "Canvas")
-            .or_else(|| matching_interfaces.first().copied());
-        let Some(selected_interface) = selected_interface else {
-            diags.push(
-                Diag::error(
-                    raster.name_span.clone(),
-                    format!(
-                        "contract-style canvas `{}` does not implement any declared renderer interface",
-                        raster.name
-                    ),
-                )
-                .with_help("implement every required plug from an engine-authored interface"),
-            );
-            continue;
-        };
-        let entry_iface_methods = &selected_interface.methods;
-
-        let contract_entry_method_name = if entry_iface_methods.len() == 1 {
-            entry_iface_methods[0].name.clone()
-        } else if let Some(draw_method) = entry_iface_methods
-            .iter()
-            .find(|method| method.name == "draw")
-        {
-            draw_method.name.clone()
-        } else {
-            "draw".to_string()
-        };
-
-        let Some(draw_method) = methods
-            .iter()
-            .find(|method| method.name == contract_entry_method_name)
-            .cloned()
-        else {
-            diags.push(
-                Diag::error(
-                    raster.name_span.clone(),
-                    format!(
-                        "contract-style canvas `{}` must define contract entry `fn {}(...)`",
-                        raster.name, contract_entry_method_name
-                    ),
-                )
-                .with_help(
-                    "declare the contract entry method in this block (matching `interface canvas` when present) so the entry can lower explicitly",
-                ),
-            );
-            continue;
-        };
-
-        let uv_param_name = draw_method
-            .params
-            .first()
-            .map(|param| param.name.clone())
-            .unwrap_or_else(|| "input".to_string());
-        let uv_param_span = draw_method
-            .params
-            .first()
-            .map(|param| param.name_span.clone())
-            .unwrap_or_else(|| draw_method.span.clone());
-        let call_span = draw_method.span.clone();
-
-        let primary_ty_name = draw_method
-            .params
-            .first()
-            .map(|param| strip_spatial_suffix(&param.ty_name))
-            .unwrap_or("coord");
-        let primary_entry_ty = match primary_ty_name {
-            "surf" => "surf".to_string(),
-            "coord" | "coord_like" | "vec2" => "coord".to_string(),
-            _ => {
-                diags.push(
-                    Diag::error(
-                        call_span.clone(),
-                        format!(
-                            "contract-style canvas `{}` entry method `{}` must start with `coord` or `surf`, found `{}`",
-                            raster.name, draw_method.name, primary_ty_name
-                        ),
-                    )
-                    .with_help(
-                        "make the first parameter `uv: coord` (or equivalent) for 2D sampling, or `sp: surf` for surface-style roots",
-                    ),
-                );
-                continue;
-            }
-        };
-
-        let mut needs = WrapperNeeds::default();
-        for param in draw_method.params.iter().skip(1) {
-            let mut visiting_structs = HashSet::new();
-            collect_wrapper_needs(
-                &param.ty_name,
-                &struct_defs,
-                &mut visiting_structs,
-                &mut needs,
-            );
-        }
-
-        let mut used_param_names = HashSet::new();
-        used_param_names.insert(uv_param_name.clone());
-        let mut unique_name = |candidate: String| {
-            let name = candidate;
-            if used_param_names.insert(name.clone()) {
-                return name;
-            }
-            let mut idx = 2usize;
-            loop {
-                let fallback = format!("{name}_{idx}");
-                if used_param_names.insert(fallback.clone()) {
-                    return fallback;
-                }
-                idx += 1;
-            }
-        };
-
-        let signal_name = if needs.signal {
-            let direct = draw_method
-                .params
-                .iter()
-                .skip(1)
-                .find(|param| matches!(strip_spatial_suffix(&param.ty_name), "signal" | "delta"))
-                .map(|param| param.name.clone())
-                .unwrap_or_else(|| format!("{}_signal", uv_param_name));
-            Some(unique_name(direct))
-        } else {
-            None
-        };
-
-        let resolution_name = if needs.resolution {
-            let direct = draw_method
-                .params
-                .iter()
-                .skip(1)
-                .find(|param| strip_spatial_suffix(&param.ty_name) == "resolution")
-                .map(|param| param.name.clone())
-                .unwrap_or_else(|| format!("{}_resolution", uv_param_name));
-            Some(unique_name(direct))
-        } else {
-            None
-        };
-
-        let wrapper_inputs = WrapperInputs {
-            primary: uv_param_name.clone(),
-            signal: signal_name.clone(),
-            resolution: resolution_name.clone(),
-        };
-
-        let mut args = vec![crate::ast::Arg {
-            name: None,
-            value: var_expr(&uv_param_name, call_span.clone()),
-        }];
-        let mut synth_failed = false;
-        for param in draw_method.params.iter().skip(1) {
-            let mut visiting_structs = HashSet::new();
-            let Some(value) = synthesize_arg_for_type(
-                &param.ty_name,
-                Some(&param.name),
-                &wrapper_inputs,
-                call_span.clone(),
-                &struct_defs,
-                &mut visiting_structs,
-            ) else {
-                diags.push(
-                    Diag::error(
-                        param.ty_span.clone(),
-                        format!(
-                            "contract-style canvas `{}` draw parameter `{}: {}` cannot be synthesized for lowering",
-                            raster.name, param.name, param.ty_name
-                        ),
-                    )
-                    .with_help(
-                        "use draw parameter types that can be materialized from entry inputs (coord/signal/resolution/scalars/vectors/colors/structs of those)",
-                    ),
-                );
-                synth_failed = true;
-                break;
-            };
-            args.push(crate::ast::Arg { name: None, value });
-        }
-        if synth_failed {
-            continue;
-        }
-
-        normalized_conformances.push(crate::ast::ConformanceDecl {
-            type_name: raster.name.clone(),
-            type_name_span: raster.name_span.clone(),
-            interface_name: selected_interface.name.clone(),
-            interface_name_span: raster.name_span.clone(),
-            methods,
-            body_checked_with_instance: true,
-            span: raster.span,
-        });
-
-        let draw_call = crate::ast::Spanned {
-            node: crate::ast::Expr::Call {
-                name: draw_method.name.clone(),
-                name_span: call_span.clone(),
-                const_args: Vec::new(),
-                args,
-            },
-            span: call_span.clone(),
-        };
-
-        let normalized_root_entry = crate::ast::NormalizedRootEntry {
-            entry_kind: raster.entry_kind.clone(),
-            kind: crate::ast::RootEntryKind::Raster,
-            name: raster.name,
-            name_span: raster.name_span,
-            params: {
-                let mut params = vec![crate::ast::NormalizedRootEntryParam {
-                    name: uv_param_name,
-                    name_span: uv_param_span,
-                    ty_name: primary_entry_ty,
-                    ty_span: call_span.clone(),
-                    role: crate::ast::RootEntryParamRole::Primary,
-                }];
-                if let Some(name) = signal_name {
-                    params.push(crate::ast::NormalizedRootEntryParam {
-                        name,
-                        name_span: call_span.clone(),
-                        ty_name: "signal".to_string(),
-                        ty_span: call_span.clone(),
-                        role: crate::ast::RootEntryParamRole::Signal,
-                    });
-                }
-                if let Some(name) = resolution_name {
-                    params.push(crate::ast::NormalizedRootEntryParam {
-                        name,
-                        name_span: call_span.clone(),
-                        ty_name: "resolution".to_string(),
-                        ty_span: call_span.clone(),
-                        role: crate::ast::RootEntryParamRole::Resolution,
-                    });
-                }
-                params
-            },
-            material_ty: None,
-            body: {
-                instance_params.extend([
-                    crate::ast::Stmt::LocalFnDecl(draw_method),
-                    crate::ast::Stmt::Expr(crate::ast::Spanned {
-                        node: crate::ast::Expr::Layer(Box::new(draw_call)),
-                        span: call_span.clone(),
-                    }),
-                ]);
-                instance_params
-            },
-            span: call_span,
-        };
-
-        retained_entries.push(normalized_root_entry.into_raster_entry());
-    }
-
-    program.raster_entries = retained_entries;
-    program.conformances.extend(normalized_conformances);
-
-    if diags.is_empty() { Ok(()) } else { Err(diags) }
-}
-
 /// Workbook result from a single-entry workbook compile pass.
 pub struct WorkbookCompileResult {
     #[allow(
@@ -2274,10 +1755,14 @@ fn prepare_workbook_input(
     } else {
         &FsModuleLoader::default()
     };
-    let resolved = resolve_imports(program, filename, &pre_src, include_stdlib, loader)?;
+    let mut resolved = resolve_imports(program, filename, &pre_src, include_stdlib, loader)?;
     super::operation_composition::reject_legacy_syntax(&resolved.program)
         .map_err(|diags| map_file_diags(diags, &resolved.sources, filename, src))?;
     let engine_context = engine_policy::apply(context, &resolved, filename, src)?;
+    // Workbook previews bind entry vocabulary exactly like full compilation:
+    // engine policy first, then entry registrations.
+    super::entry_contract::resolve(&mut resolved.program)
+        .map_err(|diags| map_file_diags(diags, &resolved.sources, filename, src))?;
     let applied_pragmas =
         apply_program_pragmas(&engine_context, &root_program, filename, src, true)?;
 

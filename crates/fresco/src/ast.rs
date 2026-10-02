@@ -524,7 +524,6 @@ pub struct EntryParam {
     pub name: String,
     pub name_span: Span,
     pub ty_name: String,
-    pub ty_span: Span,
 }
 
 /// The semantic class of a normalized root entry.
@@ -551,7 +550,6 @@ pub struct NormalizedRootEntryParam {
     pub name: String,
     pub name_span: Span,
     pub ty_name: String,
-    pub ty_span: Span,
     pub role: RootEntryParamRole,
 }
 
@@ -594,7 +592,6 @@ fn normalized_root_entry_params(params: &[EntryParam]) -> Vec<NormalizedRootEntr
             name: param.name.clone(),
             name_span: param.name_span.clone(),
             ty_name: param.ty_name.clone(),
-            ty_span: param.ty_span.clone(),
             role: normalized_root_entry_param_role(&param.ty_name),
         })
         .collect()
@@ -690,13 +687,12 @@ pub struct AuthoredEntryBlock {
 
 /// A single-body root entry whose body resolves to a color result.
 ///
-/// Produced by the parser for `kind name(params) -> color { ... }` entries
-/// (standalone or engine-registered) and by entry-contract binding for
-/// engine-registered authored entries.
+/// Produced only by entry-contract binding, which resolves an
+/// [`AuthoredEntry`] against its engine `@entry` registration. The parser never
+/// creates raster entries directly; entry kinds are engine vocabulary.
 #[derive(Debug, Clone)]
 pub struct RasterEntry {
     pub entry_kind: String,
-    pub declared_return_ty: Option<Spanned<String>>,
     pub name: String,
     pub name_span: Span,
     /// Declared entry parameters as `name: type` pairs. For standalone
@@ -706,29 +702,6 @@ pub struct RasterEntry {
     pub params: Vec<EntryParam>,
     pub body: Vec<Stmt>,
     pub span: Span,
-}
-
-impl NormalizedRootEntry {
-    pub fn into_raster_entry(self) -> RasterEntry {
-        RasterEntry {
-            entry_kind: self.entry_kind,
-            declared_return_ty: None,
-            name: self.name,
-            name_span: self.name_span,
-            params: self
-                .params
-                .into_iter()
-                .map(|param| EntryParam {
-                    name: param.name,
-                    name_span: param.name_span,
-                    ty_name: param.ty_name,
-                    ty_span: param.ty_span,
-                })
-                .collect(),
-            body: self.body,
-            span: self.span,
-        }
-    }
 }
 
 impl RasterEntry {

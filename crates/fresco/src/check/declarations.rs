@@ -1996,7 +1996,6 @@ mod tests {
                 name: param_name.to_string(),
                 name_span: span(8, 10),
                 ty_name: ty_name.to_string(),
-                ty_span: span(11, 15),
                 role: RootEntryParamRole::Primary,
             }],
             material_ty: None,

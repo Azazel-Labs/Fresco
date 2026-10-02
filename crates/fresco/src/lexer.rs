@@ -15,7 +15,6 @@ use smol_str::SmolStr;
 use std::ops::Range;
 
 pub const KEYWORD_LEXEMES: &[&str] = &[
-    "canvas",
     "surface",
     "pass",
     "pipeline",
@@ -233,8 +232,6 @@ pub enum Token {
     Comment,
 
     // Keywords
-    #[token("canvas")]
-    Canvas,
     #[token("surface")]
     Surface,
     #[token("pass")]
@@ -441,8 +438,7 @@ pub enum Token {
 impl Token {
     pub fn highlight_kind(&self) -> Option<TokenHighlightKind> {
         match self {
-            Self::Canvas
-            | Self::Surface
+            Self::Surface
             | Self::Pass
             | Self::Pipeline
             | Self::Tags
@@ -542,7 +538,6 @@ impl std::fmt::Display for Token {
         use Token::*;
         match self {
             Newline => write!(f, "newline"),
-            Canvas => write!(f, "`canvas`"),
             Surface => write!(f, "`surface`"),
             Pass => write!(f, "`pass`"),
             Pipeline => write!(f, "`pipeline`"),

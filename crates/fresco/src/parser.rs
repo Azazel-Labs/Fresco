@@ -203,8 +203,11 @@ pub fn attach_leading_fn_docs(src: &str, program: &mut Program) {
         }
     }
 
-    for entry in &mut program.raster_entries {
+    for entry in &mut program.authored_entries {
         attach_docs_to_stmt_block(src, &mut entry.body);
+        for block in &mut entry.blocks {
+            attach_docs_to_stmt_block(src, &mut block.body);
+        }
     }
 
     for surface in &mut program.surfaces {
@@ -240,9 +243,6 @@ pub(crate) fn identifier_token(token: &Token) -> Option<&str> {
         Token::Layer => "layer",
         // Shading hooks use `surface` for their prepared material argument.
         Token::Surface => "surface",
-        // The legacy interface-first contract form reuses `canvas` as a named contract type,
-        // so it must also parse as an identifier in those contexts.
-        Token::Canvas => "canvas",
         // `at` is also used as a named argument label (e.g. `stop(at: 0.0)`)
         // so it must be accepted as an identifier wherever labels appear.
         Token::At => "at",
@@ -261,21 +261,14 @@ pub(super) fn argument_name<'src>() -> PBox<'src, String> {
 }
 
 pub(super) fn ident_sp<'src>() -> PBox<'src, (String, Span)> {
-    choice((
-        ident().map_with(|s, e| (s, e.span())).boxed(),
-        just(Token::Canvas)
-            .map_with(|_, e| ("canvas".to_string(), e.span()))
-            .boxed(),
-    ))
-    .labelled("identifier")
-    .boxed()
+    ident()
+        .map_with(|s, e| (s, e.span()))
+        .labelled("identifier")
+        .boxed()
 }
 pub(super) fn type_ident_sp<'src>() -> PBox<'src, (String, Span)> {
     choice((
         ident_sp(),
-        just(Token::Canvas)
-            .map_with(|_, e| ("canvas".to_string(), e.span()))
-            .boxed(),
         just(Token::Layer)
             .map_with(|_, e| ("layer".to_string(), e.span()))
             .boxed(),

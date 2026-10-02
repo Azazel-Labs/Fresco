@@ -90,51 +90,6 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 .is_some_and(|name| compute_interfaces.contains(name))
         })
         .collect();
-    for raster in program
-        .raster_entries
-        .extract_if(.., |raster| registrations.contains_key(&raster.entry_kind))
-    {
-        program.authored_entries.push(crate::ast::AuthoredEntry {
-            config: Vec::new(),
-            kind: raster.entry_kind,
-            name: raster.name,
-            name_span: raster.name_span,
-            params: raster.params,
-            return_ty: raster.declared_return_ty,
-            body: raster.body,
-            blocks: Vec::new(),
-            span: raster.span,
-        });
-    }
-    for raster in &program.raster_entries {
-        if let Some(interface) = registrations.get(&raster.entry_kind)
-            && raster.params.is_empty()
-            && raster.body.is_empty()
-        {
-            let (_, method) = interface.entry.as_ref().expect("registered interface");
-            return Err(Diag::fail(
-                &raster.name_span,
-                format!("missing required entry block `{method}`"),
-            ));
-        }
-        if let Some(ty) = &raster.declared_return_ty
-            && ty.node != "color"
-        {
-            return Err(Diag::fail(
-                &ty.span,
-                "raster entry result type must be color",
-            ));
-        }
-        if let Some(interface) = registrations.get(&raster.entry_kind)
-            && interface.methods.len() != 1
-            && !raster.params.is_empty()
-        {
-            return Err(Diag::fail(
-                &raster.name_span,
-                "entry shorthand requires named blocks for all interface methods",
-            ));
-        }
-    }
     let configuration_program = program.clone();
     for mut entry in program.authored_entries.drain(..) {
         if entry.blocks.is_empty()
@@ -656,7 +611,6 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
                 name: param.name.clone(),
                 name_span: entry.name_span.clone(),
                 ty_name: param.ty_name.clone(),
-                ty_span: entry.name_span.clone(),
             }];
             let call = Spanned {
                 node: Expr::Call {
@@ -681,7 +635,6 @@ pub(crate) fn resolve(program: &mut Program) -> Result<(), Vec<Diag>> {
         };
         program.raster_entries.push(RasterEntry {
             entry_kind: entry.kind,
-            declared_return_ty: entry.return_ty,
             name: entry.name,
             name_span: entry.name_span,
             params,

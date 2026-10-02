@@ -144,6 +144,61 @@ fn entry_binding_rejects_missing_unknown_duplicate_and_mistyped_blocks() {
     );
 }
 
+fn errors_for(files: &HashMap<String, String>) -> Vec<String> {
+    fresco::driver::compile_bundle_virtual(files, "main.fr", false)
+        .expect_err("compile should fail")
+        .into_iter()
+        .map(|error| error.message)
+        .collect()
+}
+
+#[test]
+fn canvas_is_not_built_in_without_an_engine_registration() {
+    // `canvas` used to fall back to a compiler-owned standalone ABI. Entry
+    // kinds now come only from engine `@entry` registrations.
+    for source in [
+        "canvas demo { draw { return #fff } }",
+        "canvas demo(ctx: CanvasContext) -> color { return #fff }",
+        "canvas demo(uv: coord, t: signal, res: resolution) -> color { return rgba(uv.x, t, res.x, 1.0) }",
+    ] {
+        let errors = errors_for(&files("picture", "paint", source));
+        assert!(
+            errors
+                .iter()
+                .any(|message| message.contains("unregistered entry declaration `canvas`")),
+            "{source}: {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn registered_canvas_rejects_the_legacy_standalone_signature() {
+    let source = "canvas demo(uv: coord, t: signal, res: resolution) -> color { return rgba(uv.x, t, res.x, 1.0) }";
+    let errors = errors_for(&files("canvas", "draw", source));
+    assert!(
+        errors.iter().any(|message| message.contains(
+            "canvas `demo` must implement Painting.draw with one parameter of type `SampleContext`"
+        )),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn entries_declared_in_imported_modules_are_rejected() {
+    let mut files = files("canvas", "draw", "import \"parts.fr\"\n");
+    files.insert(
+        "parts.fr".into(),
+        "canvas hidden { draw { return #fff } }\n".into(),
+    );
+    let errors = errors_for(&files);
+    assert!(
+        errors.iter().any(|message| message.contains(
+            "imported module `parts.fr` contains `canvas` entry `hidden`, which is not supported in imported modules"
+        )),
+        "{errors:?}"
+    );
+}
+
 #[test]
 fn registered_canvas_methods_use_explicit_context_without_field_name_synthesis() {
     let source = "canvas demo { param gain: f32 = 0.5\nfn draw(@context actual: SampleContext) -> color { return rgba(actual.uv.x * gain, 0.0, 0.0, 1.0) } }";

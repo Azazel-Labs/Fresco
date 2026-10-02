@@ -2338,7 +2338,7 @@ mod tests {
 
         let actual = highlighted_text_and_kind(source);
         let expected = vec![
-            ("canvas", "keyword"),
+            ("canvas", "identifier"),
             ("import", "keyword"),
             ("enum", "keyword"),
             ("fn", "keyword"),

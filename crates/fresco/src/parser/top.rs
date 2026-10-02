@@ -1,10 +1,9 @@
 use super::*;
 use crate::ast::{
     ConstDecl, EntryParam, EvaluationContractBindingDecl, MaterialReturnTy, PassFnHookDecl,
-    PassFnHookParamDecl, RasterEntry, SchemaEvaluatorVariantDecl, SchemaProgramDecl,
-    StyleContractDecl, StyleDecl, StyleHookDecl, SurfaceDecl, TemplateConfigParamDecl,
-    TemplateDecl, TemplatePlugDecl, VertexFactoryDecl, VertexFormatDecl, VertexInterfaceDecl,
-    VertexInterfaceMemberDecl,
+    PassFnHookParamDecl, SchemaEvaluatorVariantDecl, SchemaProgramDecl, StyleContractDecl,
+    StyleDecl, StyleHookDecl, SurfaceDecl, TemplateConfigParamDecl, TemplateDecl, TemplatePlugDecl,
+    VertexFactoryDecl, VertexFormatDecl, VertexInterfaceDecl, VertexInterfaceMemberDecl,
 };
 use crate::pipeline_layout::canonical_layout_signature_from_tokens;
 
@@ -194,11 +193,10 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         .clone()
         .then_ignore(just(Token::Colon))
         .then(type_ident_sp.clone())
-        .map(|((name, name_span), (ty_name, ty_span))| EntryParam {
+        .map(|((name, name_span), (ty_name, _))| EntryParam {
             name,
             name_span,
             ty_name,
-            ty_span,
         })
         .boxed();
     let entry_params = entry_param
@@ -266,7 +264,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
         )
         .boxed();
 
-    let entry_kind = choice((just(Token::Canvas).to("canvas".to_string()), ident.clone()));
+    let entry_kind = ident.clone();
     let entry_block = ident_sp
         .clone()
         .then(nl.clone().ignore_then(block.clone()))
@@ -3516,24 +3514,7 @@ pub(super) fn program_parser<'src>() -> PBox<'src, Program> {
                     Item::StyleCapability(v) => program.style_capabilities.push(v),
                     Item::StyleProvider(v) => program.style_providers.push(v),
                     Item::Style(style) => program.styles.push(style),
-                    Item::AuthoredEntry(entry) => {
-                        if entry.kind == "canvas"
-                            && entry.blocks.is_empty()
-                            && entry.config.is_empty()
-                        {
-                            program.raster_entries.push(RasterEntry {
-                                entry_kind: entry.kind,
-                                declared_return_ty: entry.return_ty,
-                                name: entry.name,
-                                name_span: entry.name_span,
-                                params: entry.params,
-                                body: entry.body,
-                                span: entry.span,
-                            });
-                        } else {
-                            program.authored_entries.push(entry);
-                        }
-                    }
+                    Item::AuthoredEntry(entry) => program.authored_entries.push(entry),
                     Item::Surface(surface) => program.surfaces.push(surface),
                     Item::InterfaceContract(interface_contract) => {
                         // One authored interface serves both pass contracts and generic bounds.
@@ -3592,7 +3573,7 @@ mod tests {
     }
 
     #[test]
-    fn raster_entry_and_surface_share_the_same_entry_template_shape() {
+    fn authored_entry_and_surface_share_the_same_entry_template_shape() {
         let program = parse_program(
             r#"
             canvas preview(ctx: CanvasContext) -> color {
@@ -3605,14 +3586,32 @@ mod tests {
             "#,
         );
 
-        assert_eq!(program.raster_entries.len(), 1);
+        // `canvas` is ordinary engine vocabulary: the parser keeps it as an
+        // authored entry for engine registration to bind after imports.
+        assert!(program.raster_entries.is_empty());
+        assert_eq!(program.authored_entries.len(), 1);
         assert_eq!(program.surfaces.len(), 1);
-        assert_eq!(program.raster_entries[0].name, "preview");
+        assert_eq!(program.authored_entries[0].kind, "canvas");
+        assert_eq!(program.authored_entries[0].name, "preview");
         assert_eq!(program.surfaces[0].name, "base");
-        assert_eq!(program.raster_entries[0].params.len(), 1);
+        assert_eq!(program.authored_entries[0].params.len(), 1);
         assert_eq!(program.surfaces[0].params.len(), 1);
-        assert_eq!(program.raster_entries[0].body.len(), 1);
+        assert_eq!(program.authored_entries[0].body.len(), 1);
         assert_eq!(program.surfaces[0].body.len(), 1);
+    }
+
+    #[test]
+    fn canvas_is_an_identifier_outside_entry_declarations() {
+        let program = parse_program(
+            r#"
+            fn shade(canvas: vec2) -> f32 {
+                return canvas.x
+            }
+            "#,
+        );
+
+        assert_eq!(program.functions.len(), 1);
+        assert_eq!(program.functions[0].params[0].name, "canvas");
     }
 
     #[test]
@@ -3703,14 +3702,11 @@ mod tests {
     }
 
     #[test]
-    fn real_canvas_interface_and_pass_parse() {
+    fn registered_canvas_interface_block_entry_and_pass_parse() {
         let program = parse_program(
             r#"
             struct CanvasContext {
-                time: f32
-                resolution: vec2
-                mouse: vec2
-                frame: u32
+                @semantic(coord) uv: vec2
             }
 
             struct ScreenVarying {
@@ -3718,50 +3714,52 @@ mod tests {
                 uv: vec2
             }
 
-            struct CanvasViewConfig {
-                @config(editor) zoom: f32 = 1.0
-                @config(editor) pan: vec2 = vec2(0.0, 0.0)
-            }
-
-            interface canvas {
-                fn draw(uv: vec2, ctx: CanvasContext) -> color
+            @entry(canvas, draw)
+            interface Canvas {
+                fn draw(@context ctx: CanvasContext) -> color
             }
 
             canvas glow {
                 param intensity: f32 = 1.0
 
-                fn draw(uv: vec2, ctx: CanvasContext) -> color {
-                    let d = length(uv - vec2(0.5, 0.5))
+                fn draw(@context ctx: CanvasContext) -> color {
+                    let d = length(ctx.uv - vec2(0.5, 0.5))
                     return rgba(vec3(intensity / (d + 0.05)), 1.0)
                 }
             }
 
-            pass present2d for canvas {
+            pass present2d for Canvas {
                 stage: raster
                 draw: fullscreen
-
-                binding {
-                    @group(frame) ctx:  uniform<CanvasContext>
-                    @group(frame) view: uniform<vec2>
-                }
 
                 fn vertex() -> ScreenVarying {
                     return ScreenVarying(clip_pos: vec4(0.0, 0.0, 0.0, 1.0), uv: vec2(0.0, 0.0))
                 }
 
-                fn shade(v: ScreenVarying, t: canvas) -> color {
-                    return t.draw(v.uv, ctx)
+                fn shade(v: ScreenVarying, t: Canvas) -> color {
+                    return t.draw(CanvasContext(uv: v.uv))
                 }
             }
 
-            pipeline present for canvas {
+            pipeline present for Canvas {
                 present2d
             }
             "#,
         );
 
         assert_eq!(program.templates.len(), 1);
-        assert_eq!(program.raster_entries.len(), 1);
+        assert_eq!(
+            program.templates[0].entry,
+            Some(("canvas".to_string(), "draw".to_string()))
+        );
+        assert!(program.raster_entries.is_empty());
+        assert_eq!(program.authored_entries.len(), 1);
+        let entry = &program.authored_entries[0];
+        assert_eq!(entry.kind, "canvas");
+        assert_eq!(entry.name, "glow");
+        assert!(entry.body.iter().any(
+            |statement| matches!(statement, Stmt::LocalFnDecl(method) if method.name == "draw")
+        ));
         assert_eq!(program.passes.len(), 1);
         assert_eq!(program.pipelines.len(), 1);
     }
