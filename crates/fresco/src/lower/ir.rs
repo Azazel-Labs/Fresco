@@ -627,34 +627,7 @@ impl IrBuilder {
         policy: LoweringPolicy,
         global_uniform_globals: &HashMap<String, Handle<naga::GlobalVariable>>,
     ) -> Self {
-        let lowered_name = helper
-            .id
-            .rsplit_once('_')
-            .and_then(|(base, suffix)| {
-                matches!(
-                    suffix,
-                    "f" | "v2"
-                        | "v3"
-                        | "v4"
-                        | "m2"
-                        | "m3"
-                        | "m4"
-                        | "s"
-                        | "i"
-                        | "u"
-                        | "coord"
-                        | "color"
-                        | "shape"
-                        | "layer"
-                        | "struct"
-                        | "enum"
-                        | "fn"
-                        | "t"
-                )
-                .then_some(format!("{base}_"))
-            })
-            .unwrap_or_else(|| helper.id.clone());
-        let mut function = FunctionBuilder::new(lowered_name, policy);
+        let mut function = FunctionBuilder::new(helper.id.clone(), policy);
 
         let mut param_scalars = HashMap::new();
         if helper.params.is_empty() {

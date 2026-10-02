@@ -2382,7 +2382,7 @@ canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = cont
 
         let wgsl = compile_wgsl(src);
         assert_eq!(
-            wgsl.matches("_pulse01_1_(").count(),
+            wgsl.matches("_pulse01_1_f(").count(),
             2,
             "expected pure helper stop color math to be lowered once and reused across shape-anchor gradients\nwgsl:\n{wgsl}"
         );

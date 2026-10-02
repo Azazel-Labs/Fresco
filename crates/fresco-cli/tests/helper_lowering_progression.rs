@@ -273,15 +273,15 @@ canvas t(ctx: CanvasContext) -> color { let uv = context(coord); let time = cont
 
     let wgsl = normalize(&output.stdout);
     assert!(
-        wgsl.contains("fn _inner_1_"),
+        wgsl.contains("fn _inner_1_f("),
         "expected emitted WGSL helper function for inner\nwgsl:\n{wgsl}"
     );
     assert!(
-        wgsl.contains("fn _outer_1_"),
+        wgsl.contains("fn _outer_1_f("),
         "expected emitted WGSL helper function for outer\nwgsl:\n{wgsl}"
     );
     assert!(
-        wgsl.contains("_inner_1_(") && wgsl.contains("_outer_1_("),
+        wgsl.contains("_inner_1_f(") && wgsl.contains("_outer_1_f("),
         "expected emitted WGSL call sites for nested helper usage\nwgsl:\n{wgsl}"
     );
 }
