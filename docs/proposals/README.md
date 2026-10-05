@@ -16,6 +16,8 @@ moved here merely because some of its tasks remain unfinished.
 | --- | --- | --- |
 | [Technique allocation, lifetime, and composition](technique-contract-generalization.md) | Exploring | Decide shared allocation descriptors, persistent version ownership, and cross-path composition |
 | [Coordinate domains and coverage filtering](coordinate-domain-coverage-design.md) | Exploring | Define domain/footprint semantics and reference coverage before settling syntax |
+| [One syntax for engine integration](engine-integration-syntax.md) | Exploring | Review recommended answers (Q1–Q15); maintainer calls on staged-dialect removal, viewport-sized buffers, and a separate runtime proposal |
+| [Embeddable manifest runtime](embeddable-runtime.md) | Exploring | Classify example-engine runtime code as engine-neutral vs engine-specific; prototype material setup behind an equivalence canary |
 
 ## Status conventions
 
