@@ -1280,8 +1280,8 @@ release before that distribution path can support them.
 
 ### Compile a program
 
-Use Rust through rustup; [rust-toolchain.toml](rust-toolchain.toml) pins the
-workspace toolchain. Run these commands from the repository root:
+Use Rust through rustup; [rust-toolchain.toml](rust-toolchain.toml) selects the
+stable toolchain (MSRV 1.98.1). Run these commands from the repository root:
 
 ```sh
 cargo build --release -p fresco-cli
