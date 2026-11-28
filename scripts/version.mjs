@@ -5,7 +5,6 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const web = "crates/fresco-wasm/web/";
 const read = (name) => readFileSync(resolve(root, name), "utf8");
 const write = (name, text) => writeFileSync(resolve(root, name), text.replaceAll("\r\n", "\n"));
 
@@ -54,8 +53,6 @@ export function run(command = "check") {
   if (!match) throw new Error("Missing workspace.package.version in Cargo.toml");
   const current = match[2];
   const version = ["check", "sync"].includes(command) ? current : nextVersion(current, command);
-  const pkg = JSON.parse(read(`${web}package.json`));
-  const lock = JSON.parse(read(`${web}package-lock.json`));
 
   if (command !== "check") {
     manifest = manifest.replace(pattern, (_match, prefix, _old, suffix) => `${prefix}${version}${suffix}`);
@@ -63,11 +60,6 @@ export function run(command = "check") {
     manifest = manifest.replace(/^(fresco(?:-macros)? = \{ version = ")[^"]+(".*)$/gm,
       (_match, prefix, suffix) => `${prefix}=${version}${suffix}`);
     write("Cargo.toml", manifest);
-    pkg.version = version;
-    lock.version = version;
-    lock.packages[""].version = version;
-    write(`${web}package.json`, `${JSON.stringify(pkg, null, 2)}\n`);
-    write(`${web}package-lock.json`, `${JSON.stringify(lock, null, 2)}\n`);
   }
 
   const metadata = cargoMetadata(command === "check");
@@ -83,10 +75,7 @@ export function run(command = "check") {
       }
     }
   }
-  if ([pkg.version, lock.version, lock.packages[""].version].some((v) => v !== version)) {
-    throw new Error("Web package version drift; run node scripts/version.mjs sync");
-  }
-  console.log(command === "check" ? `Fresco ${version}: versions and lockfiles agree` : `Fresco ${current} -> ${version}; rebuild CLI and WASM before release`);
+  console.log(command === "check" ? `Fresco ${version}: versions and lockfiles agree` : `Fresco ${current} -> ${version}; commit and push to main to release v${version}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

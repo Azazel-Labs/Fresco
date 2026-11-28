@@ -1,7 +1,6 @@
 {
   "name": "fresco-wasm-playground",
   "private": true,
-  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "sync:examples": "node ./scripts/sync-examples.mjs",

@@ -250,3 +250,76 @@ jobs:
 
       - name: Run cargo-udeps
         run: cargo +nightly udeps --workspace --all-targets
+
+  # Cargo.toml's [workspace.package] version is the one source of truth for releases: when everything above passes on
+  # a push to main whose version no vX.Y.Z tag has yet, that commit is tagged with it and a GitHub release is made.
+  # Raise it with node scripts/version.mjs patch|minor|major and push. An already-tagged version releases nothing; one behind the newest tag fails.
+  release:
+    needs: [ci, web-playground, dependency-policy, unused-dependencies]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # One at a time, never cancelled mid-release. A newer push's run waits, then sees the newer main.
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    env:
+      # The version Fresco started at, which was never released: the first release is the first version after it.
+      UNRELEASED: 0.2.0
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Plan
+        id: plan
+        run: |
+          # Only act on main's tip: if main has moved on, the newer push's run gets here too.
+          if [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+            echo "main has moved past $GITHUB_SHA; skipping"
+            exit 0
+          fi
+          version="$(sed -n '/^\[workspace\.package\]/,/^\[/ s/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -1)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Cargo.toml's [workspace.package] version, '$version', isn't X.Y.Z"; exit 1
+          fi
+          if [ "$version" = "$UNRELEASED" ]; then
+            echo "$version is the version Fresco started at; raise it to release"
+            exit 0
+          fi
+          # A version behind the newest release is a mistake (pre-releases of the newest X.Y.Z are fine).
+          newest="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -1)"
+          newest="${newest#v}"; newest="${newest%%-*}"
+          if [ -n "$newest" ] && [ "$newest" != "${version%%-*}" ] &&
+             [ "$(printf '%s\n%s\n' "$newest" "${version%%-*}" | sort -V | tail -1)" = "$newest" ]; then
+            echo "::error::Cargo.toml says $version, behind the newest release, v$newest. Raise it with node scripts/version.mjs patch|minor|major."
+            exit 1
+          fi
+          if [[ "$version" == *-* ]] && git rev-parse -q --verify "refs/tags/v${version%%-*}" >/dev/null; then
+            echo "::error::Cargo.toml says $version, a pre-release of v${version%%-*}, which is already out."
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already released; nothing to do"
+            exit 0
+          fi
+          echo "Releasing v$version"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Tag and create the GitHub release
+        if: steps.plan.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          # Whoever pushed the commit, by their GitHub noreply address, so the version shows as theirs on GitHub
+          # without their email in the tag.
+          RELEASER: ${{ github.actor }}
+          RELEASER_ID: ${{ github.actor_id }}
+        run: |
+          git config user.name "$RELEASER"
+          git config user.email "$RELEASER_ID+$RELEASER@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Fresco $VERSION"
+          git push origin "refs/tags/v$VERSION"
+          prerelease=""; [[ "$VERSION" == *-* ]] && prerelease="--prerelease"
+          gh release create "v$VERSION" --verify-tag --title "Fresco $VERSION" --generate-notes $prerelease
